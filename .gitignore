@@ -1,0 +1,50 @@
+# ============================================================
+# Secrets and local configuration — NEVER commit
+# ============================================================
+.env
+.env.local
+.env.*.local
+
+# Bearer token cache written at runtime by core/ticket_manager.py
+core/orange_token.json
+
+# Notification state written at runtime by core/email_config.py
+core/email_notifications.json
+
+# Internal network topology / database inventory
+db_config.json
+
+# ============================================================
+# Logs
+# ============================================================
+*.log
+logs/
+
+# ============================================================
+# Python
+# ============================================================
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ============================================================
+# Editors / OS
+# ============================================================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# ============================================================
+# Local review artefacts
+# ============================================================
+REVUE_CODE.md

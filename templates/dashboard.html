@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniDiagnet</title>
+    <link rel="stylesheet" type="text/css" href="/static/styles.css">
+</head>
+
+<body>
+    <!-- Popup alertes -->
+    <div id="alert-popup" class="alert-popup">
+        <div class="alert-popup-content">
+            <div class="alert-popup-header">
+                <h3>🚨 Nouvelle Alerte</h3>
+            </div>
+            <div class="alert-popup-body">
+                <div id="alert-popup-message"></div>
+            </div>
+            <div class="alert-popup-footer">
+                <button class="btn-primary" onclick="acknowledgeAlert()">Ok</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <header class="header">
+            <div class="header-content">
+                <div class="timestamp">
+                    <div class="current-time">
+                        <span class="last-update">Last Update: </span>
+                        <span class="last-update-value"></span>
+                        <span class="next-label" style="display:none;"> | Next in</span>
+                        <span class="countdown"></span>
+                    </div>
+                </div>
+                <div class="controls">
+                    <button id="autoUpdateBtn" class="btn-secondary" onclick="toggleAutoUpdate()">
+                        Auto Update
+                    </button>
+                    <button id="themeToggleBtn" class="btn-secondary" onclick="toggleTheme()">
+                        🌙
+                    </button>
+
+                    <!-- Filter Button -->
+                    <button id="filterBtn" class="btn-secondary" title="Filtres des alertes">🔍 Filtres</button>
+                    <button id="openConfigBtn" class="btn-secondary" type="button"
+                        title="Ouvrir le Panneau de Configuration">⚙️</button>
+                    <a href="/data-management" class="btn-secondary" title="Data Management"
+                        style="text-decoration: none; background: #667eea !important; color: white !important; border: 2px solid #667eea !important;">📁
+                        DM</a>
+                    <a href="/tickets" class="btn-danger" title="Afficher les tickets des incidents"
+                        style="text-decoration: none; background: #dc3545 !important; color: white !important; border: 2px solid #dc3545 !important;">🎫
+                        Tickets</a>
+                </div>
+            </div>
+
+            <!-- Panneau de configuration -->
+            <div class="drawer" id="config-drawer" style="display:none;">
+                <div class="drawer-header">
+                    <h2>🛠️ Paramètres d'alerte</h2>
+                    <button class="close-btn" id="close-drawer" type="button">x</button>
+                </div>
+                <div class="drawer-content">
+                    <form class="config-form" id="config-form" onsubmit="return false;">
+
+                        <fieldset>
+                            <legend><strong>Paramètres de Trafic</strong></legend>
+                            <div class="row-block">
+                                <div class="row-title">Baisse Instantanée critique</div>
+                                <div class="form-row">
+                                    <div class="form-group" style="grid-column: 1 / span 2;">
+                                        <label for="alert_traffic_threshold_percent">Seuil (%)</label>
+                                        <input type="number" step="0.1" min="0" id="alert_traffic_threshold_percent"
+                                            name="alert_traffic_threshold_percent">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row-block">
+                                <div class="row-title">Baisses consécutives</div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="traffic_consecutive_drops_count">Nb de baisses</label>
+                                        <input type="number" step="1" min="1" id="traffic_consecutive_drops_count"
+                                            name="traffic_consecutive_drops_count">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="traffic_consecutive_drops_min_percent">Seuil (%)</label>
+                                        <input type="number" step="0.1" min="0"
+                                            id="traffic_consecutive_drops_min_percent"
+                                            name="traffic_consecutive_drops_min_percent">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row-block">
+                                <div class="row-title">Hausse importante</div>
+                                <div class="form-row">
+                                    <div class="form-group" style="grid-column: 1 / span 2;">
+                                        <label for="traffic_up_threshold_percent">Seuil (%)</label>
+                                        <input type="number" step="0.1" min="0" id="traffic_up_threshold_percent"
+                                            name="traffic_up_threshold_percent">
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+                        <fieldset>
+                            <legend><strong>Paramètres de Pertes</strong></legend>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="alert_pertes_threshold">Seuil pertes</label>
+                                    <input type="number" step="0.01" min="0" id="alert_pertes_threshold"
+                                        name="alert_pertes_threshold">
+                                </div>
+                                <div class="form-group">
+                                    <label for="pertes_consecutive_count">Nb de perte</label>
+                                    <input type="number" step="1" min="1" id="pertes_consecutive_count"
+                                        name="pertes_consecutive_count">
+                                </div>
+                            </div>
+                        </fieldset>
+                        <fieldset>
+                            <legend><strong>Paramètres TCP Métriques</strong></legend>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="alert_tcp_no_response_threshold">Seuil TCP No Response (%)</label>
+                                    <input type="number" step="0.1" min="0" id="alert_tcp_no_response_threshold"
+                                        name="alert_tcp_no_response_threshold">
+                                </div>
+                                <div class="form-group">
+                                    <label for="alert_tcp_block_wp_up_threshold">Seuil TCP Block WP Up (%)</label>
+                                    <input type="number" step="0.1" min="0" id="alert_tcp_block_wp_up_threshold"
+                                        name="alert_tcp_block_wp_up_threshold">
+                                </div>
+                                <div class="form-group">
+                                    <label for="alert_latence_threshold_ms">Seuil Latence (ms)</label>
+                                    <input type="number" step="0.1" min="0" id="alert_latence_threshold_ms"
+                                        name="alert_latence_threshold_ms">
+                                </div>
+                            </div>
+                        </fieldset>
+                        <fieldset>
+                            <legend><strong>Paramètres Globaux</strong></legend>
+                            <div class="row-block">
+                                <div class="row-title">Persistance des alertes</div>
+                                <div class="form-row">
+                                    <div class="form-group" style="grid-column: 1 / span 2;">
+                                        <label for="alert_persistence_duration_minutes">Durée (minutes)</label>
+                                        <input type="number" step="1" min="0" id="alert_persistence_duration_minutes"
+                                            name="alert_persistence_duration_minutes">
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+                        <fieldset>
+                            <legend><strong>Paramètres de Récupération</strong></legend>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="traffic_recovery_ratio">Seuil récupération Traffic</label>
+                                    <input type="number" step="0.01" min="0" max="1" id="traffic_recovery_ratio"
+                                        name="traffic_recovery_ratio">
+                                </div>
+                                <div class="form-group">
+                                    <label for="mode7days_recovery_ratio">Seuil Mode 7 jours</label>
+                                    <input type="number" step="0.01" min="0" max="1" id="mode7days_recovery_ratio"
+                                        name="mode7days_recovery_ratio">
+                                </div>
+                                <div class="form-group">
+                                    <label for="db_recovery_threshold_minutes">DB Down Minimum Temps (minutes)</label>
+                                    <input type="number" step="1" min="0" id="db_recovery_threshold_minutes"
+                                        name="db_recovery_threshold_minutes">
+                                </div>
+                            </div>
+                        </fieldset>
+                        <fieldset>
+                            <legend><strong>Afficher alertes</strong></legend>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="alerts_enable_international"><input type="checkbox"
+                                            id="alerts_enable_international" name="alerts_enable_international"
+                                            style="margin-right:8px;">Sortie Internationale</label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="alerts_enable_gi"><input type="checkbox" id="alerts_enable_gi"
+                                            name="alerts_enable_gi" style="margin-right:8px;">Traffic
+                                        Utilisateur</label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="alerts_enable_international_gi"><input type="checkbox"
+                                            id="alerts_enable_international_gi" name="alerts_enable_international_gi"
+                                            style="margin-right:8px;">International + GI (TCP Metrics)</label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="alerts_enable_roaming"><input type="checkbox" id="alerts_enable_roaming"
+                                            name="alerts_enable_roaming" style="margin-right:8px;">Roaming
+                                        Utilisateur</label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="alerts_enable_tdd"><input type="checkbox" id="alerts_enable_tdd"
+                                            name="alerts_enable_tdd" style="margin-right:8px;">TDD</label>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <!-- Test Sound Alert Buttons -->
+                        <fieldset>
+                            <legend><strong>🔊 Test des Alertes Sonores</strong></legend>
+                            <div class="form-row" style="gap: 10px;">
+                                <button type="button" class="save-btn" onclick="playAlertSound()" 
+                                    style="background: #28a745; flex: 1;">▶️ Démarrer l'alarme</button>
+                                <button type="button" class="save-btn" onclick="stopAlertSound()" 
+                                    style="background: #dc3545; flex: 1;">⏹️ Arrêter l'alarme</button>
+                            </div>
+                        </fieldset>
+
+                        <button type="submit" class="save-btn">💾 Enregistrer</button>
+                        <button type="button" class="btn-secondary"
+                            onclick="AlertManager.clearDismissedAlerts()">Afficher les alertes masquées</button>
+                    </form>
+                </div>
+            </div>
+        </header>
+
+        <!-- Sections principales -->
+        <div class="sections-grid" id="sections-grid">
+            {% for section_id, section_title in [('international', 'Sortie Internationale (CAMTEL)'), ('gi', 'Traffic
+            Utilisateur (Gi)'),
+            ('international_gi', 'International + GI (TCP Metrics)'),
+            ('roaming', 'Roaming Utilisateur'), ('tdd', 'TDD')] %}
+
+            <section class="data-section collapsible" id="section-{{ section_id }}" data-section-id="{{ section_id }}">
+                {% if section_id == 'gi' %}
+                <!-- Bannière d'avertissement pour GI -->
+                <div class="gi-warning-banner">
+                    <div class="banner-text">
+                        [Attention] Les données des Sorties GI Diagnet ne sont pas fiables en Busy Hour à cause de la
+                        saturation des Sondes !!!
+                    </div>
+                </div>
+                {% endif %}
+                <h2 class="section-title" onclick="toggleSection(this)">
+                    <span class="toggle-icon">▼</span>
+                    {{ section_title }}
+                </h2>
+                <div class="section-content">
+                    {% if section_id == 'roaming' %}
+                    <div class="tab-container">
+                        <div class="tab-nav">
+                            {% for interval, label in [('now', 'Now'), ('5min', '5min'), ('1day', '1D'), ('1week',
+                            '1W')] %}
+                            <button class="tab-btn {{ 'active' if interval == 'now' else '' }}"
+                                onclick="showTab('roaming', '{{ interval }}', event)">{{ label }}</button>
+                            {% endfor %}
+                        </div>
+                        {% for interval in ['now', '5min', '1day', '1week'] %}
+                        <div id="sections-roaming-{{ interval }}"
+                            class="tab-content {{ 'active' if interval == 'now' else '' }}">
+                            <div class="table-wrapper" id="table-wrapper-roaming-{{ interval }}"></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="table-wrapper" id="table-wrapper-{{ section_id }}"></div>
+                    {% endif %}
+
+                    <!-- Alertes pour chaque section -->
+                    <div class="data-section collapsible collapsed" id="section-alertes-{{ section_id }}">
+                        <h2 class="section-title alertes-title" onclick="toggleSection(this)">
+                            <span class="toggle-icon">▶</span>
+                            Alertes {{ section_title }}
+                            <span id="alertes-count-{{ section_id }}"></span>
+                        </h2>
+                        <div class="section-content">
+                            <div class="alertes-list" id="alertes-list-{{ section_id }}"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Filter Sidebar -->
+    <div id="filterSidebar" class="filter-sidebar">
+        <div class="filter-sidebar-header">
+            <h3>Filtres des Alertes</h3>
+            <button class="close-sidebar-btn" title="Fermer">✕</button>
+        </div>
+        <div class="filter-sidebar-content">
+            <div class="filter-group">
+                <h4>Statut</h4>
+                <div class="filter-options">
+                    {% for value, label, checked in [('all', 'Toutes les alertes', ''), ('open', 'Ouvertes uniquement',
+                    'checked'), ('closed', 'Fermées uniquement', '')] %}
+                    <label class="filter-option">
+                        <input type="radio" name="statusFilter" value="{{ value }}" {{ checked }}>
+                        <span>{{ label }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <h4>Type d'alerte</h4>
+                <div class="filter-options">
+                    {% for value, label, checked in [('all', 'Tous les types', 'checked'), ('traffic', 'Traffic', ''),
+                    ('pertes', 'Pertes', ''), ('db_down', 'DB_DOWN', '')] %}
+                    <label class="filter-option">
+                        <input type="checkbox" name="typeFilter" value="{{ value }}" {{ checked }}>
+                        <span>{{ label }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <h4>Période</h4>
+                <div class="filter-options">
+                    {% for value, label, checked in [('all', 'Toute période', ''), ('today', "Aujourd'hui", ''),
+                    ('week', 'Cette semaine', ''), ('month', 'Ce mois', 'checked')] %}
+                    <label class="filter-option">
+                        <input type="radio" name="periodFilter" value="{{ value }}" {{ checked }}>
+                        <span>{{ label }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="filter-actions">
+                <button class="btn-primary" id="applyFiltersBtn">Appliquer les filtres</button>
+                <button class="btn-secondary" id="resetFiltersBtn">Réinitialiser</button>
+                <button type="button" class="btn-secondary" onclick="AlertManager.clearDismissedAlerts()">Afficher les
+                    alertes masquées</button>
+                <div id="filterStatus" class="filter-status" style="display: none;">
+                    <small>⚠️ Filtres modifiés - cliquez "Appliquer" pour voir les changements</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="filter-sidebar-overlay"></div>
+
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+
+
+    <script src="/static/script.js"></script>
+</body>
+
+</html>

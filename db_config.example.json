@@ -1,0 +1,160 @@
+{
+    "international": [
+        {
+            "key": "douala_camtel",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_CAMTEL",
+            "display_name": "Douala CAMTEL",
+            "site": "Douala",
+            "c_param": "CAMTEL"
+        },
+        {
+            "key": "yaounde_camtel",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_CAMTEL",
+            "display_name": "Yaounde CAMTEL",
+            "site": "Yaounde",
+            "c_param": "CAMTEL"
+        },
+        {
+            "key": "garoua_camtel",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_CAMTEL",
+            "display_name": "Garoua CAMTEL",
+            "site": "Garoua",
+            "c_param": "CAMTEL"
+        },
+        {
+            "key": "kribi",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_KRIBI",
+            "display_name": "KRIBI",
+            "site": "Douala",
+            "c_param": "KRIBI"
+        },
+        {
+            "key": "oci_sat3",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_OCI_SAT3",
+            "display_name": "OCI-SAT3",
+            "site": "Douala",
+            "c_param": "OCI_SAT3"
+        },
+        {
+            "key": "wacs_ic",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_IC_WACS",
+            "display_name": "WACS-IC",
+            "site": "Yaounde",
+            "c_param": "IC_WACS"
+        },
+        {
+            "key": "wacs_bayobab",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_WACS-BAYOBAB",
+            "display_name": "WACS-BAYOBAB",
+            "site": "Douala",
+            "c_param": "WACS-BAYOBAB"
+        }
+    ],
+    "gi": [
+        {
+            "key": "douala_gi",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_SGi",
+            "display_name": "Douala Gi",
+            "site": "Douala",
+            "c_param": "SGi"
+        },
+        {
+            "key": "yaounde_gi",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_SGi",
+            "display_name": "Yaounde Gi",
+            "site": "Yaounde",
+            "c_param": "SGi"
+        },
+        {
+            "key": "garoua_gi",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_SGi",
+            "display_name": "Garoua Gi",
+            "site": "Garoua",
+            "c_param": "SGi"
+        }
+    ],
+    "roaming": [
+        {
+            "key": "douala_gi_roaming_in_up_gp",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_Roaming_IN_UP_Gp",
+            "display_name": "Douala GI Roaming IN UP Gp",
+            "site": "Douala",
+            "c_param": "Roaming_IN_UP_Gp"
+        },
+        {
+            "key": "douala_gi_roaming_in_up_s8",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_Roaming_IN_UP_S8",
+            "display_name": "Douala GI Roaming IN UP S8",
+            "site": "Douala",
+            "c_param": "Roaming_IN_UP_S8"
+        },
+        {
+            "key": "douala_gi_roaming_out_up",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_Roaming_OUT_UP",
+            "display_name": "Douala GI Roaming OUT UP",
+            "site": "Douala",
+            "c_param": "Roaming_OUT_UP"
+        },
+        {
+            "key": "yaounde_gi_roaming_in_up_gp",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_Roaming_IN_UP_Gp",
+            "display_name": "Yaounde GI Roaming IN UP Gp",
+            "site": "Yaounde",
+            "c_param": "Roaming_IN_UP_Gp"
+        },
+        {
+            "key": "yaounde_gi_roaming_in_up_s8",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_Roaming_IN_UP_S8",
+            "display_name": "Yaounde GI Roaming IN UP S8",
+            "site": "Yaounde",
+            "c_param": "Roaming_IN_UP_S8"
+        },
+        {
+            "key": "yaounde_gi_roaming_out_up",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_Roaming_OUT_UP",
+            "display_name": "Yaounde GI Roaming OUT UP",
+            "site": "Yaounde",
+            "c_param": "Roaming_OUT_UP"
+        },
+        {
+            "key": "garoua_gi_roaming_in_up_gp",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_Roaming_IN_UP_Gp",
+            "display_name": "Garoua GI Roaming IN UP Gp",
+            "site": "Garoua",
+            "c_param": "Roaming_IN_UP_Gp"
+        },
+        {
+            "key": "garoua_gi_roaming_in_up_s8",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_Roaming_IN_UP_S8",
+            "display_name": "Garoua GI Roaming IN UP S8",
+            "site": "Garoua",
+            "c_param": "Roaming_IN_UP_S8"
+        },
+        {
+            "key": "garoua_gi_roaming_out_up",
+            "host": "db.example.internal",
+            "db_name": "DIAGNET_Roaming_OUT_UP",
+            "display_name": "Garoua GI Roaming OUT UP",
+            "site": "Garoua",
+            "c_param": "Roaming_OUT_UP"
+        }
+    ]
+}

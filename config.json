@@ -1,0 +1,26 @@
+{
+    "criteria": {
+        "alert_traffic_threshold_percent": 40.0,
+        "traffic_consecutive_drops_count": 5,
+        "traffic_consecutive_drops_min_percent": 17.0,
+        "traffic_up_threshold_percent": 4.0,
+        "alert_pertes_threshold": 3.0,
+        "pertes_consecutive_count": 2,
+        "alert_persistence_duration_minutes": 25,
+        "day_over_day_drop_percent": 0.0,
+        "traffic_recovery_ratio": 0.9,
+        "mode7days_recovery_ratio": 0.85,
+        "db_recovery_threshold_minutes": 70,
+        "alert_tcp_no_response_threshold": 10.0,
+        "alert_tcp_block_wp_up_threshold": 10.0,
+        "alert_latence_threshold_ms": 250.0
+    },
+    "alerts": {
+        "alerts_enable_international": true,
+        "alerts_enable_gi": true,
+        "alerts_enable_international_gi": true,
+        "alerts_enable_roaming": false,
+        "alerts_enable_tdd": false
+    },
+    "database_connections": {}
+}

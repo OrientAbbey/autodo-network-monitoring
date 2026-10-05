@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Management - Suivi d'Utilisation</title>
+    <script src="/static/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* ==================== COMMON STYLES ==================== */
+        .dm-hidden {
+            display: none !important;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ==================== LOGIN STYLES ==================== */
+        .login-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .login-header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .login-header p {
+            color: #999;
+            font-size: 14px;
+        }
+
+        .login-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #555;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .login-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .login-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message {
+            font-size: 13px;
+            margin-top: 5px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+            border-left: 4px solid;
+        }
+
+        .error-message {
+            color: #dc3545;
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+
+        .success-message {
+            color: #155724;
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .back-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        /* ==================== DATA MANAGEMENT STYLES ==================== */
+        .header {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin: 0;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .controls select,
+        .controls button {
+            padding: 8px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .controls button {
+            background: #667eea;
+            color: white;
+            border: none;
+        }
+
+        .controls button:hover {
+            background: #764ba2;
+        }
+
+        .logout-btn {
+            background: #dc3545 !important;
+        }
+
+        .logout-btn:hover {
+            background: #c82333 !important;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #667eea;
+        }
+
+        .stat-card h3 {
+            color: #555;
+            font-size: 13px;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .stat-subtext {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .stat-card.tickets {
+            border-left-color: #f44336;
+        }
+
+        .stat-card.access-avg {
+            border-left-color: #2196F3;
+        }
+
+        .stat-card.access-today {
+            border-left-color: #4CAF50;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .chart-card,
+        .table-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .table-card {
+            margin-bottom: 20px;
+        }
+
+        .chart-card h3,
+        .table-card h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th {
+            background: #f5f5f5;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #555;
+            border-bottom: 2px solid #ddd;
+        }
+
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tr:hover {
+            background: #f9f9f9;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .scroll-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .scroll-container table {
+            position: relative;
+        }
+
+        .scroll-container thead {
+            position: sticky;
+            top: 0;
+            background: #f5f5f5;
+            z-index: 10;
+        }
+
+        .loading-text {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .login-container {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- ==================== LOGIN SCREEN ==================== -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-header">
+            <div class="login-icon">🔐</div>
+            <h1>Data Management</h1>
+            <p>Accès sécurisé</p>
+        </div>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="password">Mot de passe</label>
+                <input type="password" id="password" name="password" placeholder="Entrez le mot de passe"
+                    autocomplete="off" required>
+            </div>
+            <div class="error-message message" id="errorMessage"></div>
+            <div class="success-message message" id="successMessage"></div>
+            <button type="submit" class="login-button" id="loginBtn">Se connecter</button>
+        </form>
+        <div class="back-link">
+            <a onclick="returnToDashboardWithLogout()">← Retour au dashboard</a>
+        </div>
+    </div>
+
+    <!-- ==================== DATA MANAGEMENT SCREEN ==================== -->
+    <div id="dmScreen" class="dm-hidden">
+        <div class="container">
+            <div class="header">
+                <h1>📊 Data Management</h1>
+                <div class="controls">
+                    <select id="period" onchange="loadData()">
+                        <!-- <option value="today">Aujourd'hui</option> -->
+                        <option value="7days" selected>7 jours</option>
+                        <option value="1month">1 mois</option>
+                        <option value="3months">3 mois</option>
+                    </select>
+                    <button onclick="loadData()">🔄 Actualiser</button>
+                    <button class="logout-btn" onclick="returnToDashboardWithLogout()">← Retour au dashboard</button>
+                </div>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card tickets">
+                    <h3>📋 Tickets Totaux</h3>
+                    <div class="stat-value" id="total-tickets">-</div>
+                    <div class="stat-subtext" id="tickets-breakdown">-</div>
+                    <div class="stat-subtext" style="margin-top: 2px; padding-top: 2px; border-top: 1px solid #f0f0f0;"
+                        id="tickets-today">-
+                    </div>
+                </div>
+                <div class="stat-card access-avg">
+                    <h3>👥 Accès par jour</h3>
+                    <div class="stat-value" id="avg-access">-</div>
+                    <div class="stat-subtext" id="avg-access-subtext">-</div>
+                </div>
+                <div class="stat-card access-today">
+                    <h3>📱 Accès Aujourd'hui</h3>
+                    <div class="stat-value" id="today-access">-</div>
+                    <div class="stat-subtext">Users</div>
+                </div>
+            </div>
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>📈 Accès Uniques par Jour</h3>
+                    <canvas id="accessChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>🚨 Alertes par Jour</h3>
+                    <canvas id="alertsChart"></canvas>
+                </div>
+            </div>
+            <div class="table-card">
+                <h3>👥 Accès Utilisateurs</h3>
+                <div class="scroll-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Adresse IP</th>
+                                <th>Nombre d'accès</th>
+                                <th>Dernier accès</th>
+                            </tr>
+                        </thead>
+                        <tbody id="access-logs-table">
+                            <tr class="loading-text">
+                                <td colspan="4">Chargement...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="table-card">
+                <h3>⚙️ Modifications de Configuration</h3>
+                <div class="scroll-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date/Heure</th>
+                                <th>Paramètre</th>
+                                <th>Modifié par</th>
+                            </tr>
+                        </thead>
+                        <tbody id="config-table">
+                            <tr class="loading-text">
+                                <td colspan="3">Chargement...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let accessChart = null, alertsChart = null, isAuthenticated = false, isLoading = false, currentRequest = null;
+
+        // ==================== CHECK EXISTING AUTH ON PAGE LOAD ====================
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('/api/data-management?action=data', {
+                    method: 'GET',
+                    credentials: 'same-origin'
+                });
+                if (response.ok) {
+                    // Valid cookie, show data management screen directly
+                    showDMScreen();
+                    loadData();
+                }
+            } catch (e) {
+                // No valid cookie or error, show login screen
+            }
+        });
+
+        // ==================== LOGIN LOGIC ====================
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const passwordInput = document.getElementById('password');
+            const loginBtn = document.getElementById('loginBtn');
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+            loginBtn.disabled = true;
+            const originalText = loginBtn.textContent;
+            loginBtn.innerHTML = '<span class="loading"></span>Connexion...';
+            try {
+                const response = await fetch('/api/data-management',
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'login', password: passwordInput.value })
+                    });
+                const data = await response.json();
+                if (response.ok && data.success) {
+                    isAuthenticated = true;
+                    successMessage.textContent = data.message;
+                    successMessage.style.display = 'block';
+                    setTimeout(() => {
+                        showDMScreen();
+                        loadData();
+                    }, 500);
+                }
+                else {
+                    throw new Error(data.detail || 'Mot de passe incorrect');
+                }
+            }
+            catch (error) {
+                errorMessage.textContent = '❌ ' + (error.message || 'Erreur lors de la connexion');
+                errorMessage.style.display = 'block';
+                loginBtn.disabled = false;
+                loginBtn.textContent = originalText;
+                passwordInput.value = '';
+                passwordInput.focus();
+            }
+        });
+
+        function showDMScreen() {
+            document.getElementById('loginScreen').classList.add('dm-hidden');
+            document.getElementById('dmScreen').classList.remove('dm-hidden');
+        }
+
+        function returnToDashboardWithLogout() {
+            isAuthenticated = false;
+            window.location.href = '/';
+        }
+
+        // ==================== DATA MANAGEMENT LOGIC ====================
+        function parseDate(d) {
+            return d ? new Date(d) : new Date();
+        }
+
+        async function loadData() {
+            if (isLoading) return; // empêche double appel
+            isLoading = true;
+
+            // Annule la requête précédente si elle existe
+            if (currentRequest) {
+                currentRequest.abort();
+            }
+
+            const controller = new AbortController();
+            currentRequest = controller;
+
+            const period = document.getElementById('period').value;
+
+            try {
+                const res = await fetch(`/api/data-management?action=data&period=${period}`, {
+                    signal: controller.signal
+                });
+
+                const data = await res.json();
+
+                if (!data || data.error) {
+                    console.error("❌ No data or error in response:", data);
+                    return;
+                }
+
+                updateStats(data);
+                updateCharts(data);
+                updateTables(data);
+            }
+            catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error("Erreur chargement:", err);
+                }
+            }
+            finally {
+                isLoading = false;
+            }
+        }
+
+        function updateStats(data) {
+            const stats = data.access_stats || {}, alerts = data.alerts_stats || {};
+            let traffic = 0, pertes = 0, db_down = 0, today_traffic = 0, today_pertes = 0, today_db_down = 0;
+            const today = new Date().toISOString().split('T')[0];
+            Object.entries(alerts).forEach(([date, day]) => {
+                traffic += day.traffic || 0;
+                pertes += day.pertes || 0;
+                db_down += day.db_down || 0;
+                if (date === today) {
+                    today_traffic += day.traffic || 0;
+                    today_pertes += day.pertes || 0;
+                    today_db_down += day.db_down || 0;
+                }
+            });
+            const total = traffic + pertes + db_down;
+            const today_total = today_traffic + today_pertes + today_db_down;
+            document.getElementById('total-tickets').textContent = total;
+            document.getElementById('tickets-breakdown').textContent = `Traffic: ${traffic}, Perte: ${pertes}${db_down > 0 ? `, BD Down: ${db_down}` : ''}`;
+            document.getElementById('tickets-today').textContent = `Aujourd'hui: ${today_total} (Traffic: ${today_traffic}, Perte: ${today_pertes}${today_db_down > 0 ? `, BD Down: ${today_db_down}` : ''})`;
+            document.getElementById('avg-access').textContent = stats.avg_daily_unique || 0;
+            document.getElementById('avg-access-subtext').textContent = `Periode: ${data.period || 0}`;
+            document.getElementById('today-access').textContent = stats.today_unique_count || 0;
+        }
+
+        function updateCharts(data) {
+            const access = data.access_stats?.daily_data || {};
+            const dates = Object.keys(access).sort();
+            const counts = dates.map(d => access[d]);
+            updateAccessChart(dates, counts);
+
+            const alerts = data.alerts_stats || {};
+
+            const alertDates = Object.keys(alerts).sort();
+            const traffic = alertDates.map(d => alerts[d].traffic || 0);
+            const pertes = alertDates.map(d => alerts[d].pertes || 0);
+            const db_down = alertDates.map(d => alerts[d].db_down || 0);
+            updateAlertsChart(alertDates, traffic, pertes, db_down);
+        }
+
+        function updateAccessChart(dates, counts) {
+            const ctx = document.getElementById('accessChart').getContext('2d');
+            if (accessChart) {
+                accessChart.data.labels = dates;
+                accessChart.data.datasets[0].data = counts;
+                accessChart.update();
+            }
+            else {
+                accessChart = new Chart(ctx,
+                    {
+                        type: 'line',
+                        data:
+                        {
+                            labels: dates,
+                            datasets: [
+                                {
+                                    label: 'Accès Uniques',
+                                    data: counts,
+                                    borderColor: '#2196F3',
+                                    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                                    tension: 0.3,
+                                    fill: true,
+                                    pointRadius: 4,
+                                    pointBackgroundColor: '#2196F3'
+                                }]
+                        },
+                        options:
+                        {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: { legend: { display: true } },
+                            scales: { y: { beginAtZero: true } }
+                        }
+                    });
+            }
+        }
+
+        function updateAlertsChart(dates, traffic, pertes, db_down) {
+            const ctx = document.getElementById('alertsChart').getContext('2d');
+            if (alertsChart) {
+                alertsChart.data.labels = dates;
+                alertsChart.data.datasets[0].data = traffic;
+                alertsChart.data.datasets[1].data = pertes;
+                if (alertsChart.data.datasets[2]) alertsChart.data.datasets[2].data = db_down;
+                alertsChart.update();
+            }
+            else {
+                const datasets = [
+                    { label: 'Traffic', data: traffic, backgroundColor: 'rgba(76, 175, 80, 0.7)', borderColor: '#4CAF50', borderWidth: 1 },
+                    { label: 'Perte', data: pertes, backgroundColor: 'rgba(244, 67, 54, 0.7)', borderColor: '#f44336', borderWidth: 1 }
+                ];
+                if (db_down.some(v => v > 0)) datasets.push({ label: 'BD Down', data: db_down, backgroundColor: 'rgba(255, 152, 0, 0.7)', borderColor: '#FF9800', borderWidth: 1 });
+                alertsChart = new Chart(ctx,
+                    {
+                        type: 'bar',
+                        data: { labels: dates, datasets },
+                        options:
+                        {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            scales: { y: { beginAtZero: true } },
+                            plugins: { legend: { display: true } }
+                        }
+                    });
+            }
+        }
+
+        function updateTables(data, period) {
+            let logs = (data.access_logs || []);
+
+            document.getElementById('access-logs-table').innerHTML = logs.length ?
+                logs.map(log => `<tr><td>${log.date || '-'}</td><td>${log.ip_address || '-'}</td><td><span class="badge">${log.access_count || 1}</span></td><td>${parseDate(log.last_access).toLocaleString('fr-FR')}</td></tr>`).join('') :
+                '<tr><td colspan="4" class="loading-text">Aucun accès</td></tr>';
+
+            let configs = (data.config_changes || []);
+
+            document.getElementById('config-table').innerHTML = configs.length ?
+                configs.map(cfg => `<tr><td>${parseDate(cfg.timestamp).toLocaleString('fr-FR')}</td><td>${cfg.parameter || '-'}</td><td>${cfg.modified_by || 'système'}</td></tr>`).join('') :
+                '<tr><td colspan="3" class="loading-text">Aucune modification</td></tr>';
+        }
+
+        // Focus on password input on page load
+        window.addEventListener('load', () => {
+            document.getElementById('password').focus();
+        });
+    </script>
+</body>
+
+</html>
