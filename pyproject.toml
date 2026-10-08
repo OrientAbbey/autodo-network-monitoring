@@ -1,0 +1,29 @@
+[project]
+name = "autodo-network-monitoring"
+version = "3.0.0"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 130
+target-version = "py312"
+extend-exclude = ["static", "templates", "data"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "S110", "S113", "S501", "S608", "UP006", "UP007"]
+ignore = ["E701", "E702", "E731"]
+
+[tool.ruff.lint.per-file-ignores]
+# idiome FastAPI : dépendances (Depends) en valeur par défaut des paramètres
+"routers/*.py" = ["B008"]
+# SQL dynamique limité aux NOMS de colonnes/tables issus de listes blanches (INSERT_COLS, _UPDATABLE, constantes) ;
+# toutes les VALEURS sont des paramètres liés (revue : aucune injection possible).
+"core/tickets.py" = ["S608"]
+"core/collector.py" = ["S608"]
+"core/analytics.py" = ["S608"]
+"tests/*" = ["B017", "B905", "E402", "S110", "S608"]
+"demo/*" = ["S110", "S113", "B905", "S608"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider --ignore=tests/e2e"
+markers = ["e2e: tests de bout en bout Playwright (pile démo requise)"]

@@ -1,0 +1,3 @@
+# Destinataires des notifications — un par ligne : nom,email  (ou variable EMAIL_RECIPIENTS="nom,mail;nom2,mail2")
+# Copier ce fichier vers email_recipients.txt (ignoré par git) et le renseigner.
+Prénom Nom,prenom.nom@example.com

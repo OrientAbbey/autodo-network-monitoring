@@ -1,0 +1,25 @@
+# /etc/systemd/system/autodo.service — installation : voir README
+[Unit]
+Description=AUTODO Network Monitoring
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=autodo
+WorkingDirectory=/opt/autodo
+EnvironmentFile=/opt/autodo/.env
+Environment=DATA_DIR=/var/lib/autodo
+ExecStart=/opt/autodo/.venv/bin/python main.py
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+# durcissement
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/autodo /opt/autodo
+
+[Install]
+WantedBy=multi-user.target

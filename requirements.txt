@@ -1,12 +1,15 @@
-fastapi>=0.128.0
-uvicorn>=0.40.0
-jinja2>=3.1.6
-python-multipart>=0.0.21
-mysql-connector-python>=9.5.0
-polars>=1.36.1
-orjson>=3.11.5
-requests>=2.32.5
-python-dotenv>=1.2.1
-apscheduler>=3.11.2
-pydantic>=2.12.5
-pydantic-settings>=2.12.0
+# Dépendances directes — bornées : >= version minimale supportée, <= version validée par la suite de tests (2026-10-07).
+# Verrou exact des versions validées : requirements.lock.txt. Python 3.12.
+fastapi>=0.128.0,<=0.142.2
+starlette>=0.40.0,<=1.7.0
+uvicorn>=0.40.0,<=0.54.0
+anyio>=4.0.0,<=4.15.1
+jinja2>=3.1.6,<=3.1.6
+SQLAlchemy>=2.1.0,<=2.1.3          # Core uniquement (pas d'ORM)
+PyMySQL>=1.1.0,<=1.2.3             # pilote MySQL/MariaDB (pur Python)
+cryptography>=42.0.0,<=46.0.6      # requis par PyMySQL pour l'authentification caching_sha2 (MySQL 8)
+requests>=2.32.5,<=2.33.1
+orjson>=3.11.5,<=3.12.0
+python-dotenv>=1.2.1,<=1.2.2
+APScheduler>=3.11.2,<=3.11.3       # l'API 4.x est incompatible
+pydantic>=2.12.5,<=2.13.5
