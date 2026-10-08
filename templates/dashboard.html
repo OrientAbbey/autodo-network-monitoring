@@ -19,7 +19,7 @@
                 <div id="alert-popup-message"></div>
             </div>
             <div class="alert-popup-footer">
-                <button class="btn-primary" onclick="acknowledgeAlert()">Ok</button>
+                <button class="btn-primary" data-action="acknowledgeAlert" aria-label="Acquitter l'alerte">Ok</button>
             </div>
         </div>
     </div>
@@ -36,10 +36,10 @@
                     </div>
                 </div>
                 <div class="controls">
-                    <button id="autoUpdateBtn" class="btn-secondary" onclick="toggleAutoUpdate()">
+                    <button id="autoUpdateBtn" class="btn-secondary" data-action="toggleAutoUpdate">
                         Auto Update
                     </button>
-                    <button id="themeToggleBtn" class="btn-secondary" onclick="toggleTheme()">
+                    <button id="themeToggleBtn" class="btn-secondary" data-action="toggleTheme">
                         🌙
                     </button>
 
@@ -63,7 +63,7 @@
                     <button class="close-btn" id="close-drawer" type="button">x</button>
                 </div>
                 <div class="drawer-content">
-                    <form class="config-form" id="config-form" onsubmit="return false;">
+                    <form class="config-form" id="config-form" data-no-submit>
 
                         <fieldset>
                             <legend><strong>Paramètres de Trafic</strong></legend>
@@ -206,16 +206,16 @@
                         <fieldset>
                             <legend><strong>🔊 Test des Alertes Sonores</strong></legend>
                             <div class="form-row" style="gap: 10px;">
-                                <button type="button" class="save-btn" onclick="playAlertSound()" 
+                                <button type="button" class="save-btn" data-action="playAlertSound" 
                                     style="background: #28a745; flex: 1;">▶️ Démarrer l'alarme</button>
-                                <button type="button" class="save-btn" onclick="stopAlertSound()" 
+                                <button type="button" class="save-btn" data-action="stopAlertSound" 
                                     style="background: #dc3545; flex: 1;">⏹️ Arrêter l'alarme</button>
                             </div>
                         </fieldset>
 
                         <button type="submit" class="save-btn">💾 Enregistrer</button>
                         <button type="button" class="btn-secondary"
-                            onclick="AlertManager.clearDismissedAlerts()">Afficher les alertes masquées</button>
+                            data-action="clearDismissedAlerts">Afficher les alertes masquées</button>
                     </form>
                 </div>
             </div>
@@ -238,7 +238,7 @@
                     </div>
                 </div>
                 {% endif %}
-                <h2 class="section-title" onclick="toggleSection(this)">
+                <h2 class="section-title" data-action="toggleSection">
                     <span class="toggle-icon">▼</span>
                     {{ section_title }}
                 </h2>
@@ -249,7 +249,7 @@
                             {% for interval, label in [('now', 'Now'), ('5min', '5min'), ('1day', '1D'), ('1week',
                             '1W')] %}
                             <button class="tab-btn {{ 'active' if interval == 'now' else '' }}"
-                                onclick="showTab('roaming', '{{ interval }}', event)">{{ label }}</button>
+                                data-action="showTab" data-tab="roaming" data-interval="{{ interval }}">{{ label }}</button>
                             {% endfor %}
                         </div>
                         {% for interval in ['now', '5min', '1day', '1week'] %}
@@ -265,7 +265,7 @@
 
                     <!-- Alertes pour chaque section -->
                     <div class="data-section collapsible collapsed" id="section-alertes-{{ section_id }}">
-                        <h2 class="section-title alertes-title" onclick="toggleSection(this)">
+                        <h2 class="section-title alertes-title" data-action="toggleSection">
                             <span class="toggle-icon">▶</span>
                             Alertes {{ section_title }}
                             <span id="alertes-count-{{ section_id }}"></span>
@@ -329,7 +329,7 @@
             <div class="filter-actions">
                 <button class="btn-primary" id="applyFiltersBtn">Appliquer les filtres</button>
                 <button class="btn-secondary" id="resetFiltersBtn">Réinitialiser</button>
-                <button type="button" class="btn-secondary" onclick="AlertManager.clearDismissedAlerts()">Afficher les
+                <button type="button" class="btn-secondary" data-action="clearDismissedAlerts">Afficher les
                     alertes masquées</button>
                 <div id="filterStatus" class="filter-status" style="display: none;">
                     <small>⚠️ Filtres modifiés - cliquez "Appliquer" pour voir les changements</small>

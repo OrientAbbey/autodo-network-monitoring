@@ -119,7 +119,6 @@ const ConfigPanel = {
                 traffic_consecutive_drops_min_percent: parseFloat(getVal('traffic_consecutive_drops_min_percent') || '0'),
                 alert_persistence_duration_minutes: parseInt(getVal('alert_persistence_duration_minutes') || '0'),
                 pertes_consecutive_count: parseInt(getVal('pertes_consecutive_count') || '1'),
-                day_over_day_drop_percent: parseFloat(getVal('day_over_day_drop_percent') || '0'),
                 traffic_recovery_ratio: parseFloat(getVal('traffic_recovery_ratio') || '0'),
                 mode7days_recovery_ratio: parseFloat(getVal('mode7days_recovery_ratio') || '0'),
                 db_recovery_threshold_minutes: parseInt(getVal('db_recovery_threshold_minutes') || '0'),
@@ -229,7 +228,6 @@ const ConfigPanel = {
                 'traffic_consecutive_drops_min_percent',
                 'alert_persistence_duration_minutes',
                 'pertes_consecutive_count',
-                'day_over_day_drop_percent',
                 'traffic_recovery_ratio',
                 'mode7days_recovery_ratio',
                 'db_recovery_threshold_minutes',
@@ -282,6 +280,7 @@ const ConfigPanel = {
 
 
 // ====== GESTIONNAIRE DES ALERTES ======
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const AlertManager = {
     updateBadge(allAlertes) {
         document.querySelectorAll('#alertes-badge-open, #alertes-badge').forEach(e => e.remove());
@@ -545,16 +544,16 @@ const AlertManager = {
             if (alertesToShow.length > 0) {
                 html = alertesToShow.map(a => {
                     const isOpen = a.status === 'open';
-                    const titreMessage = (a.title ? `<b>${a.title || ''}</b>` : a.message || '');
-                    return `<div class="alert" data-alerte-id="${a.id}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;${!isOpen ? 'opacity:0.7;' : ''}">
+                    const titreMessage = (a.title ? `<b>${esc(a.title)}</b>` : esc(a.message || ''));
+                    return `<div class="alert" data-alerte-id="${esc(a.id)}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;${!isOpen ? 'opacity:0.7;' : ''}">
                         <span>
                             ${titreMessage}
                             <span style="margin-left:8px;padding:2px 8px;border-radius:8px;font-size:0.95em;font-weight:bold;vertical-align:middle;background:${isOpen ? 'var(--danger)' : 'var(--success)'};color:white;">
                                 ${isOpen ? 'OPEN' : 'CLOSED'}
                             </span><br>
-                            Valeurs: ${a.valeurs.map(v => v.toFixed(3)).join(' → ')}<br>Date: ${a.creation_time || a.date || 'N/A'}
+                            Valeurs: ${(a.valeurs || []).map(v => (v == null ? '—' : Number(v).toFixed(3))).join(' → ')}<br>Date: ${esc(a.creation_time || a.date || 'N/A')}
                         </span>
-                        ${isOpen ? `<button class="btn-secondary" style="font-size:0.8em;padding:2px 8px;" onclick="AlertManager.dismissAlerte('${a.id}')">✕</button>` : ''}
+                        ${isOpen ? `<button class="btn-secondary" style="font-size:0.8em;padding:2px 8px;" data-action="dismissAlerte" data-id="${esc(a.id)}" aria-label="Masquer l'alerte">✕</button>` : ''}
                     </div>`;
                 }).join('');
             }
@@ -584,21 +583,6 @@ const AlertManager = {
     // Fermer une alerte de section
     async dismissAlerte(alerteId) {
         try {
-            const response = await fetch(`/api/dismiss_alerte`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ alerte_id: alerteId })
-            });
-
-            if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-
-            const result = await response.json();
-            if (!result.success) {
-                console.error(`Erreur lors de la suppression:`, result.error);
-                Toasts.show(`Erreur lors de la suppression de l'alerte ${alerteId}`, { type: 'error' });
-                return;
-            }
-
             // Enregistrer l'alerte comme ignorée dans le localStorage
             this.saveDismissedAlerte(alerteId);
 
@@ -917,47 +901,7 @@ const TableManager = {
                     ? link.replace('__END_TIMESTAMP__', roundedTimestamp)
                     : link;
 
-                const baseUrl = new URL(finalLink).origin;
-                const newWindow = window.open(finalLink, '_blank');
-
-                try {
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-
-                    let needsLogin = false;
-                    try {
-                        needsLogin = newWindow.document.body.innerText.includes("You are not authenticated");
-                    } catch (e) {
-                        needsLogin = true; // CORS blocked, assume login needed
-                    }
-
-                    if (needsLogin) {
-                        try {
-                            const authResponse = await fetch('/api/exnet-auth-url', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ base_url: baseUrl })
-                            });
-
-                            if (authResponse.ok) {
-                                const { auth_url } = await authResponse.json();
-
-                                // Load auth URL via image (server-side credentials never exposed to frontend)
-                                const authImg = new Image();
-                                authImg.src = auth_url;
-
-                                setTimeout(() => {
-                                    try { newWindow.location.reload(); }
-                                    catch (e) { console.log('Reload failed, continuing anyway'); }
-                                }, 3000);
-                            }
-                        } catch (error) {
-                            console.error('Failed to get auth URL:', error);
-                        }
-                    }
-                } catch (error) {
-                    console.error('Auto-login check failed:', error);
-                    newWindow.location.href = finalLink;
-                }
+                window.open(finalLink, '_blank', 'noopener');
             }
         };
     }
@@ -1960,3 +1904,27 @@ updateDashboardDOM = function (data) {
     style.innerHTML = `.clickable-row, .clickable-cell { cursor: pointer !important; }`;
     document.head.appendChild(style);
 })();
+
+// ====== ACTIONS (remplacent les attributs onclick= inline, incompatibles avec la CSP) ======
+const ACTIONS = {
+    acknowledgeAlert: () => acknowledgeAlert(),
+    toggleAutoUpdate: () => toggleAutoUpdate(),
+    toggleTheme: () => toggleTheme(),
+    playAlertSound: () => playAlertSound(),
+    stopAlertSound: () => stopAlertSound(),
+    clearDismissedAlerts: () => AlertManager.clearDismissedAlerts(),
+    toggleSection: (el) => toggleSection(el),
+    showTab: (el, e) => showTab(el.dataset.tab, el.dataset.interval, e),
+    dismissAlerte: (el) => AlertManager.dismissAlerte(el.dataset.id),
+};
+document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-action]');
+    const fn = el && ACTIONS[el.dataset.action];
+    if (fn) fn(el, e);
+});
+document.addEventListener('submit', (e) => { if (e.target.hasAttribute('data-no-submit')) e.preventDefault(); });
+// Échap acquitte la pop-up d'alerte (accessibilité clavier)
+document.addEventListener('keydown', (e) => {
+    const pop = document.getElementById('alert-popup');
+    if (e.key === 'Escape' && pop && getComputedStyle(pop).display !== 'none') acknowledgeAlert();
+});
