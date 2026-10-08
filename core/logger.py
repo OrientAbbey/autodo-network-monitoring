@@ -1,56 +1,39 @@
 """
 CENTRALIZED LOGGING MODULE
-Provides a consistent logger for the entire application
+Configuration unique (logger racine) : un seul RotatingFileHandler, partagé par tous les modules.
 """
-
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+_configured = False
+
+
+def _setup_root() -> None:
+    global _configured
+    if _configured:
+        return
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    fmt = logging.Formatter("%(asctime)s | %(levelname)-8s | %(name)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    log_file = Path(os.getenv("LOG_FILE", Path(__file__).parent.parent / "app_unified.log"))
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    fh = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8")
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(fmt)
+    ch = logging.StreamHandler()
+    ch.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
+    ch.setFormatter(fmt)
+    root.addHandler(fh)
+    logging.getLogger("apscheduler").setLevel(logging.WARNING)      # 1 ligne/10 s par tâche : bruit sans valeur
+    root.addHandler(ch)
+    _configured = True
+
 
 def get_logger(name: str) -> logging.Logger:
-    """
-    Get or create a logger with the specified name.
-    All loggers share the same handlers and format.
-    
-    Args:
-        name: The logger name (typically __name__)
-        
-    Returns:
-        A configured logger instance
-    """
-    logger = logging.getLogger(name)
-    
-    # Only configure once (if this is the first call)
-    if not logger.handlers:
-        logger.setLevel(logging.DEBUG)
-        
-        # Define formatter
-        formatter = logging.Formatter(
-            "%(asctime)s | %(levelname)-4s | %(name)s | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
-        
-        # File handler with rotation
-        log_file = Path(__file__).parent.parent / "app_unified.log"
-        file_handler = RotatingFileHandler(
-            log_file,
-            maxBytes=5 * 1024 * 1024,  # 5MB
-            backupCount=3,
-            encoding="utf-8",
-        )
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-        
-        # Console handler
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
-    
-    return logger
+    _setup_root()
+    return logging.getLogger(name)
 
 
-# Root logger for the application
 app_logger = get_logger("AUTODO")

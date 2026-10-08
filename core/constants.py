@@ -6,17 +6,22 @@ import json
 import os
 import threading
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any
 from zoneinfo import ZoneInfo
 
+from .logger import get_logger
+
+logger = get_logger(__name__)
+_loaded_mtime = None
+
 # Global variables for database configurations (will be updated by reload function)
-DB_CONFIGS: Dict[str, Dict[str, str]] = {}
-LABELS: Dict[str, Dict[str, str]] = {"international": {}, "utilisateur": {}, "roaming": {}}
-DB_KEY_TO_CPARAM: Dict[str, str] = {}
-LOCATION_MAPPING: Dict[str, str] = {}
+DB_CONFIGS: dict[str, dict[str, str]] = {}
+LABELS: dict[str, dict[str, str]] = {"international": {}, "utilisateur": {}, "roaming": {}}
+DB_KEY_TO_CPARAM: dict[str, str] = {}
+LOCATION_MAPPING: dict[str, str] = {}
 
 # Frontend metadata (generated from db_config.json)
-FRONTEND_METADATA: Dict[str, any] = {
+FRONTEND_METADATA: dict[str, Any] = {
     "international_names": {},
     "gi_names": {},
     "roaming_cities": [],
@@ -28,7 +33,7 @@ _config_lock = threading.RLock()
 
 
 
-def load_database_configurations() -> Tuple[Dict[str, Dict[str, str]], Dict[str, Dict[str, str]], Dict[str, str], Dict[str, str], Dict[str, str], Dict[str, str], List[str], List[str]]:
+def load_database_configurations() -> tuple[dict[str, dict[str, str]], dict[str, dict[str, str]], dict[str, str], dict[str, str], dict[str, str], dict[str, str], list[str], list[str]]:
     """
     Load database configurations from db_config.json file.
     Returns DB_CONFIGS, LABELS, db_key_to_cparam, location_mapping, international_names, gi_names, roaming_cities, roaming_types.
@@ -71,7 +76,8 @@ def load_database_configurations() -> Tuple[Dict[str, Dict[str, str]], Dict[str,
                 db_configs[key] = {
                     "host": host,
                     "db_name": db_name,
-                    "site": site
+                    "site": site,
+                    "port": db_info.get("port"),
                 }
 
                 # Add to LABELS based on category
@@ -110,22 +116,26 @@ def load_database_configurations() -> Tuple[Dict[str, Dict[str, str]], Dict[str,
         return db_configs, labels, db_key_to_cparam, location_mapping, international_names, gi_names, roaming_cities, roaming_types
 
     except FileNotFoundError:
-        raise FileNotFoundError(f"Configuration file {config_file} not found")
+        raise FileNotFoundError(f"Configuration file {config_file} not found") from None
     except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON in configuration file: {e}")
+        raise ValueError(f"Invalid JSON in configuration file: {e}") from e
     except KeyError as e:
-        raise KeyError(f"Missing required key in configuration: {e}")
+        raise KeyError(f"Missing required key in configuration: {e}") from e
 
 
-def reload_database_configurations() -> bool:
+def reload_database_configurations(force: bool = False) -> bool:
     """
     Reload database configurations from file and update global variables.
     Returns True if successful, False otherwise.
     """
-    global DB_CONFIGS, LABELS, DB_KEY_TO_CPARAM, LOCATION_MAPPING, FRONTEND_METADATA
+    global DB_CONFIGS, LABELS, DB_KEY_TO_CPARAM, LOCATION_MAPPING, FRONTEND_METADATA, _loaded_mtime
 
     with _config_lock:
         try:
+            cfg_file = Path(__file__).parent.parent / "db_config.json"
+            mtime = cfg_file.stat().st_mtime_ns if cfg_file.exists() else None
+            if not force and mtime is not None and mtime == _loaded_mtime:
+                return True                        # fichier inchangé : rien à recharger
             # Load new configurations
             new_db_configs, new_labels, new_db_key_to_cparam, new_location_mapping, new_international_names, new_gi_names, new_roaming_cities, new_roaming_types = load_database_configurations()
 
@@ -141,9 +151,10 @@ def reload_database_configurations() -> bool:
                 "roaming_types": new_roaming_types
             }
 
+            _loaded_mtime = mtime
             return True
         except Exception as e:
-            print(f"Error reloading database configurations: {e}")
+            logger.error("Rechargement de db_config.json impossible : %s", e)
             return False
 
 
@@ -153,41 +164,12 @@ reload_database_configurations()
 # ============================================================================
 # GLOBAL CONFIGURATION
 # ============================================================================
-APP_PORT = int(os.getenv("APP_PORT_UNIFIED", "501"))
 CAMEROON_TZ = ZoneInfo("Africa/Douala")
-TOKEN_TTL = int(os.getenv("TOKEN_TTL", 180))  # 3 minutes
-TOKENS = {}  # token -> expiration timestamp
 
-# Scheduler and Orange API client
+# Ordonnanceur (renseigné par main.py) et cache du tableau de bord
 scheduler = None
-orange_api_client = None
-
-# Monitoring state
-monitoring_data = {'last_update': None, 'data': {}}
-monitoring_lock = threading.Lock()
-
-# Global cache for dashboard data
-DASHBOARD_CACHE = {}
-DASHBOARD_CACHE_LOCK = threading.Lock()
-
-# ============================================================================
-# DATABASE CONFIGURATION
-# ============================================================================
-# Ticket database (local) - moved here to avoid circular imports
-LOCAL_DB_HOST = os.getenv("LOCAL_DB_HOST", "localhost")
-LOCAL_DB_USER = os.getenv("LOCAL_DB_USER", "root")
-LOCAL_DB_PASS = os.getenv("LOCAL_DB_PASS", "")
-LOCAL_DB_NAME = os.getenv("LOCAL_DB_NAME", "tickets_db")
-LOCAL_DB_PORT = int(os.getenv("LOCAL_DB_PORT", "3306"))
-
-# Database configuration for analytics (uses centralized vars)
-LOGS_DB_CONFIG = {
-    "host": LOCAL_DB_HOST,
-    "user": LOCAL_DB_USER,
-    "password": LOCAL_DB_PASS,
-    "db": LOCAL_DB_NAME,
-    "port": LOCAL_DB_PORT,
-}
+DASHBOARD_CACHE: dict[str, Any] = {}
+DASHBOARD_CACHE_LOCK = threading.RLock()
 
 
 # ============================================================================
