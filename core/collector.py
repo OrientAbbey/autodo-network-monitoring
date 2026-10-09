@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import bindparam, text
 
-from . import constants
+from . import constants, demo_data
 from .config import parse, settings
 from .db import diag_engine
 from .logger import get_logger
@@ -87,6 +87,17 @@ def _rows(conn, stmt, ts: list, **extra) -> dict:
 def _collect_one(db_key: str, timestamps: list, latest_alert_ts: datetime, want_monitoring: bool) -> DbSnapshot:
     snap = DbSnapshot(db_key)
     t0 = time.monotonic()
+    if settings.diagnet_source == "fake":                       # démo : aucune base DIAGNET interrogée
+        try:
+            f = demo_data.fake_fields(db_key, timestamps, latest_alert_ts, want_monitoring)
+            snap.whole, snap.apn = f["whole"], f["apn"]
+            snap.last_update, snap.mode7d = f["last_update"], f["mode7d"]
+            snap.ok = True
+        except Exception as e:
+            snap.error = f"{type(e).__name__}: {str(e)[:200]}"
+            logger.warning("Collecte simulée %s en échec : %s", db_key, snap.error)
+        snap.duration_s = time.monotonic() - t0
+        return snap
     cfg = constants.DB_CONFIGS.get(db_key, {})
     host, db_name = cfg.get("host"), cfg.get("db_name")
     if not host or not db_name:

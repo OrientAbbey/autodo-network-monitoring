@@ -63,6 +63,10 @@ class Settings:
     cors_origins: tuple = field(default_factory=lambda: tuple(o.strip() for o in _env("CORS_ORIGINS").split(",") if o.strip()))
     trusted_proxies: frozenset = field(default_factory=lambda: frozenset(x.strip() for x in _env("TRUSTED_PROXIES").split(",") if x.strip()))
     max_sse_subscribers: int = field(default_factory=lambda: _env_int("MAX_SSE_SUBSCRIBERS", 200))
+    # --- backends : base locale MySQL (défaut) ou SQLite (démo), sources DIAGNET réelles ou simulées
+    db_backend: str = field(default_factory=lambda: _env("DB_BACKEND", "mysql").strip().lower())
+    diagnet_source: str = field(default_factory=lambda: _env("DIAGNET_SOURCE").strip().lower()
+                                or ("fake" if _env("DB_BACKEND", "mysql").strip().lower() == "sqlite" else "live"))
     # --- base locale (tickets, visites, journaux) : lecture + écriture
     local_db_host: str = field(default_factory=lambda: _env("LOCAL_DB_HOST", "localhost"))
     local_db_port: int = field(default_factory=lambda: _env_int("LOCAL_DB_PORT", 3306))

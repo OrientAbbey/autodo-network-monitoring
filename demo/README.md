@@ -42,6 +42,28 @@ python demo/seed_demo_data.py scenario clear kribi
 ```
 Mots de passe de démo : configuration `cfgpass`, data-management `dmpass`.
 
+## Démo sans base de données (SQLite + sources simulées)
+
+Aucun MySQL/MariaDB à installer : la base **locale** (tickets, visites, journaux) est un fichier SQLite dans
+`DATA_DIR`, et les bases **DIAGNET** ne sont pas interrogées — une fonction **reproductible** (`core/demo_data.py`)
+recalcule les mêmes colonnes que `whole_5min` / `apn_5min` / `dns_5min`. Deux cycles relisant un créneau
+obtiennent les mêmes chiffres (tickets stables), et les scénarios ci-dessus fonctionnent à l'identique.
+
+```powershell
+# Windows : génère db_config.json, charge demo/env.demo.sqlite et démarre l'app
+.\demo\run_demo_sqlite.ps1
+.\demo\run_demo_sqlite.ps1 zero douala_camtel        # anomalie avant démarrage (optionnel)
+
+# Ou, manuellement (Linux/macOS identique) :
+export DB_BACKEND=sqlite DIAGNET_SOURCE=fake DATA_DIR=./data
+python -m core.demo_data config db_config.json       # catalogue simulé
+python main.py                                        # http://127.0.0.1:8501
+python -m core.demo_data scenario instant_drop kribi  # anomalie à chaud
+python -m core.demo_data scenario clear kribi
+```
+Réglages : `DB_BACKEND=sqlite` (base locale dans `DATA_DIR/<LOCAL_DB_NAME>.sqlite`) et
+`DIAGNET_SOURCE=fake` (sources en mémoire). Par défaut `DB_BACKEND=sqlite` implique `DIAGNET_SOURCE=fake`.
+
 ## Tests Playwright
 
 ```bash

@@ -17,6 +17,7 @@ from collections.abc import Iterator
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import URL, Connection, Engine
+from sqlalchemy.pool import NullPool
 
 from .config import fmt, now_local, settings
 from .logger import get_logger
@@ -28,21 +29,48 @@ _diag_engines: dict[tuple, Engine] = {}
 _lock = threading.Lock()
 
 
+def is_sqlite() -> bool:
+    """La base LOCALE est-elle SQLite (mode démo) plutôt que MySQL (production) ?"""
+    return settings.db_backend == "sqlite"
+
+
 # ----------------------------------------------------------------------------
 # Moteurs
 # ----------------------------------------------------------------------------
+def _sqlite_pragmas(dbapi_conn, _record):
+    """Réglages SQLite par connexion : WAL (lecteurs concurrents + 1 écrivain), attente des verrous, synchro modérée."""
+    cur = dbapi_conn.cursor()
+    try:
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA synchronous=NORMAL")
+        cur.execute("PRAGMA busy_timeout=5000")
+        cur.execute("PRAGMA foreign_keys=ON")
+    finally:
+        cur.close()
+
+
 def local_engine() -> Engine:
     global _local_engine
     with _lock:
         if _local_engine is None:
-            url = URL.create("mysql+pymysql", username=settings.local_db_user, password=settings.local_db_pass,
-                             host=settings.local_db_host, port=settings.local_db_port,
-                             database=settings.local_db_name, query={"charset": "utf8mb4"})
-            _local_engine = create_engine(
-                url, pool_size=settings.local_pool_size, max_overflow=settings.local_pool_overflow,
-                pool_timeout=10, pool_pre_ping=True, pool_recycle=1800,
-                connect_args={"connect_timeout": 5, "read_timeout": 30, "write_timeout": 30},
-            )
+            if is_sqlite():
+                path = settings.data_dir / f"{settings.local_db_name}.sqlite"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                _local_engine = create_engine(
+                    f"sqlite+pysqlite:///{path.as_posix()}",
+                    connect_args={"check_same_thread": False, "timeout": 30},
+                    poolclass=NullPool,
+                )
+                event.listen(_local_engine, "connect", _sqlite_pragmas)
+            else:
+                url = URL.create("mysql+pymysql", username=settings.local_db_user, password=settings.local_db_pass,
+                                 host=settings.local_db_host, port=settings.local_db_port,
+                                 database=settings.local_db_name, query={"charset": "utf8mb4"})
+                _local_engine = create_engine(
+                    url, pool_size=settings.local_pool_size, max_overflow=settings.local_pool_overflow,
+                    pool_timeout=10, pool_pre_ping=True, pool_recycle=1800,
+                    connect_args={"connect_timeout": 5, "read_timeout": 30, "write_timeout": 30},
+                )
         return _local_engine
 
 
@@ -216,9 +244,64 @@ MIGRATIONS = [
     (3, "logs.access_time en DATETIME", _m3_logs_datetime),
 ]
 
+# Schéma SQLite « final » (baseline + toutes les migrations fusionnées) : pas de ALTER/information_schema.
+_SQLITE_TABLES = (
+    """CREATE TABLE IF NOT EXISTS tickets_tb (
+        id INTEGER NOT NULL PRIMARY KEY, type TEXT NOT NULL, site TEXT NOT NULL,
+        database_name TEXT NOT NULL, timestamp TEXT NOT NULL, value NUMERIC NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open', agent TEXT NOT NULL DEFAULT 'DIAGNET',
+        severity TEXT NOT NULL DEFAULT 'critical', closure_timestamp TEXT DEFAULT NULL,
+        closure_pending_timestamp TEXT DEFAULT NULL, closure_reason TEXT DEFAULT NULL,
+        autin_id TEXT DEFAULT NULL, external_api_ticket_id TEXT DEFAULT NULL,
+        ttr_seconds INTEGER DEFAULT NULL, category INTEGER DEFAULT NULL, pertes TEXT NOT NULL DEFAULT 'No',
+        last_values TEXT DEFAULT NULL, description TEXT NOT NULL, reason TEXT DEFAULT NULL,
+        pertes_warnings TEXT DEFAULT NULL, version INTEGER NOT NULL DEFAULT 0,
+        orange_sync_state TEXT NOT NULL DEFAULT 'pending', orange_attempts INTEGER NOT NULL DEFAULT 0,
+        orange_next_retry_at TEXT DEFAULT NULL, orange_last_error TEXT DEFAULT NULL)""",
+    """CREATE TABLE IF NOT EXISTS daily_users (
+        `date` TEXT NOT NULL, client_id TEXT NOT NULL, last_seen TEXT NOT NULL,
+        visits_count INTEGER NOT NULL DEFAULT 0, last_ip TEXT, user_agent TEXT,
+        PRIMARY KEY (`date`, client_id))""",
+    """CREATE TABLE IF NOT EXISTS logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, ip_address TEXT NOT NULL,
+        access_time TEXT DEFAULT CURRENT_TIMESTAMP, action TEXT NOT NULL DEFAULT 'criteria_access')""",
+    "CREATE TABLE IF NOT EXISTS ticket_counters (day TEXT PRIMARY KEY, n INTEGER NOT NULL)",
+    """CREATE TABLE IF NOT EXISTS notification_state (
+        recipient TEXT NOT NULL PRIMARY KEY, ticket_ids TEXT, sent_at TEXT NOT NULL)""",
+    """CREATE TABLE IF NOT EXISTS schema_version (
+        version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)""",
+)
+_SQLITE_INDEXES = (
+    "CREATE INDEX IF NOT EXISTS idx_ticket_filter ON tickets_tb (database_name, type, status, category)",
+    "CREATE INDEX IF NOT EXISTS idx_timestamp ON tickets_tb (timestamp)",
+    "CREATE INDEX IF NOT EXISTS idx_status_ts ON tickets_tb (status, timestamp)",
+    "CREATE INDEX IF NOT EXISTS idx_orange_sync ON tickets_tb (orange_sync_state, orange_next_retry_at)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_external_ticket ON tickets_tb (external_api_ticket_id)",
+    "CREATE INDEX IF NOT EXISTS idx_ip_time ON logs (ip_address, access_time)",
+    "CREATE INDEX IF NOT EXISTS idx_access_time ON logs (access_time)",
+    "CREATE INDEX IF NOT EXISTS idx_action ON logs (action)",
+)
+
+
+def _ensure_schema_sqlite() -> bool:
+    """Crée le schéma SQLite final et marque toutes les migrations comme appliquées (idempotent)."""
+    try:
+        with local_tx() as c:
+            for stmt in _SQLITE_TABLES + _SQLITE_INDEXES:
+                c.execute(text(stmt))
+            for version, name, _fn in MIGRATIONS:
+                c.execute(text("INSERT OR IGNORE INTO schema_version (version, name, applied_at) VALUES (:v, :n, :t)"),
+                          {"v": version, "n": name, "t": fmt(now_local().replace(tzinfo=None))})
+        return True
+    except Exception:
+        logger.exception("Initialisation du schéma SQLite impossible")
+        return False
+
 
 def ensure_schema() -> bool:
     """Applique les migrations manquantes. Retourne False si la base est inaccessible."""
+    if is_sqlite():
+        return _ensure_schema_sqlite()
     try:
         with local_tx() as c:
             c.execute(text("CREATE TABLE IF NOT EXISTS schema_version (version INT PRIMARY KEY, "

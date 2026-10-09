@@ -21,7 +21,7 @@ from collections.abc import Callable
 from sqlalchemy import bindparam, text
 
 from . import constants, rules
-from .config import fmt, now_local, parse, period_to_cutoff
+from .config import fmt, now_local, parse, period_to_cutoff, settings
 from .db import fetch_all, fetch_one, local_conn, local_tx
 from .logger import get_logger
 
@@ -149,9 +149,11 @@ def dashboard_alerts(filters: dict | None = None) -> dict:
         except Exception:
             vals = [float(a["value"])] if a.get("value") is not None else []
         loc = constants.LOCATION_MAPPING.get(a["database_name"], a["database_name"])
+        ts = a["timestamp"]                          # datetime (MySQL) ou str (SQLite) : on normalise
+        ts_str = ts.strftime("%Y-%m-%d %H:%M") if isinstance(ts, datetime) else str(ts)[:16]
         item = {"id": a["id"], "type": a["type"].upper(), "location": loc, "title": f"Alerte {a['type'].upper()} - {loc}",
                 "message": a["reason"], "valeurs": vals, "status": a["status"],
-                "date": a["timestamp"].strftime("%Y-%m-%d %H:%M"), "creation_time": a["timestamp"].strftime("%Y-%m-%d %H:%M"),
+                "date": ts_str, "creation_time": ts_str,
                 "external_id": a.get("external_api_ticket_id"), "autin_id": a.get("autin_id")}
         result["pertes" if a["type"] == "pertes" else "traffic"].append(item)
     with _alerts_lock:
@@ -178,9 +180,16 @@ def next_id() -> int:
     with local_tx() as c:
         seed = int(c.execute(text("SELECT COALESCE(MAX(id), :base) FROM tickets_tb WHERE id BETWEEN :lo AND :hi"),
                              {"base": prefix * 1000, "lo": prefix * 1000, "hi": prefix * 1000 + 999}).scalar()) - prefix * 1000
-        c.execute(text("INSERT INTO ticket_counters (day, n) VALUES (:d, LAST_INSERT_ID(:n)) "
-                       "ON DUPLICATE KEY UPDATE n = LAST_INSERT_ID(n + 1)"), {"d": day, "n": seed + 1})
-        n = int(c.execute(text("SELECT LAST_INSERT_ID()")).scalar())
+        if settings.db_backend == "sqlite":
+            day_s = day.isoformat()
+            row = c.execute(text("SELECT n FROM ticket_counters WHERE day = :d"), {"d": day_s}).scalar()
+            n = (int(row) + 1) if row is not None else (seed + 1)
+            c.execute(text("INSERT INTO ticket_counters (day, n) VALUES (:d, :n) ON CONFLICT(day) DO UPDATE SET n = :n"),
+                      {"d": day_s, "n": n})
+        else:
+            c.execute(text("INSERT INTO ticket_counters (day, n) VALUES (:d, LAST_INSERT_ID(:n)) "
+                           "ON DUPLICATE KEY UPDATE n = LAST_INSERT_ID(n + 1)"), {"d": day, "n": seed + 1})
+            n = int(c.execute(text("SELECT LAST_INSERT_ID()")).scalar())
     return prefix * 1000 + n if n < 1000 else int(f"{prefix}{n:04d}")
 
 

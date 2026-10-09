@@ -22,6 +22,17 @@ logger = get_logger(__name__)
 SESSION_GAP_MIN = 60
 MAX_BUFFER = 10_000
 
+_VISITS_UPSERT_MYSQL = (
+    "INSERT INTO daily_users (`date`, client_id, last_seen, visits_count, last_ip, user_agent) "
+    "VALUES (:d, :c, :last, 1 + :extra, :ip, :ua) ON DUPLICATE KEY UPDATE "
+    "visits_count = visits_count + IF(TIMESTAMPDIFF(MINUTE, last_seen, :first) >= :gap, 1, 0) + :extra, "
+    "last_seen = :last, last_ip = :ip, user_agent = :ua")
+_VISITS_UPSERT_SQLITE = (
+    "INSERT INTO daily_users (`date`, client_id, last_seen, visits_count, last_ip, user_agent) "
+    "VALUES (:d, :c, :last, 1 + :extra, :ip, :ua) ON CONFLICT(`date`, client_id) DO UPDATE SET "
+    "visits_count = visits_count + (CASE WHEN (julianday(:first) - julianday(last_seen)) * 1440 >= :gap "
+    "THEN 1 ELSE 0 END) + :extra, last_seen = :last, last_ip = :ip, user_agent = :ua")
+
 
 class VisitBuffer:
     def __init__(self):
@@ -71,11 +82,8 @@ def flush_visits() -> int:
             for (d, c), v in batch.items()]
     try:
         with local_tx() as conn:
-            conn.execute(text(
-                "INSERT INTO daily_users (`date`, client_id, last_seen, visits_count, last_ip, user_agent) "
-                "VALUES (:d, :c, :last, 1 + :extra, :ip, :ua) ON DUPLICATE KEY UPDATE "
-                "visits_count = visits_count + IF(TIMESTAMPDIFF(MINUTE, last_seen, :first) >= :gap, 1, 0) + :extra, "
-                "last_seen = :last, last_ip = :ip, user_agent = :ua"), [{**r, "gap": SESSION_GAP_MIN} for r in rows])
+            conn.execute(text(_VISITS_UPSERT_SQLITE if settings.db_backend == "sqlite" else _VISITS_UPSERT_MYSQL),
+                         [{**r, "gap": SESSION_GAP_MIN} for r in rows])
         return len(rows)
     except Exception:
         logger.exception("Écriture des visites impossible (%d entrées perdues)", len(rows))
@@ -132,7 +140,12 @@ def purge(retention_days: int | None = None, batch: int = 5000) -> dict:
         total = 0
         while True:
             with local_tx() as c:
-                n = c.execute(text(f"DELETE FROM {table} WHERE {where} LIMIT {batch}"), {"v": p}).rowcount
+                if settings.db_backend == "sqlite":     # SQLite n'accepte pas DELETE ... LIMIT : borne par rowid
+                    sql = (f"DELETE FROM {table} WHERE rowid IN "
+                           f"(SELECT rowid FROM {table} WHERE {where} LIMIT {batch})")
+                else:
+                    sql = f"DELETE FROM {table} WHERE {where} LIMIT {batch}"
+                n = c.execute(text(sql), {"v": p}).rowcount
             total += n
             if n < batch:
                 break

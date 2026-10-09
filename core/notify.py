@@ -61,9 +61,14 @@ def _already_notified(recipient: str) -> set[str]:
 
 
 def _remember(recipient: str, ticket_ids: Iterable) -> None:
+    if settings.db_backend == "sqlite":
+        sql = ("INSERT INTO notification_state (recipient, ticket_ids, sent_at) VALUES (:r, :t, :s) "
+               "ON CONFLICT(recipient) DO UPDATE SET ticket_ids = excluded.ticket_ids, sent_at = excluded.sent_at")
+    else:
+        sql = ("INSERT INTO notification_state (recipient, ticket_ids, sent_at) VALUES (:r, :t, :s) "
+               "ON DUPLICATE KEY UPDATE ticket_ids = :t, sent_at = :s")
     with local_tx() as c:
-        c.execute(text("INSERT INTO notification_state (recipient, ticket_ids, sent_at) VALUES (:r, :t, :s) "
-                       "ON DUPLICATE KEY UPDATE ticket_ids = :t, sent_at = :s"),
+        c.execute(text(sql),
                   {"r": recipient.lower(), "t": ",".join(str(i) for i in ticket_ids), "s": fmt(now_local().replace(tzinfo=None))})
 
 
