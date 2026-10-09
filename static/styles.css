@@ -1403,3 +1403,12 @@ html {
   margin-right: -4px;
   /* léger ajustement visuel */
 }
+/* ===== MOBILE : rien ne doit déborder de l'écran (barre de boutons, pop-up, tableaux défilent dans leur conteneur) ===== */
+@media (max-width: 768px) {
+  html, body { max-width: 100%; overflow-x: hidden; }
+  .controls { flex-wrap: wrap; justify-content: center; }
+  .controls > * { flex: 0 1 auto; }
+  .alert-popup-content { width: calc(100% - 24px); max-width: 500px; }
+  .main-container, .header, .header-content { min-width: 0; max-width: 100%; box-sizing: border-box; }
+  [id^="table-wrapper"], .table-wrapper { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}

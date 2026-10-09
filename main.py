@@ -12,6 +12,7 @@ from apscheduler.executors.pool import ThreadPoolExecutor as ApsThreadPool
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -65,9 +66,16 @@ CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
        "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 
 
+# Compression : le JSON du tableau de bord pèse ≈ 113 Ko brut / 19 Ko compressé ; × 25-50 spectateurs rechargés au même instant.
+# (le flux SSE text/event-stream est exclu par Starlette)
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     resp = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        resp.headers.setdefault("Cache-Control", "no-cache")           # revalidation par ETag (304) à chaque chargement
     resp.headers.setdefault("Content-Security-Policy", CSP)
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     resp.headers.setdefault("X-Frame-Options", "DENY")

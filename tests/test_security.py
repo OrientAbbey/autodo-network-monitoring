@@ -102,3 +102,18 @@ def test_config_save_is_partial_atomic_and_cached():
     with pytest.raises(Exception):
         config.save_config_updates({"alert_pertes_threshold": 999})                                  # revalidation à l'écriture
     config.save_config_updates({"alert_pertes_threshold": before["alert_pertes_threshold"]})
+
+
+def test_large_json_is_gzipped_but_the_sse_stream_is_not(client, monkeypatch):
+    from core import constants, tickets
+    monkeypatch.setattr(tickets, "dashboard_alerts", lambda filters=None: {"traffic": [], "pertes": []})
+    with constants.DASHBOARD_CACHE_LOCK:
+        constants.DASHBOARD_CACHE.clear()
+        constants.DASHBOARD_CACHE.update({"recap": {f"db{i}": {"v": "x" * 50} for i in range(400)}})
+    try:
+        r = client.post("/api/dashboard_data", json={}, headers={"Accept-Encoding": "gzip"})
+        assert r.status_code == 200 and r.headers.get("content-encoding") == "gzip"
+    finally:
+        with constants.DASHBOARD_CACHE_LOCK:
+            constants.DASHBOARD_CACHE.clear()
+    assert client.get("/static/js/state.js").headers.get("cache-control") == "no-cache"
