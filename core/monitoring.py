@@ -17,7 +17,6 @@ import threading
 import time
 from contextlib import suppress
 from datetime import datetime, timedelta
-from typing import Optional
 
 from . import analytics, collector, constants, metrics, notify, orange, rules, tickets
 from .config import (fmt, load_config, local_to_utc_naive, now_local, parse, round5, settings,
@@ -28,7 +27,7 @@ logger = get_logger(__name__)
 
 TRAFFIC_COLS = ("tcp_dw", "udp_dw", "icmp_dw", "other_dw")
 _cycle_lock = threading.Lock()
-_orange: Optional[orange.OrangeClient] = None
+_orange: orange.OrangeClient | None = None
 
 
 def get_orange() -> orange.OrangeClient:
@@ -43,8 +42,8 @@ class State:
     def __init__(self):
         self.cycles_ok = 0
         self.cycles_failed = 0
-        self.last_ok_at: Optional[float] = None
-        self.last_ok_iso: Optional[str] = None
+        self.last_ok_at: float | None = None
+        self.last_ok_iso: str | None = None
         self.last_duration_s: float = 0.0
         self.last_error: str = ""
         self.last_stats: dict = {}
@@ -97,11 +96,13 @@ def build_series(snap: collector.DbSnapshot, alert_ts: list) -> tuple[list, list
 
 
 def _alerts_enabled(db_key: str, cfg: dict) -> bool:
-    """Interrupteurs « alerts_enable_* » : créer ou non des tickets par catégorie de base."""
+    """Interrupteurs « alerts_enable_* » : créer (ou non) des tickets par catégorie de base (international, gi, roaming)."""
     if db_key in constants.LABELS.get("international", {}):
         return bool(cfg.get("alerts_enable_international", True))
     if db_key in constants.LABELS.get("utilisateur", {}):
         return bool(cfg.get("alerts_enable_gi", True))
+    if "roaming" in db_key:
+        return bool(cfg.get("alerts_enable_roaming", False))
     return True
 
 
@@ -123,7 +124,7 @@ def run_cycle() -> dict:
         logger.info("Cycle de supervision — checkpoint %s", now_str)
         all_ts, alert_ts, cps = build_windows(checkpoint, cfg)
 
-        snaps = collector.collect_all(all_ts, alert_ts)
+        snaps = collector.collect_all(all_ts, alert_ts, monitor_roaming=bool(cfg.get("alerts_enable_roaming", False)))
         stats["sources_failed"] = [k for k, s in snaps.items() if not s.ok]
 
         # --- tableau de bord (même si certaines bases sont en échec)
@@ -168,8 +169,6 @@ def _process_monitoring(snaps: dict, alert_ts: list, now_str: str, cfg: dict) ->
     checkpoint = parse(now_str)
     n_db = 0
     for db_key, snap in snaps.items():
-        if "roaming" in db_key:
-            continue
         try:
             # M-05 : un incident de SUPERVISION (base injoignable) n'est pas un incident RÉSEAU → pas de ticket Orange
             if not snap.ok:

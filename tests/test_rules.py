@@ -11,14 +11,21 @@ CFG = ConfigParams().model_dump()
 
 # ------------------------------------------------------------------ détection trafic
 def test_zero_traffic_is_category_1():
-    v = rules.detect_traffic([5, 5, 5, 5, 5, 0], CFG)
+    v = rules.detect_traffic([5, 5, 5, 5, 0, 0], CFG)
     assert v.alert and v.category == 1
 
 
-def test_zero_traffic_needs_min_samples_when_configured():
-    cfg = {**CFG, "zero_traffic_min_samples": 2}
-    assert not rules.detect_traffic([5, 5, 5, 5, 5, 0], cfg).alert
-    assert rules.detect_traffic([5, 5, 5, 5, 0, 0], cfg).alert
+def test_default_requires_two_zero_samples_a_single_zero_waits_for_confirmation():
+    assert CFG["zero_traffic_min_samples"] == 2
+    v = rules.detect_traffic([5, 5, 5, 5, 5, 0], CFG)
+    assert not v.alert and "non confirmé" in v.reason
+    assert rules.detect_traffic([5, 5, 5, 5, 5, 0], {**CFG, "zero_traffic_min_samples": 1}).alert
+
+
+def test_zero_traffic_min_samples_is_configurable():
+    cfg = {**CFG, "zero_traffic_min_samples": 3}
+    assert not rules.detect_traffic([5, 5, 5, 5, 0, 0], cfg).alert
+    assert rules.detect_traffic([5, 5, 5, 0, 0, 0], cfg).alert
 
 
 def test_instant_drop_is_category_2():

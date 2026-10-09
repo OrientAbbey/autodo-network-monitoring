@@ -10,10 +10,10 @@
 
 <body>
     <!-- Popup alertes -->
-    <div id="alert-popup" class="alert-popup">
+    <div id="alert-popup" class="alert-popup" role="alertdialog" aria-modal="true" aria-labelledby="alert-popup-title" aria-describedby="alert-popup-message">
         <div class="alert-popup-content">
             <div class="alert-popup-header">
-                <h3>🚨 Nouvelle Alerte</h3>
+                <h3 id="alert-popup-title">🚨 Nouvelle Alerte</h3>
             </div>
             <div class="alert-popup-body">
                 <div id="alert-popup-message"></div>
@@ -30,23 +30,23 @@
                 <div class="timestamp">
                     <div class="current-time">
                         <span class="last-update">Last Update: </span>
-                        <span class="last-update-value"></span>
+                        <span class="last-update-value" role="status" aria-live="polite"></span>
                         <span class="next-label" style="display:none;"> | Next in</span>
                         <span class="countdown"></span>
                     </div>
                 </div>
                 <div class="controls">
-                    <button id="autoUpdateBtn" class="btn-secondary" data-action="toggleAutoUpdate">
+                    <button id="autoUpdateBtn" class="btn-secondary" data-action="toggleAutoUpdate" aria-pressed="true">
                         Auto Update
                     </button>
-                    <button id="themeToggleBtn" class="btn-secondary" data-action="toggleTheme">
+                    <button id="themeToggleBtn" class="btn-secondary" data-action="toggleTheme" aria-label="Basculer le thème clair/sombre">
                         🌙
                     </button>
 
                     <!-- Filter Button -->
-                    <button id="filterBtn" class="btn-secondary" title="Filtres des alertes">🔍 Filtres</button>
+                    <button id="filterBtn" class="btn-secondary" title="Filtres des alertes" aria-label="Filtrer les alertes">🔍 Filtres</button>
                     <button id="openConfigBtn" class="btn-secondary" type="button"
-                        title="Ouvrir le Panneau de Configuration">⚙️</button>
+                        title="Ouvrir le Panneau de Configuration" aria-label="Ouvrir le panneau de configuration (administrateurs)">⚙️</button>
                     <a href="/data-management" class="btn-secondary" title="Data Management"
                         style="text-decoration: none; background: #667eea !important; color: white !important; border: 2px solid #667eea !important;">📁
                         DM</a>
@@ -60,7 +60,7 @@
             <div class="drawer" id="config-drawer" style="display:none;">
                 <div class="drawer-header">
                     <h2>🛠️ Paramètres d'alerte</h2>
-                    <button class="close-btn" id="close-drawer" type="button">x</button>
+                    <button class="close-btn" id="close-drawer" type="button" aria-label="Fermer le panneau de configuration">×</button>
                 </div>
                 <div class="drawer-content">
                     <form class="config-form" id="config-form" data-no-submit>
@@ -173,7 +173,8 @@
                             </div>
                         </fieldset>
                         <fieldset>
-                            <legend><strong>Afficher alertes</strong></legend>
+                            <legend><strong>Sections et alertes actives</strong></legend>
+                            <p class="form-hint" style="margin:4px 0 8px;font-size:12px;opacity:.8">Sortie Internationale, Traffic Utilisateur et Roaming : masquent la section <u>et suspendent la création de tickets</u>. TCP Metrics et TDD : affichage seulement.</p>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="alerts_enable_international"><input type="checkbox"
@@ -343,7 +344,14 @@
 
 
 
-    <script src="/static/script.js"></script>
+    <script src="/static/js/state.js"></script>
+    <script src="/static/js/config-panel.js"></script>
+    <script src="/static/js/alerts.js"></script>
+    <script src="/static/js/live.js"></script>
+    <script src="/static/js/sections.js"></script>
+    <script src="/static/js/theme-filters-audio.js"></script>
+    <script src="/static/js/render.js"></script>
+    <script src="/static/js/main.js"></script>
 </body>
 
 </html>

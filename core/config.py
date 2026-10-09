@@ -117,6 +117,9 @@ class Settings:
     data_dir: Path = field(default_factory=lambda: Path(_env("DATA_DIR", str(BASE_DIR / "data"))))
     retention_days: int = field(default_factory=lambda: _env_int("RETENTION_DAYS", 90))
     watchdog_max_age_min: int = field(default_factory=lambda: _env_int("WATCHDOG_MAX_AGE_MIN", 15))
+    dns_reference_ips: tuple = field(default_factory=lambda: tuple(
+        x.strip() for x in _env("DNS_REFERENCE_IPS", "8.8.8.0/24,8.8.4.0/24,2001:4860:4860::/128").split(",") if x.strip()))
+    mode_bin_gbps: float = field(default_factory=lambda: _env_float("MODE_BIN_GBPS", 2.5))
     exnet_autologin: bool = field(default_factory=lambda: _env_bool("EXNET_AUTOLOGIN_ENABLED", False))
     exnet_username: str = field(default_factory=lambda: _env("EXNET_USERNAME"))
     exnet_password: str = field(default_factory=lambda: _env("EXNET_PASSWORD"))
@@ -144,7 +147,7 @@ class ConfigParams(BaseModel):
     mode7days_recovery_ratio: float = Field(0.85, gt=0, le=2)
     db_down_threshold_minutes: int = Field(70, ge=1, le=10080)       # seuil de DÉCLARATION
     db_recovery_threshold_minutes: int = Field(35, ge=1, le=10080)   # seuil de LEVÉE (hystérésis)
-    zero_traffic_min_samples: int = Field(1, ge=1, le=12)            # 2 conseillé pour réduire le bruit
+    zero_traffic_min_samples: int = Field(2, ge=1, le=12)            # 2 = un « zéro » isolé (bruit de collecte) n'ouvre pas de ticket
     source_unreachable_cycles: int = Field(3, ge=1, le=100)          # cycles d'échec avant alerte interne
     alert_tcp_no_response_threshold: float = Field(10.0, ge=0, le=100)
     alert_tcp_block_wp_up_threshold: float = Field(10.0, ge=0, le=100)

@@ -18,7 +18,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Optional
 
 from sqlalchemy import bindparam, text
 
@@ -41,20 +40,20 @@ SQL_APN = text(f"SELECT SAUV_td32, {_SUM} FROM apn_5min WHERE SAUV_td32 IN :ts A
                ).bindparams(bindparam("ts", expanding=True))
 SQL_DNS = text("SELECT SAUV_td32, SUM(qtype_MALFORMED) + SUM(tooshort_src) AS dns_malformed_ul, "
                "SUM(queries_woresp) AS dns_queries_woresp, SUM(queries) AS dns_queries FROM dns_5min "
-               "WHERE SAUV_td32 IN :ts AND (ip='8.8.8.0/24' OR ip='8.8.4.0/24' OR ip='2001:4860:4860::/128') AND supra='*' "
-               "GROUP BY SAUV_td32").bindparams(bindparam("ts", expanding=True))
+               "WHERE SAUV_td32 IN :ts AND ip IN :ips AND supra='*' "
+               "GROUP BY SAUV_td32").bindparams(bindparam("ts", expanding=True), bindparam("ips", expanding=True))
 SQL_LAST = text("SELECT MAX(SAUV_td32) FROM whole_5min")
 SQL_MODE = text("""
 WITH computed AS (
-  SELECT (COALESCE(tcp_dw,0)+COALESCE(udp_dw,0)+COALESCE(icmp_dw,0)+COALESCE(other_dw,0)) / 37500000.0 AS traffic_gbps
+  SELECT (COALESCE(tcp_dw,0)+COALESCE(udp_dw,0)+COALESCE(icmp_dw,0)+COALESCE(other_dw,0)) / :upg AS traffic_gbps
   FROM whole_5min WHERE SAUV_td32 BETWEEN :a AND :b),
-bins AS (SELECT FLOOR(traffic_gbps / 2.5) * 2.5 AS bin_start, COUNT(*) AS freq FROM computed GROUP BY bin_start),
+bins AS (SELECT FLOOR(traffic_gbps / :bin) * :bin AS bin_start, COUNT(*) AS freq FROM computed GROUP BY bin_start),
 ranked AS (SELECT bin_start, freq, LAG(freq) OVER (ORDER BY bin_start) AS freq_prev,
                   LEAD(freq) OVER (ORDER BY bin_start) AS freq_next FROM bins),
 modal AS (SELECT bin_start, freq, COALESCE(freq_prev,0) AS freq_prev, COALESCE(freq_next,0) AS freq_next
           FROM ranked ORDER BY freq DESC, bin_start LIMIT 1)
-SELECT CASE WHEN (2*freq - freq_prev - freq_next) = 0 THEN bin_start + 1.25
-            ELSE bin_start + ((freq - freq_prev) / (2*freq - freq_prev - freq_next)) * 2.5 END AS mode_7days_gbps
+SELECT CASE WHEN (2*freq - freq_prev - freq_next) = 0 THEN bin_start + :bin / 2
+            ELSE bin_start + ((freq - freq_prev) / (2*freq - freq_prev - freq_next)) * :bin END AS mode_7days_gbps
 FROM modal""")
 
 
@@ -65,12 +64,12 @@ class DbSnapshot:
     error: str = ""
     whole: dict = field(default_factory=dict)        # "YYYY-mm-dd HH:MM:SS" (UTC) -> ligne
     apn: dict = field(default_factory=dict)          # idem, TDD (bases « utilisateur »)
-    last_update: Optional[datetime] = None           # UTC naïf
-    mode7d: Optional[float] = None
+    last_update: datetime | None = None           # UTC naïf
+    mode7d: float | None = None
     duration_s: float = 0.0
 
 
-_mode_cache: dict[str, tuple[float, Optional[float]]] = {}
+_mode_cache: dict[str, tuple[float, float | None]] = {}
 _mode_lock = threading.Lock()
 
 
@@ -95,7 +94,7 @@ def _collect_one(db_key: str, timestamps: list, latest_alert_ts: datetime, want_
         return snap
     try:
         with diag_engine(host, db_name, cfg.get("port")).connect() as conn:
-            dns = _rows(conn, SQL_DNS, timestamps)
+            dns = _rows(conn, SQL_DNS, timestamps, ips=list(settings.dns_reference_ips))
             whole = _rows(conn, SQL_WHOLE, timestamps)
             for ts, row in whole.items():
                 row.update({k: v for k, v in dns.get(ts, {}).items()})
@@ -110,7 +109,8 @@ def _collect_one(db_key: str, timestamps: list, latest_alert_ts: datetime, want_
                 if cached and time.monotonic() - cached[0] < settings.mode7d_cache_ttl:
                     snap.mode7d = cached[1]
                 else:
-                    r = conn.execute(SQL_MODE, {"a": latest_alert_ts - timedelta(days=7), "b": latest_alert_ts}).scalar()
+                    r = conn.execute(SQL_MODE, {"a": latest_alert_ts - timedelta(days=7), "b": latest_alert_ts,
+                                                 "upg": round(1 / constants.DEBIT_FACTOR), "bin": settings.mode_bin_gbps}).scalar()
                     snap.mode7d = float(r) if r is not None else None
                     with _mode_lock:
                         _mode_cache[db_key] = (time.monotonic(), snap.mode7d)
@@ -122,7 +122,7 @@ def _collect_one(db_key: str, timestamps: list, latest_alert_ts: datetime, want_
     return snap
 
 
-def collect_all(timestamps: list, alert_timestamps: list) -> dict[str, DbSnapshot]:
+def collect_all(timestamps: list, alert_timestamps: list, monitor_roaming: bool = False) -> dict[str, DbSnapshot]:
     """Collecte toutes les bases en parallèle. Ne lève jamais : une base en échec donne un ``DbSnapshot(ok=False)``."""
     keys = list(constants.DB_CONFIGS.keys())
     if not keys:
@@ -132,7 +132,7 @@ def collect_all(timestamps: list, alert_timestamps: list) -> dict[str, DbSnapsho
     results: dict[str, DbSnapshot] = {}
     t0 = time.monotonic()
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="collect") as pool:
-        futures = {k: pool.submit(_collect_one, k, timestamps, latest, "roaming" not in k) for k in keys}
+        futures = {k: pool.submit(_collect_one, k, timestamps, latest, monitor_roaming or "roaming" not in k) for k in keys}
         for k, fut in futures.items():
             try:
                 results[k] = fut.result(timeout=settings.collect_db_timeout + 10)

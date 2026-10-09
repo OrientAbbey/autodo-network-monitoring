@@ -11,7 +11,7 @@
         "mode7days_recovery_ratio": 0.85,
         "db_down_threshold_minutes": 70,
         "db_recovery_threshold_minutes": 35,
-        "zero_traffic_min_samples": 1,
+        "zero_traffic_min_samples": 2,
         "source_unreachable_cycles": 3,
         "alert_tcp_no_response_threshold": 10.0,
         "alert_tcp_block_wp_up_threshold": 10.0,
