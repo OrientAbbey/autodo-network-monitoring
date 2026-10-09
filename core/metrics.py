@@ -6,7 +6,6 @@ polars (import ≈ 100 ms, ≈ 30 Mo) n'apporterait aucun gain à cette échelle
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from . import constants
 from .config import load_config
@@ -15,441 +14,120 @@ from .logger import get_logger
 logger = get_logger(__name__)
 
 
-def _go(kind: str, db_key: str, c_param: Optional[str] = None) -> str:
+def _go(kind: str, db_key: str, c_param: str | None = None) -> str:
     """Lien vers le portail ExNet via /go/ (le JS remplace __END_TIMESTAMP__ avant l'ouverture)."""
     return f"/go/{kind}/{db_key}?end_date=__END_TIMESTAMP__" + (f"&c={c_param}" if c_param else "")
 
 
-def _process_data_for_interval(
-    data_dict: dict[str, dict[str, dict]],
-    interval: str,
-    checkpoints: dict,
-    recap: dict,
-    tdd_recap: dict,
-    roaming_recap: dict,
-    inaccessible_dbs: list,
-    tdd_data: dict,
-):
-    """Process data for a specific time interval"""
-    protocols = ["tcp_dw", "udp_dw", "icmp_dw", "other_dw"]
+_PROTOCOLS = ("tcp_dw", "udp_dw", "icmp_dw", "other_dw")
+_EMPTY_METRICS = {
+    "total": None, "pertes": None, "tcp_no_response": None, "tcp_block_wp_up": None, "latence": None,
+    "dns_malformed": None, "dns_no_response": None, "tcp_loss_dw_raw": 0, "tcp_pkt_dw_raw": 0, "tcp_no_response_raw": 0,
+    "tcp_block_wp_up_raw": 0, "tcp_sessions_raw": 0, "dns_malformed_raw": 0, "dns_queries_raw": 0, "dns_queries_woresp_raw": 0,
+}
 
+
+def _num(rec: dict, key: str, default: float = 0.0) -> float:
+    v = rec.get(key)
+    return float(v) if v is not None else default
+
+
+def _is_empty(rec) -> bool:
+    return isinstance(rec, dict) and all(v is None or (isinstance(v, str) and v.strip() == "") for v in rec.values())
+
+
+def _compute_metrics(rec: dict) -> dict:
+    """Métriques dérivées d'UN relevé 5 min (None = relevé vide)."""
+    if _is_empty(rec):
+        return dict(_EMPTY_METRICS)
+    sessions = _num(rec, "#tcp_sessions")
+    synack = _num(rec, "#tcp_synack_core")
+    queries = _num(rec, "dns_queries")
+    malformed, woresp = _num(rec, "dns_malformed_ul"), _num(rec, "dns_queries_woresp")
+    return {
+        "total": sum(_num(rec, p) for p in _PROTOCOLS) * constants.DEBIT_FACTOR,
+        "pertes": 100 * _num(rec, "#tcp_loss_dw") / max(1, _num(rec, "#tcp_pkt_dw", 1.0)),
+        "tcp_no_response": (_num(rec, "#tcp_no_response_to_syn") / max(1, sessions)) * 100,
+        "tcp_block_wp_up": (_num(rec, "#tcp_block_wp_up") / max(1, sessions)) * 100,
+        "latence": (_num(rec, "Irt_tcp_core_td22") / synack) if synack > 0 else 0,
+        "dns_malformed": (malformed / max(1, queries)) * 100 if queries > 0 else 0,
+        "dns_no_response": (woresp / max(1, queries)) * 100 if queries > 0 else 0,
+        "tcp_loss_dw_raw": _num(rec, "#tcp_loss_dw"), "tcp_pkt_dw_raw": _num(rec, "#tcp_pkt_dw"),
+        "tcp_no_response_raw": _num(rec, "#tcp_no_response_to_syn"), "tcp_block_wp_up_raw": _num(rec, "#tcp_block_wp_up"),
+        "tcp_sessions_raw": sessions, "dns_malformed_raw": malformed, "dns_queries_raw": queries, "dns_queries_woresp_raw": woresp,
+    }
+
+
+def _nz(v):
+    return 0 if v is None else v
+
+
+def _block(kind: str, ms: dict, me: dict, key: str, extra: dict | None = None, dns: bool = False) -> dict:
+    """Bloc {start, end, taux, <extras>, trend_icon, trend_color} pour une métrique (table de description, pas de copier-coller)."""
+    s, e = ms[key], me[key]
+    icon, color = _get_trend_icon_and_color(kind, _nz(e), _nz(s))
+    taux = ((s or 0) - (e or 0)) if dns else (_nz(s) - _nz(e))
+    return {"start": s, "end": e, "taux": taux, **(extra or {}), "trend_icon": icon, "trend_color": color}
+
+
+def _entry(ms: dict, me: dict, db_key: str) -> dict:
+    pair = lambda k: {"start": ms[k], "end": me[k]}           # noqa: E731
+    return {
+        "total": _block("traffic", ms, me, "total"),
+        "pertes": _block("pertes", ms, me, "pertes", {
+            "tcp_loss_dw_start": ms["tcp_loss_dw_raw"], "tcp_pkt_dw_start": ms["tcp_pkt_dw_raw"],
+            "tcp_loss_dw_end": me["tcp_loss_dw_raw"], "tcp_pkt_dw_end": me["tcp_pkt_dw_raw"]}),
+        "tcp_metrics": {
+            "tcp_no_response": _block("tcp_no_response", ms, me, "tcp_no_response", {
+                "tcp_no_response_start": ms["tcp_no_response_raw"], "tcp_no_response_end": me["tcp_no_response_raw"]}),
+            "tcp_block_wp_up": _block("tcp_block_wp_up", ms, me, "tcp_block_wp_up", {
+                "tcp_block_wp_up_start": ms["tcp_block_wp_up_raw"], "tcp_block_wp_up_end": me["tcp_block_wp_up_raw"]}),
+            "latence": _block("latence", ms, me, "latence"),
+            "tcp_sessions": pair("tcp_sessions_raw"),
+        },
+        "dns_metrics": {
+            "dns_malformed": _block("dns_malformed", ms, me, "dns_malformed", {
+                "dns_malformed_start": ms["dns_malformed_raw"], "dns_malformed_end": me["dns_malformed_raw"],
+                "queries_start": ms["dns_queries_raw"], "queries_end": me["dns_queries_raw"]}, dns=True),
+            "dns_no_response": _block("dns_no_response", ms, me, "dns_no_response", {
+                "dns_no_response_start": ms["dns_queries_woresp_raw"], "dns_no_response_end": me["dns_queries_woresp_raw"],
+                "queries_start": ms["dns_queries_raw"], "queries_end": me["dns_queries_raw"]}, dns=True),
+        },
+        "link": {"total": _go("traffic", db_key), "pertes": _go("loss", db_key), "tcp_service_access": _go("tcp_service_access", db_key),
+                 "tcp_tts": _go("tcp_tts", db_key), "dns": _go("dns", db_key)},
+    }
+
+
+_NA = {"start": "N/A", "end": "N/A", "taux": "N/A", "trend_icon": "↔", "trend_color": "neutral"}
+
+
+def _tdd_entry(start_rec, end_rec, db_key: str) -> dict:
+    """Colonne TDD (bases « utilisateur ») : métriques si les deux relevés existent, sinon « N/A »."""
+    if not (start_rec and end_rec):
+        return {"total": dict(_NA), "pertes": dict(_NA), "link": {"total": None, "pertes": None}}
+    ms, me = _compute_metrics(start_rec), _compute_metrics(end_rec)
+    return {"total": _block("traffic", ms, me, "total"),
+            "pertes": _block("pertes", ms, me, "pertes", {"pkt_start": ms["tcp_pkt_dw_raw"], "pkt_end": me["tcp_pkt_dw_raw"]}),
+            "link": {"total": _go("traffic", db_key, "SGi"), "pertes": _go("loss", db_key, "SGi")}}
+
+
+def _process_data_for_interval(data_dict: dict, interval: str, checkpoints: dict, recap: dict, tdd_recap: dict,
+                               roaming_recap: dict, inaccessible_dbs: list, tdd_data: dict) -> None:
+    """Remplit ``recap`` / ``roaming_recap`` / ``tdd_recap`` pour un intervalle (début → fin)."""
+    start_str, end_str = checkpoints[interval]["start_str"], checkpoints[interval]["end_str"]
     for db_key, db_data in data_dict.items():
-        start_str = checkpoints[interval]["start_str"]
-        end_str = checkpoints[interval]["end_str"]
-        start_record = db_data.get(start_str)
-        end_record = db_data.get(end_str)
-
-        def record_is_empty(rec):
-            if isinstance(rec, dict):
-                return all(v is None or (isinstance(v, str) and v.strip() == "") for v in rec.values())
-            return False
-
-        if start_record is None or end_record is None:
+        start_rec, end_rec = db_data.get(start_str), db_data.get(end_str)
+        if start_rec is None or end_rec is None:
             if db_key not in inaccessible_dbs:
                 inaccessible_dbs.append(db_key)
-            logger.warning(
-                f"Données manquantes pour {db_key} : {start_record} -> {end_record}"
-            )
+            logger.warning("Données manquantes pour %s : %s -> %s", db_key, start_rec, end_rec)
             continue
-
-        # helper pour calculer les métriques d'un enregistrement (réduit répétitions)
-        def _num(rec, key, default=0.0):
-            v = rec.get(key)
-            return float(v) if v is not None else default
-
-        def _compute_metrics(rec):
-            if record_is_empty(rec):
-                return {
-                    "total": None,
-                    "pertes": None,
-                    "tcp_no_response": None,
-                    "tcp_block_wp_up": None,
-                    "latence": None,
-                    "dns_malformed": None,
-                    "dns_no_response": None,
-                    "tcp_loss_dw_raw": 0,
-                    "tcp_pkt_dw_raw": 0,
-                    "tcp_no_response_raw": 0,
-                    "tcp_block_wp_up_raw": 0,
-                    "tcp_sessions_raw": 0,
-                    "dns_malformed_raw": 0,
-                    "dns_queries_raw": 0,
-                    "dns_queries_woresp_raw": 0,
-                }
-
-            # Calculs métriques
-            total = sum(_num(rec, p) for p in protocols) * constants.DEBIT_FACTOR
-            pertes_val = 100 * _num(rec, "#tcp_loss_dw") / max(
-                1, _num(rec, "#tcp_pkt_dw", 1.0)
-            )
-
-            tcp_sessions = _num(rec, "#tcp_sessions")
-            tcp_no_response = (
-                _num(rec, "#tcp_no_response_to_syn") / max(1, tcp_sessions)
-            ) * 100
-            tcp_block_wp_up = (
-                _num(rec, "#tcp_block_wp_up") / max(1, tcp_sessions)
-            ) * 100
-
-            latence = (
-                (
-                    _num(rec, "Irt_tcp_core_td22")
-                    / _num(rec, "#tcp_synack_core")
-                )
-                if _num(rec, "#tcp_synack_core") > 0
-                else 0
-            )
-
-            # DNS metrics
-            dns_malformed_raw = _num(rec, "dns_malformed_ul")
-            dns_queries_raw = _num(rec, "dns_queries")
-            dns_queries_woresp_raw = _num(rec, "dns_queries_woresp")
-
-            dns_malformed = (
-                (dns_malformed_raw / max(1, dns_queries_raw)) * 100
-                if dns_queries_raw > 0
-                else 0
-            )
-            dns_no_response = (
-                (dns_queries_woresp_raw / max(1, dns_queries_raw)) * 100
-                if dns_queries_raw > 0
-                else 0
-            )
-
-            return {
-                "total": total,
-                "pertes": pertes_val,
-                "tcp_no_response": tcp_no_response,
-                "tcp_block_wp_up": tcp_block_wp_up,
-                "latence": latence,
-                "dns_malformed": dns_malformed,
-                "dns_no_response": dns_no_response,
-                "tcp_loss_dw_raw": _num(rec, "#tcp_loss_dw"),
-                "tcp_pkt_dw_raw": _num(rec, "#tcp_pkt_dw"),
-                "tcp_no_response_raw": _num(rec, "#tcp_no_response_to_syn"),
-                "tcp_block_wp_up_raw": _num(rec, "#tcp_block_wp_up"),
-                "tcp_sessions_raw": _num(rec, "#tcp_sessions"),
-                "dns_malformed_raw": dns_malformed_raw,
-                "dns_queries_raw": dns_queries_raw,
-                "dns_queries_woresp_raw": dns_queries_woresp_raw,
-            }
-
-        metrics_start = _compute_metrics(start_record)
-        metrics_end = _compute_metrics(end_record)
-
-        # Calculs métriques (utilisation des résultats du helper)
-        total_start = metrics_start["total"]
-        total_end = metrics_end["total"]
-        pertes_start = metrics_start["pertes"]
-        pertes_end = metrics_end["pertes"]
-
-        # Nouvelles métriques TCP
-        tcp_no_response_start = metrics_start["tcp_no_response"]
-        tcp_no_response_end = metrics_end["tcp_no_response"]
-        tcp_block_wp_up_start = metrics_start["tcp_block_wp_up"]
-        tcp_block_wp_up_end = metrics_end["tcp_block_wp_up"]
-        latence_start = metrics_start["latence"]
-        latence_end = metrics_end["latence"]
-
-        # Ajout des compteurs de paquets bruts pour le calcul de la formule des pertes totales
-        tcp_loss_dw_start = metrics_start["tcp_loss_dw_raw"]
-        tcp_pkt_dw_start = metrics_start["tcp_pkt_dw_raw"]
-        tcp_loss_dw_end = metrics_end["tcp_loss_dw_raw"]
-        tcp_pkt_dw_end = metrics_end["tcp_pkt_dw_raw"]
-
-        tcp_no_response_raw_start = metrics_start["tcp_no_response_raw"]
-        tcp_no_response_raw_end = metrics_end["tcp_no_response_raw"]
-        tcp_block_wp_up_raw_start = metrics_start["tcp_block_wp_up_raw"]
-        tcp_block_wp_up_raw_end = metrics_end["tcp_block_wp_up_raw"]
-        tcp_sessions_raw_start = metrics_start["tcp_sessions_raw"]
-        tcp_sessions_raw_end = metrics_end["tcp_sessions_raw"]
-
-        # taux_total = (
-        #     ((total_start - total_end) / total_end * 100) if total_end != 0 else 0
-        # )
-        taux_total = (total_start if total_start is not None else 0) - (
-            total_end if total_end is not None else 0
-        )
-
-        # taux_pertes = (
-        #     ((pertes_start - pertes_end) / pertes_end * 100) if pertes_end != 0 else 0
-        # )
-        taux_pertes = (pertes_start if pertes_start is not None else 0) - (
-            pertes_end if pertes_end is not None else 0
-        )
-
-        taux_tcp_no_response = (
-            tcp_no_response_start if tcp_no_response_start is not None else 0
-        ) - (tcp_no_response_end if tcp_no_response_end is not None else 0)
-
-        taux_tcp_block_wp_up = (
-            tcp_block_wp_up_start if tcp_block_wp_up_start is not None else 0
-        ) - (tcp_block_wp_up_end if tcp_block_wp_up_end is not None else 0)
-
-        taux_latence = (latence_start if latence_start is not None else 0) - (
-            latence_end if latence_end is not None else 0
-        )
-
-        # Icones et couleurs
-        total_start_for_trend = total_start if total_start is not None else 0
-        total_end_for_trend = total_end if total_end is not None else 0
-        pertes_start_for_trend = pertes_start if pertes_start is not None else 0
-        pertes_end_for_trend = pertes_end if pertes_end is not None else 0
-
-        icon_total, color_total = _get_trend_icon_and_color(
-            "traffic", total_end_for_trend, total_start_for_trend
-        )
-        icon_pertes, color_pertes = _get_trend_icon_and_color(
-            "pertes", pertes_end_for_trend, pertes_start_for_trend
-        )
-
-        # Tendances pour nouvelles métriques TCP
-        tcp_no_response_start_for_trend = (
-            tcp_no_response_start if tcp_no_response_start is not None else 0
-        )
-        tcp_no_response_end_for_trend = (
-            tcp_no_response_end if tcp_no_response_end is not None else 0
-        )
-        tcp_block_wp_up_start_for_trend = (
-            tcp_block_wp_up_start if tcp_block_wp_up_start is not None else 0
-        )
-        tcp_block_wp_up_end_for_trend = (
-            tcp_block_wp_up_end if tcp_block_wp_up_end is not None else 0
-        )
-        latence_start_for_trend = latence_start if latence_start is not None else 0
-        latence_end_for_trend = latence_end if latence_end is not None else 0
-
-        icon_tcp_no_response, color_tcp_no_response = _get_trend_icon_and_color(
-            "tcp_no_response",
-            tcp_no_response_end_for_trend,
-            tcp_no_response_start_for_trend,
-        )
-        icon_tcp_block_wp_up, color_tcp_block_wp_up = _get_trend_icon_and_color(
-            "tcp_block_wp_up",
-            tcp_block_wp_up_end_for_trend,
-            tcp_block_wp_up_start_for_trend,
-        )
-        icon_latence, color_latence = _get_trend_icon_and_color(
-            "latence", latence_end_for_trend, latence_start_for_trend
-        )
-
-        # DNS trends
-        dns_malformed_start_for_trend = (
-            metrics_start.get("dns_malformed") if metrics_start.get("dns_malformed") is not None else 0
-        )
-        dns_malformed_end_for_trend = (
-            metrics_end.get("dns_malformed") if metrics_end.get("dns_malformed") is not None else 0
-        )
-        dns_no_response_start_for_trend = (
-            metrics_start.get("dns_no_response") if metrics_start.get("dns_no_response") is not None else 0
-        )
-        dns_no_response_end_for_trend = (
-            metrics_end.get("dns_no_response") if metrics_end.get("dns_no_response") is not None else 0
-        )
-
-        icon_dns_malformed, color_dns_malformed = _get_trend_icon_and_color(
-            "dns_malformed", dns_malformed_end_for_trend, dns_malformed_start_for_trend
-        )
-        icon_dns_no_response, color_dns_no_response = _get_trend_icon_and_color(
-            "dns_no_response", dns_no_response_end_for_trend, dns_no_response_start_for_trend
-        )
-
-        # --- Ajout du lien diagnet --- (Mapping db_key -> c_param)
-        # Liens relatifs /go/... : le nom d'hôte interne n'est plus publié dans le JSON (redirection côté serveur)
-        link_t, link_l = _go("traffic", db_key), _go("loss", db_key)
-        link_tcp_service_access, link_tcp_tts, link_dns = _go("tcp_service_access", db_key), _go("tcp_tts", db_key), _go("dns", db_key)
-
-        data_entry = {
-            "total": {
-                "start": total_start,
-                "end": total_end,
-                "taux": taux_total,
-                "trend_icon": icon_total,
-                "trend_color": color_total,
-            },
-            "pertes": {
-                "start": pertes_start,
-                "end": pertes_end,
-                "tcp_loss_dw_start": tcp_loss_dw_start,
-                "tcp_pkt_dw_start": tcp_pkt_dw_start,
-                "tcp_loss_dw_end": tcp_loss_dw_end,
-                "tcp_pkt_dw_end": tcp_pkt_dw_end,
-                "taux": taux_pertes,
-                "trend_icon": icon_pertes,
-                "trend_color": color_pertes,
-            },
-            "tcp_metrics": {
-                "tcp_no_response": {
-                    "start": tcp_no_response_start,
-                    "end": tcp_no_response_end,
-                    "taux": taux_tcp_no_response,
-                    "tcp_no_response_start": tcp_no_response_raw_start,
-                    "tcp_no_response_end": tcp_no_response_raw_end,
-                    "trend_icon": icon_tcp_no_response,
-                    "trend_color": color_tcp_no_response,
-                },
-                "tcp_block_wp_up": {
-                    "start": tcp_block_wp_up_start,
-                    "end": tcp_block_wp_up_end,
-                    "taux": taux_tcp_block_wp_up,
-                    "tcp_block_wp_up_start": tcp_block_wp_up_raw_start,
-                    "tcp_block_wp_up_end": tcp_block_wp_up_raw_end,
-                    "trend_icon": icon_tcp_block_wp_up,
-                    "trend_color": color_tcp_block_wp_up,
-                },
-                "latence": {
-                    "start": latence_start,
-                    "end": latence_end,
-                    "taux": taux_latence,
-                    "trend_icon": icon_latence,
-                    "trend_color": color_latence,
-                },
-                "tcp_sessions": {"start": tcp_sessions_raw_start, "end": tcp_sessions_raw_end},
-            },
-            "dns_metrics": {
-                "dns_malformed": {
-                    "start": metrics_start.get("dns_malformed"),
-                    "end": metrics_end.get("dns_malformed"),
-                    "taux": (metrics_start.get("dns_malformed") or 0) - (metrics_end.get("dns_malformed") or 0),
-                    "dns_malformed_start": metrics_start.get("dns_malformed_raw"),
-                    "dns_malformed_end": metrics_end.get("dns_malformed_raw"),
-                    "queries_start": metrics_start.get("dns_queries_raw"),
-                    "queries_end": metrics_end.get("dns_queries_raw"),
-                    "trend_icon": icon_dns_malformed,
-                    "trend_color": color_dns_malformed,
-                },
-                "dns_no_response": {
-                    "start": metrics_start.get("dns_no_response"),
-                    "end": metrics_end.get("dns_no_response"),
-                    "taux": (metrics_start.get("dns_no_response") or 0) - (metrics_end.get("dns_no_response") or 0),
-                    "dns_no_response_start": metrics_start.get("dns_queries_woresp_raw"),
-                    "dns_no_response_end": metrics_end.get("dns_queries_woresp_raw"),
-                    "queries_start": metrics_start.get("dns_queries_raw"),
-                    "queries_end": metrics_end.get("dns_queries_raw"),
-                    "trend_icon": icon_dns_no_response,
-                    "trend_color": color_dns_no_response,
-                },
-            },
-            "link": {
-                "total": link_t,
-                "pertes": link_l,
-                "tcp_service_access": link_tcp_service_access,
-                "tcp_tts": link_tcp_tts,
-                "dns": link_dns,
-            },
-        }
-
-        # Assignation selon le type
-        if "roaming" in db_key:
-            roaming_recap[interval][db_key] = data_entry
-        else:
-            recap[interval][db_key] = data_entry
-
-        # Traitement TDD pour les bases utilisateur
+        entry = _entry(_compute_metrics(start_rec), _compute_metrics(end_rec), db_key)
+        (roaming_recap if "roaming" in db_key else recap)[interval][db_key] = entry
         if db_key in constants.LABELS["utilisateur"]:
-            tdd_start = tdd_data.get(db_key, {}).get(start_str)
-            tdd_end = tdd_data.get(db_key, {}).get(end_str)
-            if tdd_start and tdd_end:
-                # Calculs métriques
-                tdd_total_start, tdd_total_end, tdd_pertes_start, tdd_pertes_end = (
-                    None,
-                    None,
-                    None,
-                    None,
-                )
-                tdd_taux_total, tdd_taux_pertes = None, None
+            t = tdd_data.get(db_key, {})
+            tdd_recap[interval][db_key] = _tdd_entry(t.get(start_str), t.get(end_str), db_key)
 
-                # Utilisation du helper pour TDD également
-                tdd_metrics_start = _compute_metrics(tdd_start)
-                tdd_metrics_end = _compute_metrics(tdd_end)
-
-                tdd_total_start = tdd_metrics_start["total"]
-                tdd_total_end = tdd_metrics_end["total"]
-                tdd_pertes_start = tdd_metrics_start["pertes"]
-                tdd_pertes_end = tdd_metrics_end["pertes"]
-
-                # Ajout des compteurs de paquets bruts pour le calcul de la moyenne pondérée des pertes TDD
-                tdd_pkt_count_start = tdd_metrics_start["tcp_pkt_dw_raw"]
-                tdd_pkt_count_end = tdd_metrics_end["tcp_pkt_dw_raw"]
-
-                # tdd_taux_total = (
-                #     ((tdd_total_start - tdd_total_end) / tdd_total_end * 100)
-                #     if tdd_total_end != 0
-                #     else 0
-                # )
-                tdd_taux_total = (
-                    tdd_total_start if tdd_total_start is not None else 0
-                ) - (tdd_total_end if tdd_total_end is not None else 0)
-
-                # tdd_taux_pertes = (
-                #     ((tdd_pertes_start - tdd_pertes_end) / tdd_pertes_end * 100)
-                #     if tdd_pertes_end != 0
-                #     else 0
-                # )
-                tdd_taux_pertes = (
-                    tdd_pertes_start if tdd_pertes_start is not None else 0
-                ) - (tdd_pertes_end if tdd_pertes_end is not None else 0)
-
-                # Icones et couleurs
-                tdd_total_start_for_trend = (
-                    tdd_total_start if tdd_total_start is not None else 0
-                )
-                tdd_total_end_for_trend = (
-                    tdd_total_end if tdd_total_end is not None else 0
-                )
-                tdd_pertes_start_for_trend = (
-                    tdd_pertes_start if tdd_pertes_start is not None else 0
-                )
-                tdd_pertes_end_for_trend = (
-                    tdd_pertes_end if tdd_pertes_end is not None else 0
-                )
-
-                icon_tdd_total, color_tdd_total = _get_trend_icon_and_color(
-                    "traffic", tdd_total_end_for_trend, tdd_total_start_for_trend
-                )
-                icon_tdd_pertes, color_tdd_pertes = _get_trend_icon_and_color(
-                    "pertes", tdd_pertes_end_for_trend, tdd_pertes_start_for_trend
-                )
-                # Ajout du lien pour TDD
-                tdd_t_link = _go("traffic", db_key, "SGi")
-                tdd_l_link = _go("loss", db_key, "SGi")
-                tdd_recap[interval][db_key] = {
-                    "total": {
-                        "start": tdd_total_start,
-                        "end": tdd_total_end,
-                        "taux": tdd_taux_total,
-                        "trend_icon": icon_tdd_total,
-                        "trend_color": color_tdd_total,
-                    },
-                    "pertes": {
-                        "start": tdd_pertes_start,
-                        "end": tdd_pertes_end,
-                        "pkt_start": tdd_pkt_count_start,
-                        "pkt_end": tdd_pkt_count_end,
-                        "taux": tdd_taux_pertes,
-                        "trend_icon": icon_tdd_pertes,
-                        "trend_color": color_tdd_pertes,
-                    },
-                    "link": {"total": tdd_t_link, "pertes": tdd_l_link},
-                }
-            else:
-                tdd_recap[interval][db_key] = {
-                    "total": {
-                        "start": "N/A",
-                        "end": "N/A",
-                        "taux": "N/A",
-                        "trend_icon": "↔",
-                        "trend_color": "neutral",
-                    },
-                    "pertes": {
-                        "start": "N/A",
-                        "end": "N/A",
-                        "taux": "N/A",
-                        "trend_icon": "↔",
-                        "trend_color": "neutral",
-                    },
-                    "link": {"total": None, "pertes": None},
-                }
 
 def _calculate_totals_optimized(
     data_dict: dict[str, dict[str, dict]], label_dict: dict[str, dict]

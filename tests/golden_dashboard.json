@@ -1,0 +1,1949 @@
+{
+ "1day": {
+  "inaccessible": [
+   "dead"
+  ],
+  "recap": {
+   "douala_gi": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 68106.0,
+      "dns_malformed_start": 66897.0,
+      "end": 119.83530695194693,
+      "queries_end": 56833.0,
+      "queries_start": 42960.0,
+      "start": 155.71927374301674,
+      "taux": 35.88396679106981,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 27130.0,
+      "dns_no_response_start": 62393.0,
+      "end": 47.736350359826154,
+      "queries_end": 56833.0,
+      "queries_start": 42960.0,
+      "start": 145.23510242085663,
+      "taux": 97.49875206103047,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/douala_gi?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/douala_gi?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/douala_gi?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/douala_gi?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/douala_gi?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 3.373045318172708,
+     "start": 2.779616795304779,
+     "taux": -0.5934285228679292,
+     "tcp_loss_dw_end": 22047.0,
+     "tcp_loss_dw_start": 19901.0,
+     "tcp_pkt_dw_end": 653623.0,
+     "tcp_pkt_dw_start": 715962.0,
+     "trend_color": "down",
+     "trend_icon": "\u2191"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 0.9013316650281527,
+      "start": 0.07296906370760563,
+      "taux": -0.8283626013205471,
+      "trend_color": "neutral",
+      "trend_icon": "\u2191"
+     },
+     "tcp_block_wp_up": {
+      "end": 104.62469514948967,
+      "start": 2526.334625708321,
+      "taux": 2421.7099305588313,
+      "tcp_block_wp_up_end": 81081.0,
+      "tcp_block_wp_up_start": 84708.0,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "tcp_no_response": {
+      "end": 96.6785811063654,
+      "start": 1356.516552341187,
+      "taux": 1259.8379712348217,
+      "tcp_no_response_end": 74923.0,
+      "tcp_no_response_start": 45484.0,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "tcp_sessions": {
+      "end": 77497.0,
+      "start": 3353.0
+     }
+    },
+    "total": {
+     "end": 207.47702986666667,
+     "start": 166.8378336,
+     "taux": -40.63919626666666,
+     "trend_color": "up",
+     "trend_icon": "\u2191"
+    }
+   },
+   "empty_db": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 0,
+      "dns_malformed_start": 0,
+      "end": null,
+      "queries_end": 0,
+      "queries_start": 0,
+      "start": null,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 0,
+      "dns_no_response_start": 0,
+      "end": null,
+      "queries_end": 0,
+      "queries_start": 0,
+      "start": null,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/empty_db?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/empty_db?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/empty_db?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/empty_db?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/empty_db?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": null,
+     "start": null,
+     "taux": 0,
+     "tcp_loss_dw_end": 0,
+     "tcp_loss_dw_start": 0,
+     "tcp_pkt_dw_end": 0,
+     "tcp_pkt_dw_start": 0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": null,
+      "start": null,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_block_wp_up": {
+      "end": null,
+      "start": null,
+      "taux": 0,
+      "tcp_block_wp_up_end": 0,
+      "tcp_block_wp_up_start": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_no_response": {
+      "end": null,
+      "start": null,
+      "taux": 0,
+      "tcp_no_response_end": 0,
+      "tcp_no_response_start": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_sessions": {
+      "end": 0,
+      "start": 0
+     }
+    },
+    "total": {
+     "end": null,
+     "start": null,
+     "taux": 0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    }
+   },
+   "garoua_gi": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 35140.0,
+      "dns_malformed_start": 46098.0,
+      "end": 48.24206147636633,
+      "queries_end": 72841.0,
+      "queries_start": 75016.0,
+      "start": 61.450890476698305,
+      "taux": 13.208829000331974,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 87858.0,
+      "dns_no_response_start": 73662.0,
+      "end": 120.6161365165223,
+      "queries_end": 72841.0,
+      "queries_start": 75016.0,
+      "start": 98.19505172229924,
+      "taux": -22.421084794223063,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/garoua_gi?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/garoua_gi?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/garoua_gi?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/garoua_gi?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/garoua_gi?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 4.7813549449522155,
+     "start": 4.249601934801618,
+     "taux": -0.5317530101505978,
+     "tcp_loss_dw_end": 6649.0,
+     "tcp_loss_dw_start": 35283.0,
+     "tcp_pkt_dw_end": 139061.0,
+     "tcp_pkt_dw_start": 830266.0,
+     "trend_color": "down",
+     "trend_icon": "\u2191"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 0.5171578144037274,
+      "start": 12.946954813359529,
+      "taux": 12.429796998955801,
+      "trend_color": "neutral",
+      "trend_icon": "\u2193"
+     },
+     "tcp_block_wp_up": {
+      "end": 38.09898198479077,
+      "start": 116.39248515526137,
+      "taux": 78.2935031704706,
+      "tcp_block_wp_up_end": 28106.0,
+      "tcp_block_wp_up_start": 23914.0,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "tcp_no_response": {
+      "end": 100.92583806644888,
+      "start": 427.67448651805705,
+      "taux": 326.7486484516082,
+      "tcp_no_response_end": 74454.0,
+      "tcp_no_response_start": 87870.0,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "tcp_sessions": {
+      "end": 73771.0,
+      "start": 20546.0
+     }
+    },
+    "total": {
+     "end": 190.471252,
+     "start": 264.43893445333333,
+     "taux": 73.96768245333334,
+     "trend_color": "neutral",
+     "trend_icon": "\u2193"
+    }
+   },
+   "kribi": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 60433.0,
+      "dns_malformed_start": 11752.0,
+      "end": 508.4384990745415,
+      "queries_end": 11886.0,
+      "queries_start": 70525.0,
+      "start": 16.663594470046085,
+      "taux": -491.7749046044954,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 55340.0,
+      "dns_no_response_start": 73066.0,
+      "end": 465.58976947669527,
+      "queries_end": 11886.0,
+      "queries_start": 70525.0,
+      "start": 103.6029776674938,
+      "taux": -361.98679180920146,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/kribi?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/kribi?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/kribi?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/kribi?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/kribi?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 9.179829963290246,
+     "start": 6.153203269868631,
+     "taux": -3.0266266934216146,
+     "tcp_loss_dw_end": 38385.0,
+     "tcp_loss_dw_start": 18848.0,
+     "tcp_pkt_dw_end": 418145.0,
+     "tcp_pkt_dw_start": 306312.0,
+     "trend_color": "down",
+     "trend_icon": "\u2191"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 14.912091301665638,
+      "start": 0.11967315100614935,
+      "taux": -14.79241815065949,
+      "trend_color": "neutral",
+      "trend_icon": "\u2191"
+     },
+     "tcp_block_wp_up": {
+      "end": 84.99685204616999,
+      "start": 150.87860857091627,
+      "taux": 65.88175652474628,
+      "tcp_block_wp_up_end": 40501.0,
+      "tcp_block_wp_up_start": 67316.0,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "tcp_no_response": {
+      "end": 158.83315844700945,
+      "start": 110.56123363815671,
+      "taux": -48.271924808852745,
+      "tcp_no_response_end": 75684.0,
+      "tcp_no_response_start": 49328.0,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "tcp_sessions": {
+      "end": 47650.0,
+      "start": 44616.0
+     }
+    },
+    "total": {
+     "end": 242.76369221333334,
+     "start": 138.19635845333335,
+     "taux": -104.56733376,
+     "trend_color": "up",
+     "trend_icon": "\u2191"
+    }
+   },
+   "wacs_ic": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 62802.0,
+      "dns_malformed_start": 73116.0,
+      "end": 0,
+      "queries_end": 0.0,
+      "queries_start": 0.0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 8427.0,
+      "dns_no_response_start": 87018.0,
+      "end": 0,
+      "queries_end": 0.0,
+      "queries_start": 0.0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/wacs_ic?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/wacs_ic?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/wacs_ic?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/wacs_ic?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/wacs_ic?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 11.690347517984325,
+     "start": 2.180456302549926,
+     "taux": -9.509891215434399,
+     "tcp_loss_dw_end": 32664.0,
+     "tcp_loss_dw_start": 19009.0,
+     "tcp_pkt_dw_end": 279410.0,
+     "tcp_pkt_dw_start": 871790.0,
+     "trend_color": "down",
+     "trend_icon": "\u2191"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 0.40414385580729384,
+      "start": 0.9724079269384588,
+      "taux": 0.568264071131165,
+      "trend_color": "neutral",
+      "trend_icon": "\u2193"
+     },
+     "tcp_block_wp_up": {
+      "end": 60.789865070690055,
+      "start": 107.46727576210138,
+      "taux": 46.677410691411325,
+      "tcp_block_wp_up_end": 33925.0,
+      "tcp_block_wp_up_start": 61165.0,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "tcp_no_response": {
+      "end": 120.99557403193148,
+      "start": 111.82289378898358,
+      "taux": -9.172680242947905,
+      "tcp_no_response_end": 67524.0,
+      "tcp_no_response_start": 63644.0,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "tcp_sessions": {
+      "end": 55807.0,
+      "start": 56915.0
+     }
+    },
+    "total": {
+     "end": 234.26127106666667,
+     "start": 252.93386450666668,
+     "taux": 18.672593440000014,
+     "trend_color": "neutral",
+     "trend_icon": "\u2193"
+    }
+   },
+   "yaounde_gi": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 0.0,
+      "dns_malformed_start": 0.0,
+      "end": 0,
+      "queries_end": 0.0,
+      "queries_start": 0.0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 0.0,
+      "dns_no_response_start": 0.0,
+      "end": 0,
+      "queries_end": 0.0,
+      "queries_start": 0.0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/yaounde_gi?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/yaounde_gi?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/yaounde_gi?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/yaounde_gi?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/yaounde_gi?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 0.0,
+     "start": 0.0,
+     "taux": 0.0,
+     "tcp_loss_dw_end": 0.0,
+     "tcp_loss_dw_start": 0.0,
+     "tcp_pkt_dw_end": 0.0,
+     "tcp_pkt_dw_start": 0.0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_block_wp_up": {
+      "end": 0.0,
+      "start": 0.0,
+      "taux": 0.0,
+      "tcp_block_wp_up_end": 0.0,
+      "tcp_block_wp_up_start": 0.0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_no_response": {
+      "end": 0.0,
+      "start": 0.0,
+      "taux": 0.0,
+      "tcp_no_response_end": 0.0,
+      "tcp_no_response_start": 0.0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_sessions": {
+      "end": 0.0,
+      "start": 0.0
+     }
+    },
+    "total": {
+     "end": 0.0,
+     "start": 0.0,
+     "taux": 0.0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    }
+   }
+  },
+  "roaming": {
+   "douala_gi_roaming_out_up": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 82315.0,
+      "dns_malformed_start": 45047.0,
+      "end": 408.3895614209169,
+      "queries_end": 20156.0,
+      "queries_start": 49116.0,
+      "start": 91.71553058066618,
+      "taux": -316.6740308402507,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 53810.0,
+      "dns_no_response_start": 26342.0,
+      "end": 266.9676523119667,
+      "queries_end": 20156.0,
+      "queries_start": 49116.0,
+      "start": 53.63221760729701,
+      "taux": -213.33543470466967,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 0.06844869298400896,
+     "start": 7.993031525442634,
+     "taux": 7.924582832458625,
+     "tcp_loss_dw_end": 348.0,
+     "tcp_loss_dw_start": 30098.0,
+     "tcp_pkt_dw_end": 508410.0,
+     "tcp_pkt_dw_start": 376553.0,
+     "trend_color": "up",
+     "trend_icon": "\u2193"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 0.6018719910066228,
+      "start": 2.4153568498769484,
+      "taux": 1.8134848588703256,
+      "trend_color": "neutral",
+      "trend_icon": "\u2193"
+     },
+     "tcp_block_wp_up": {
+      "end": 366.7855593579794,
+      "start": 130.52235502434706,
+      "taux": -236.26320433363236,
+      "tcp_block_wp_up_end": 76097.0,
+      "tcp_block_wp_up_start": 47176.0,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "tcp_no_response": {
+      "end": 425.4301826770136,
+      "start": 144.71834882691456,
+      "taux": -280.711833850099,
+      "tcp_no_response_end": 88264.0,
+      "tcp_no_response_start": 52307.0,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "tcp_sessions": {
+      "end": 20747.0,
+      "start": 36144.0
+     }
+    },
+    "total": {
+     "end": 281.15481688,
+     "start": 307.56275485333333,
+     "taux": 26.407937973333333,
+     "trend_color": "neutral",
+     "trend_icon": "\u2193"
+    }
+   }
+  },
+  "tdd": {
+   "douala_gi": {
+    "link": {
+     "pertes": "/go/loss/douala_gi?end_date=__END_TIMESTAMP__&c=SGi",
+     "total": "/go/traffic/douala_gi?end_date=__END_TIMESTAMP__&c=SGi"
+    },
+    "pertes": {
+     "end": 1.3851494969533795,
+     "pkt_end": 508104.0,
+     "pkt_start": 804063.0,
+     "start": 0.016167887342161,
+     "taux": -1.3689816096112186,
+     "trend_color": "neutral",
+     "trend_icon": "\u2191"
+    },
+    "total": {
+     "end": 188.75721373333334,
+     "start": 164.76280005333334,
+     "taux": -23.994413680000008,
+     "trend_color": "up",
+     "trend_icon": "\u2191"
+    }
+   },
+   "garoua_gi": {
+    "link": {
+     "pertes": null,
+     "total": null
+    },
+    "pertes": {
+     "end": "N/A",
+     "start": "N/A",
+     "taux": "N/A",
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    },
+    "total": {
+     "end": "N/A",
+     "start": "N/A",
+     "taux": "N/A",
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    }
+   },
+   "yaounde_gi": {
+    "link": {
+     "pertes": "/go/loss/yaounde_gi?end_date=__END_TIMESTAMP__&c=SGi",
+     "total": "/go/traffic/yaounde_gi?end_date=__END_TIMESTAMP__&c=SGi"
+    },
+    "pertes": {
+     "end": 0.0,
+     "pkt_end": 0.0,
+     "pkt_start": 0.0,
+     "start": 0.0,
+     "taux": 0.0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    },
+    "total": {
+     "end": 0.0,
+     "start": 0.0,
+     "taux": 0.0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    }
+   }
+  }
+ },
+ "1week": {
+  "inaccessible": [
+   "dead"
+  ],
+  "recap": {
+   "douala_gi": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 28668.0,
+      "dns_malformed_start": 22723.0,
+      "end": 158.81668605617418,
+      "queries_end": 18051.0,
+      "queries_start": 84964.0,
+      "start": 26.74426816063274,
+      "taux": -132.07241789554143,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 67744.0,
+      "dns_no_response_start": 5929.0,
+      "end": 375.2922275774195,
+      "queries_end": 18051.0,
+      "queries_start": 84964.0,
+      "start": 6.978249611600207,
+      "taux": -368.3139779658193,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/douala_gi?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/douala_gi?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/douala_gi?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/douala_gi?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/douala_gi?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 7.24810027232403,
+     "start": 0.5528421126341404,
+     "taux": -6.69525815968989,
+     "tcp_loss_dw_end": 12190.0,
+     "tcp_loss_dw_start": 3158.0,
+     "tcp_pkt_dw_end": 168182.0,
+     "tcp_pkt_dw_start": 571230.0,
+     "trend_color": "down",
+     "trend_icon": "\u2191"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 4.999763677183032,
+      "start": 5.724530831099195,
+      "taux": 0.7247671539161633,
+      "trend_color": "neutral",
+      "trend_icon": "\u2193"
+     },
+     "tcp_block_wp_up": {
+      "end": 3.8627103759052104,
+      "start": 61.67175509530489,
+      "taux": 57.80904471939968,
+      "tcp_block_wp_up_end": 2683.0,
+      "tcp_block_wp_up_start": 52318.0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2193"
+     },
+     "tcp_no_response": {
+      "end": 128.05971868296405,
+      "start": 84.56850518076692,
+      "taux": -43.49121350219713,
+      "tcp_no_response_end": 88949.0,
+      "tcp_no_response_start": 71742.0,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "tcp_sessions": {
+      "end": 69459.0,
+      "start": 84833.0
+     }
+    },
+    "total": {
+     "end": 311.0104422666667,
+     "start": 225.49857253333334,
+     "taux": -85.51186973333336,
+     "trend_color": "up",
+     "trend_icon": "\u2191"
+    }
+   },
+   "empty_db": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 0,
+      "dns_malformed_start": 0,
+      "end": null,
+      "queries_end": 0,
+      "queries_start": 0,
+      "start": null,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 0,
+      "dns_no_response_start": 0,
+      "end": null,
+      "queries_end": 0,
+      "queries_start": 0,
+      "start": null,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/empty_db?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/empty_db?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/empty_db?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/empty_db?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/empty_db?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": null,
+     "start": null,
+     "taux": 0,
+     "tcp_loss_dw_end": 0,
+     "tcp_loss_dw_start": 0,
+     "tcp_pkt_dw_end": 0,
+     "tcp_pkt_dw_start": 0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": null,
+      "start": null,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_block_wp_up": {
+      "end": null,
+      "start": null,
+      "taux": 0,
+      "tcp_block_wp_up_end": 0,
+      "tcp_block_wp_up_start": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_no_response": {
+      "end": null,
+      "start": null,
+      "taux": 0,
+      "tcp_no_response_end": 0,
+      "tcp_no_response_start": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_sessions": {
+      "end": 0,
+      "start": 0
+     }
+    },
+    "total": {
+     "end": null,
+     "start": null,
+     "taux": 0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    }
+   },
+   "garoua_gi": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 33691.0,
+      "dns_malformed_start": 82586.0,
+      "end": 1666.2215628090999,
+      "queries_end": 2022.0,
+      "queries_start": 66404.0,
+      "start": 124.3690139148244,
+      "taux": -1541.8525488942755,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 54333.0,
+      "dns_no_response_start": 13935.0,
+      "end": 2687.091988130564,
+      "queries_end": 2022.0,
+      "queries_start": 66404.0,
+      "start": 20.985181615565327,
+      "taux": -2666.106806514999,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/garoua_gi?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/garoua_gi?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/garoua_gi?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/garoua_gi?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/garoua_gi?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 10.51650692225772,
+     "start": 5.517029521080838,
+     "taux": -4.9994774011768826,
+     "tcp_loss_dw_end": 6320.0,
+     "tcp_loss_dw_start": 18139.0,
+     "tcp_pkt_dw_end": 60096.0,
+     "tcp_pkt_dw_start": 328782.0,
+     "trend_color": "down",
+     "trend_icon": "\u2191"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 0.22060429559519476,
+      "start": 0.5206878828114961,
+      "taux": 0.30008358721630135,
+      "trend_color": "neutral",
+      "trend_icon": "\u2193"
+     },
+     "tcp_block_wp_up": {
+      "end": 62.219668606590794,
+      "start": 9.35451485265458,
+      "taux": -52.86515375393621,
+      "tcp_block_wp_up_end": 33570.0,
+      "tcp_block_wp_up_start": 7920.0,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "tcp_no_response": {
+      "end": 63.37064907143122,
+      "start": 105.97531447469439,
+      "taux": 42.60466540326317,
+      "tcp_no_response_end": 34191.0,
+      "tcp_no_response_start": 89724.0,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "tcp_sessions": {
+      "end": 53954.0,
+      "start": 84665.0
+     }
+    },
+    "total": {
+     "end": 203.91943330666666,
+     "start": 180.70205848,
+     "taux": -23.217374826666656,
+     "trend_color": "up",
+     "trend_icon": "\u2191"
+    }
+   },
+   "kribi": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 56283.0,
+      "dns_malformed_start": 55045.0,
+      "end": 301.5268402442945,
+      "queries_end": 18666.0,
+      "queries_start": 62808.0,
+      "start": 87.64010954018596,
+      "taux": -213.88673070410852,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 61609.0,
+      "dns_no_response_start": 73924.0,
+      "end": 330.0600021429337,
+      "queries_end": 18666.0,
+      "queries_start": 62808.0,
+      "start": 117.69838237167241,
+      "taux": -212.36161977126127,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/kribi?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/kribi?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/kribi?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/kribi?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/kribi?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 2.967560970302631,
+     "start": 6.311225637564677,
+     "taux": 3.343664667262046,
+     "tcp_loss_dw_end": 15002.0,
+     "tcp_loss_dw_start": 33946.0,
+     "tcp_pkt_dw_end": 505533.0,
+     "tcp_pkt_dw_start": 537867.0,
+     "trend_color": "up",
+     "trend_icon": "\u2193"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 0.15297959741013417,
+      "start": 1.3177288928064999,
+      "taux": 1.1647492953963656,
+      "trend_color": "neutral",
+      "trend_icon": "\u2193"
+     },
+     "tcp_block_wp_up": {
+      "end": 84.07689384187232,
+      "start": 189.85250737463127,
+      "taux": 105.77561353275895,
+      "tcp_block_wp_up_end": 68579.0,
+      "tcp_block_wp_up_start": 64360.0,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "tcp_no_response": {
+      "end": 7.854892297129967,
+      "start": 232.047197640118,
+      "taux": 224.19230534298802,
+      "tcp_no_response_end": 6407.0,
+      "tcp_no_response_start": 78664.0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2193"
+     },
+     "tcp_sessions": {
+      "end": 81567.0,
+      "start": 33900.0
+     }
+    },
+    "total": {
+     "end": 186.75553088,
+     "start": 233.25421509333333,
+     "taux": 46.49868421333332,
+     "trend_color": "neutral",
+     "trend_icon": "\u2193"
+    }
+   },
+   "wacs_ic": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 46825.0,
+      "dns_malformed_start": 59143.0,
+      "end": 0,
+      "queries_end": 0.0,
+      "queries_start": 0.0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 20284.0,
+      "dns_no_response_start": 76105.0,
+      "end": 0,
+      "queries_end": 0.0,
+      "queries_start": 0.0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/wacs_ic?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/wacs_ic?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/wacs_ic?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/wacs_ic?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/wacs_ic?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 11.625982371321907,
+     "start": 0.6206512790456361,
+     "taux": -11.00533109227627,
+     "tcp_loss_dw_end": 38211.0,
+     "tcp_loss_dw_start": 5443.0,
+     "tcp_pkt_dw_end": 328669.0,
+     "tcp_pkt_dw_start": 876982.0,
+     "trend_color": "down",
+     "trend_icon": "\u2191"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 2.4893598886268715,
+      "start": 6.568787384448069,
+      "taux": 4.079427495821198,
+      "trend_color": "neutral",
+      "trend_icon": "\u2193"
+     },
+     "tcp_block_wp_up": {
+      "end": 85.999711829403,
+      "start": 210367.85714285716,
+      "taux": 210281.85743102775,
+      "tcp_block_wp_up_end": 71624.0,
+      "tcp_block_wp_up_start": 58903.0,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "tcp_no_response": {
+      "end": 7.027760434177033,
+      "start": 68510.71428571429,
+      "taux": 68503.6865252801,
+      "tcp_no_response_end": 5853.0,
+      "tcp_no_response_start": 19183.0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2193"
+     },
+     "tcp_sessions": {
+      "end": 83284.0,
+      "start": 28.0
+     }
+    },
+    "total": {
+     "end": 121.03367088,
+     "start": 150.29713488000002,
+     "taux": 29.263464000000013,
+     "trend_color": "neutral",
+     "trend_icon": "\u2193"
+    }
+   },
+   "yaounde_gi": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 0.0,
+      "dns_malformed_start": 0.0,
+      "end": 0,
+      "queries_end": 0.0,
+      "queries_start": 0.0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 0.0,
+      "dns_no_response_start": 0.0,
+      "end": 0,
+      "queries_end": 0.0,
+      "queries_start": 0.0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/yaounde_gi?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/yaounde_gi?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/yaounde_gi?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/yaounde_gi?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/yaounde_gi?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 0.0,
+     "start": 0.0,
+     "taux": 0.0,
+     "tcp_loss_dw_end": 0.0,
+     "tcp_loss_dw_start": 0.0,
+     "tcp_pkt_dw_end": 0.0,
+     "tcp_pkt_dw_start": 0.0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_block_wp_up": {
+      "end": 0.0,
+      "start": 0.0,
+      "taux": 0.0,
+      "tcp_block_wp_up_end": 0.0,
+      "tcp_block_wp_up_start": 0.0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_no_response": {
+      "end": 0.0,
+      "start": 0.0,
+      "taux": 0.0,
+      "tcp_no_response_end": 0.0,
+      "tcp_no_response_start": 0.0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_sessions": {
+      "end": 0.0,
+      "start": 0.0
+     }
+    },
+    "total": {
+     "end": 0.0,
+     "start": 0.0,
+     "taux": 0.0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    }
+   }
+  },
+  "roaming": {
+   "douala_gi_roaming_out_up": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 49883.0,
+      "dns_malformed_start": 48862.0,
+      "end": 73.67045236372229,
+      "queries_end": 67711.0,
+      "queries_start": 34736.0,
+      "start": 140.6667434362045,
+      "taux": 66.99629107248222,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 70645.0,
+      "dns_no_response_start": 71660.0,
+      "end": 104.33312164936272,
+      "queries_end": 67711.0,
+      "queries_start": 34736.0,
+      "start": 206.29894058037772,
+      "taux": 101.965818931015,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 1.2163341331050284,
+     "start": 4.563710140118759,
+     "taux": 3.3473760070137306,
+     "tcp_loss_dw_end": 10357.0,
+     "tcp_loss_dw_start": 6602.0,
+     "tcp_pkt_dw_end": 851493.0,
+     "tcp_pkt_dw_start": 144663.0,
+     "trend_color": "up",
+     "trend_icon": "\u2193"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 0.07795616547864899,
+      "start": 0.4879526062160131,
+      "taux": 0.40999644073736413,
+      "trend_color": "neutral",
+      "trend_icon": "\u2193"
+     },
+     "tcp_block_wp_up": {
+      "end": 77.98901972956719,
+      "start": 213.72624059191224,
+      "taux": 135.73722086234505,
+      "tcp_block_wp_up_end": 40201.0,
+      "tcp_block_wp_up_start": 83770.0,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "tcp_no_response": {
+      "end": 148.08621258269153,
+      "start": 12.542416124505676,
+      "taux": -135.54379645818585,
+      "tcp_no_response_end": 76334.0,
+      "tcp_no_response_start": 4916.0,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "tcp_sessions": {
+      "end": 51547.0,
+      "start": 39195.0
+     }
+    },
+    "total": {
+     "end": 191.54373757333335,
+     "start": 289.36329541333333,
+     "taux": 97.81955783999999,
+     "trend_color": "neutral",
+     "trend_icon": "\u2193"
+    }
+   }
+  },
+  "tdd": {
+   "douala_gi": {
+    "link": {
+     "pertes": "/go/loss/douala_gi?end_date=__END_TIMESTAMP__&c=SGi",
+     "total": "/go/traffic/douala_gi?end_date=__END_TIMESTAMP__&c=SGi"
+    },
+    "pertes": {
+     "end": 1.8754628838375207,
+     "pkt_end": 789885.0,
+     "pkt_start": 582582.0,
+     "start": 5.837633157220786,
+     "taux": 3.9621702733832653,
+     "trend_color": "up",
+     "trend_icon": "\u2193"
+    },
+    "total": {
+     "end": 242.56617090666668,
+     "start": 287.58046824,
+     "taux": 45.01429733333333,
+     "trend_color": "neutral",
+     "trend_icon": "\u2193"
+    }
+   },
+   "garoua_gi": {
+    "link": {
+     "pertes": null,
+     "total": null
+    },
+    "pertes": {
+     "end": "N/A",
+     "start": "N/A",
+     "taux": "N/A",
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    },
+    "total": {
+     "end": "N/A",
+     "start": "N/A",
+     "taux": "N/A",
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    }
+   },
+   "yaounde_gi": {
+    "link": {
+     "pertes": "/go/loss/yaounde_gi?end_date=__END_TIMESTAMP__&c=SGi",
+     "total": "/go/traffic/yaounde_gi?end_date=__END_TIMESTAMP__&c=SGi"
+    },
+    "pertes": {
+     "end": 0.0,
+     "pkt_end": 0.0,
+     "pkt_start": 0.0,
+     "start": 0.0,
+     "taux": 0.0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    },
+    "total": {
+     "end": 0.0,
+     "start": 0.0,
+     "taux": 0.0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    }
+   }
+  }
+ },
+ "5min": {
+  "inaccessible": [
+   "dead"
+  ],
+  "recap": {
+   "douala_gi": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 19468.0,
+      "dns_malformed_start": 17198.0,
+      "end": 75.51297467126955,
+      "queries_end": 25781.0,
+      "queries_start": 66154.0,
+      "start": 25.996916286241195,
+      "taux": -49.51605838502835,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 68161.0,
+      "dns_no_response_start": 78398.0,
+      "end": 264.38462433575114,
+      "queries_end": 25781.0,
+      "queries_start": 66154.0,
+      "start": 118.50832905039756,
+      "taux": -145.8762952853536,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/douala_gi?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/douala_gi?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/douala_gi?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/douala_gi?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/douala_gi?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 0.2348632416199984,
+     "start": 1.815282758258667,
+     "taux": 1.5804195166386688,
+     "tcp_loss_dw_end": 926.0,
+     "tcp_loss_dw_start": 5533.0,
+     "tcp_pkt_dw_end": 394272.0,
+     "tcp_pkt_dw_start": 304801.0,
+     "trend_color": "up",
+     "trend_icon": "\u2193"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 0.8115711172890525,
+      "start": 2.121701632499401,
+      "taux": 1.3101305152103486,
+      "trend_color": "neutral",
+      "trend_icon": "\u2193"
+     },
+     "tcp_block_wp_up": {
+      "end": 78.38033261026753,
+      "start": 92.83424819298996,
+      "taux": 14.45391558272243,
+      "tcp_block_wp_up_end": 40108.0,
+      "tcp_block_wp_up_start": 71539.0,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "tcp_no_response": {
+      "end": 150.10845986984816,
+      "start": 22.937672752754313,
+      "taux": -127.17078711709385,
+      "tcp_no_response_end": 76812.0,
+      "tcp_no_response_start": 17676.0,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "tcp_sessions": {
+      "end": 51171.0,
+      "start": 77061.0
+     }
+    },
+    "total": {
+     "end": 158.26112080000001,
+     "start": 358.56848488,
+     "taux": 200.30736408,
+     "trend_color": "down",
+     "trend_icon": "\u2193"
+    }
+   },
+   "empty_db": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 0,
+      "dns_malformed_start": 0,
+      "end": null,
+      "queries_end": 0,
+      "queries_start": 0,
+      "start": null,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 0,
+      "dns_no_response_start": 0,
+      "end": null,
+      "queries_end": 0,
+      "queries_start": 0,
+      "start": null,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/empty_db?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/empty_db?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/empty_db?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/empty_db?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/empty_db?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": null,
+     "start": null,
+     "taux": 0,
+     "tcp_loss_dw_end": 0,
+     "tcp_loss_dw_start": 0,
+     "tcp_pkt_dw_end": 0,
+     "tcp_pkt_dw_start": 0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": null,
+      "start": null,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_block_wp_up": {
+      "end": null,
+      "start": null,
+      "taux": 0,
+      "tcp_block_wp_up_end": 0,
+      "tcp_block_wp_up_start": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_no_response": {
+      "end": null,
+      "start": null,
+      "taux": 0,
+      "tcp_no_response_end": 0,
+      "tcp_no_response_start": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_sessions": {
+      "end": 0,
+      "start": 0
+     }
+    },
+    "total": {
+     "end": null,
+     "start": null,
+     "taux": 0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    }
+   },
+   "garoua_gi": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 12394.0,
+      "dns_malformed_start": 22897.0,
+      "end": 40.875960555390655,
+      "queries_end": 30321.0,
+      "queries_start": 60806.0,
+      "start": 37.65582343847647,
+      "taux": -3.220137116914188,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 28092.0,
+      "dns_no_response_start": 34530.0,
+      "end": 92.64865934500841,
+      "queries_end": 30321.0,
+      "queries_start": 60806.0,
+      "start": 56.787159161924805,
+      "taux": -35.861500183083606,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/garoua_gi?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/garoua_gi?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/garoua_gi?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/garoua_gi?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/garoua_gi?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 118.600583090379,
+     "start": 5.2216093557747225,
+     "taux": -113.37897373460429,
+     "tcp_loss_dw_end": 6102.0,
+     "tcp_loss_dw_start": 27245.0,
+     "tcp_pkt_dw_end": 5145.0,
+     "tcp_pkt_dw_start": 521774.0,
+     "trend_color": "down",
+     "trend_icon": "\u2191"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 0.9951669150737262,
+      "start": 0.6139371950456649,
+      "taux": -0.3812297200280613,
+      "trend_color": "neutral",
+      "trend_icon": "\u2191"
+     },
+     "tcp_block_wp_up": {
+      "end": 43.86057786074503,
+      "start": 111.36882719471362,
+      "taux": 67.50824933396859,
+      "tcp_block_wp_up_end": 15742.0,
+      "tcp_block_wp_up_start": 50224.0,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "tcp_no_response": {
+      "end": 162.3582513722103,
+      "start": 22.859613721533584,
+      "taux": -139.49863765067673,
+      "tcp_no_response_end": 58272.0,
+      "tcp_no_response_start": 10309.0,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "tcp_sessions": {
+      "end": 35891.0,
+      "start": 45097.0
+     }
+    },
+    "total": {
+     "end": 144.09583085333333,
+     "start": 185.67355797333335,
+     "taux": 41.57772712000002,
+     "trend_color": "neutral",
+     "trend_icon": "\u2193"
+    }
+   },
+   "kribi": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 58937.0,
+      "dns_malformed_start": 55130.0,
+      "end": 65.62628748315834,
+      "queries_end": 89807.0,
+      "queries_start": 71802.0,
+      "start": 76.78059106988663,
+      "taux": 11.15430358672829,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 1505.0,
+      "dns_no_response_start": 75047.0,
+      "end": 1.675815916353959,
+      "queries_end": 89807.0,
+      "queries_start": 71802.0,
+      "start": 104.51937271942286,
+      "taux": 102.8435568030689,
+      "trend_color": "neutral",
+      "trend_icon": "\u2193"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/kribi?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/kribi?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/kribi?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/kribi?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/kribi?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 4.005617551346715,
+     "start": 3.6420426050267003,
+     "taux": -0.36357494632001464,
+     "tcp_loss_dw_end": 20593.0,
+     "tcp_loss_dw_start": 32171.0,
+     "tcp_pkt_dw_end": 514103.0,
+     "tcp_pkt_dw_start": 883323.0,
+     "trend_color": "down",
+     "trend_icon": "\u2191"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 2.5939782279178725,
+      "start": 1.0340323440554469,
+      "taux": -1.5599458838624256,
+      "trend_color": "neutral",
+      "trend_icon": "\u2191"
+     },
+     "tcp_block_wp_up": {
+      "end": 82.32822348455373,
+      "start": 40.118438909375044,
+      "taux": -42.20978457517869,
+      "tcp_block_wp_up_end": 10580.0,
+      "tcp_block_wp_up_start": 29266.0,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "tcp_no_response": {
+      "end": 626.44152206054,
+      "start": 18.440280195753196,
+      "taux": -608.0012418647868,
+      "tcp_no_response_end": 80504.0,
+      "tcp_no_response_start": 13452.0,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "tcp_sessions": {
+      "end": 12851.0,
+      "start": 72949.0
+     }
+    },
+    "total": {
+     "end": 292.25415101333334,
+     "start": 166.40912122666666,
+     "taux": -125.84502978666669,
+     "trend_color": "up",
+     "trend_icon": "\u2191"
+    }
+   },
+   "wacs_ic": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 19640.0,
+      "dns_malformed_start": 52701.0,
+      "end": 0,
+      "queries_end": 0.0,
+      "queries_start": 0.0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 85936.0,
+      "dns_no_response_start": 87785.0,
+      "end": 0,
+      "queries_end": 0.0,
+      "queries_start": 0.0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/wacs_ic?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/wacs_ic?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/wacs_ic?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/wacs_ic?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/wacs_ic?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 7.131930728614926,
+     "start": 5.722577143095745,
+     "taux": -1.409353585519181,
+     "tcp_loss_dw_end": 34268.0,
+     "tcp_loss_dw_start": 32892.0,
+     "tcp_pkt_dw_end": 480487.0,
+     "tcp_pkt_dw_start": 574776.0,
+     "trend_color": "down",
+     "trend_icon": "\u2191"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 0.03445537815840966,
+      "start": 0.46001649957352797,
+      "taux": 0.4255611214151183,
+      "trend_color": "neutral",
+      "trend_icon": "\u2193"
+     },
+     "tcp_block_wp_up": {
+      "end": 889.2371514173773,
+      "start": 83.85237076308724,
+      "taux": -805.38478065429,
+      "tcp_block_wp_up_end": 38584.0,
+      "tcp_block_wp_up_start": 61525.0,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "tcp_no_response": {
+      "end": 611.7999539064301,
+      "start": 120.4557534788001,
+      "taux": -491.34420042763,
+      "tcp_no_response_end": 26546.0,
+      "tcp_no_response_start": 88382.0,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "tcp_sessions": {
+      "end": 4339.0,
+      "start": 73373.0
+     }
+    },
+    "total": {
+     "end": 273.46548704,
+     "start": 183.0586672,
+     "taux": -90.40681984000003,
+     "trend_color": "up",
+     "trend_icon": "\u2191"
+    }
+   },
+   "yaounde_gi": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 0.0,
+      "dns_malformed_start": 0.0,
+      "end": 0,
+      "queries_end": 0.0,
+      "queries_start": 0.0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 0.0,
+      "dns_no_response_start": 0.0,
+      "end": 0,
+      "queries_end": 0.0,
+      "queries_start": 0.0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/yaounde_gi?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/yaounde_gi?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/yaounde_gi?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/yaounde_gi?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/yaounde_gi?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 0.0,
+     "start": 0.0,
+     "taux": 0.0,
+     "tcp_loss_dw_end": 0.0,
+     "tcp_loss_dw_start": 0.0,
+     "tcp_pkt_dw_end": 0.0,
+     "tcp_pkt_dw_start": 0.0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 0,
+      "start": 0,
+      "taux": 0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_block_wp_up": {
+      "end": 0.0,
+      "start": 0.0,
+      "taux": 0.0,
+      "tcp_block_wp_up_end": 0.0,
+      "tcp_block_wp_up_start": 0.0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_no_response": {
+      "end": 0.0,
+      "start": 0.0,
+      "taux": 0.0,
+      "tcp_no_response_end": 0.0,
+      "tcp_no_response_start": 0.0,
+      "trend_color": "neutral",
+      "trend_icon": "\u2194"
+     },
+     "tcp_sessions": {
+      "end": 0.0,
+      "start": 0.0
+     }
+    },
+    "total": {
+     "end": 0.0,
+     "start": 0.0,
+     "taux": 0.0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    }
+   }
+  },
+  "roaming": {
+   "douala_gi_roaming_out_up": {
+    "dns_metrics": {
+     "dns_malformed": {
+      "dns_malformed_end": 61675.0,
+      "dns_malformed_start": 4981.0,
+      "end": 212.11652221763651,
+      "queries_end": 29076.0,
+      "queries_start": 67377.0,
+      "start": 7.3927304569808685,
+      "taux": -204.72379176065564,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "dns_no_response": {
+      "dns_no_response_end": 7641.0,
+      "dns_no_response_start": 85224.0,
+      "end": 26.2794056954189,
+      "queries_end": 29076.0,
+      "queries_start": 67377.0,
+      "start": 126.48826750968432,
+      "taux": 100.20886181426542,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     }
+    },
+    "link": {
+     "dns": "/go/dns/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__",
+     "pertes": "/go/loss/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__",
+     "tcp_service_access": "/go/tcp_service_access/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__",
+     "tcp_tts": "/go/tcp_tts/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__",
+     "total": "/go/traffic/douala_gi_roaming_out_up?end_date=__END_TIMESTAMP__"
+    },
+    "pertes": {
+     "end": 4.680579778524828,
+     "start": 2.021775291093301,
+     "taux": -2.6588044874315275,
+     "tcp_loss_dw_end": 33332.0,
+     "tcp_loss_dw_start": 17381.0,
+     "tcp_pkt_dw_end": 712134.0,
+     "tcp_pkt_dw_start": 859690.0,
+     "trend_color": "down",
+     "trend_icon": "\u2191"
+    },
+    "tcp_metrics": {
+     "latence": {
+      "end": 55.04615384615385,
+      "start": 2.0046916318348544,
+      "taux": -53.041462214319,
+      "trend_color": "neutral",
+      "trend_icon": "\u2191"
+     },
+     "tcp_block_wp_up": {
+      "end": 270.9442262372349,
+      "start": 107.3537527593819,
+      "taux": -163.59047347785298,
+      "tcp_block_wp_up_end": 86228.0,
+      "tcp_block_wp_up_start": 77810.0,
+      "trend_color": "down",
+      "trend_icon": "\u2191"
+     },
+     "tcp_no_response": {
+      "end": 23.167321288295366,
+      "start": 113.34575055187639,
+      "taux": 90.17842926358102,
+      "tcp_no_response_end": 7373.0,
+      "tcp_no_response_start": 82153.0,
+      "trend_color": "down",
+      "trend_icon": "\u2193"
+     },
+     "tcp_sessions": {
+      "end": 31825.0,
+      "start": 72480.0
+     }
+    },
+    "total": {
+     "end": 257.54919576000003,
+     "start": 194.89864813333332,
+     "taux": -62.65054762666671,
+     "trend_color": "up",
+     "trend_icon": "\u2191"
+    }
+   }
+  },
+  "tdd": {
+   "douala_gi": {
+    "link": {
+     "pertes": "/go/loss/douala_gi?end_date=__END_TIMESTAMP__&c=SGi",
+     "total": "/go/traffic/douala_gi?end_date=__END_TIMESTAMP__&c=SGi"
+    },
+    "pertes": {
+     "end": 4.13549418198429,
+     "pkt_end": 851579.0,
+     "pkt_start": 170091.0,
+     "start": 11.285723524466315,
+     "taux": 7.1502293424820245,
+     "trend_color": "down",
+     "trend_icon": "\u2193"
+    },
+    "total": {
+     "end": 169.42320554666668,
+     "start": 96.33462632,
+     "taux": -73.08857922666668,
+     "trend_color": "up",
+     "trend_icon": "\u2191"
+    }
+   },
+   "garoua_gi": {
+    "link": {
+     "pertes": null,
+     "total": null
+    },
+    "pertes": {
+     "end": "N/A",
+     "start": "N/A",
+     "taux": "N/A",
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    },
+    "total": {
+     "end": "N/A",
+     "start": "N/A",
+     "taux": "N/A",
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    }
+   },
+   "yaounde_gi": {
+    "link": {
+     "pertes": "/go/loss/yaounde_gi?end_date=__END_TIMESTAMP__&c=SGi",
+     "total": "/go/traffic/yaounde_gi?end_date=__END_TIMESTAMP__&c=SGi"
+    },
+    "pertes": {
+     "end": 0.0,
+     "pkt_end": 0.0,
+     "pkt_start": 0.0,
+     "start": 0.0,
+     "taux": 0.0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    },
+    "total": {
+     "end": 0.0,
+     "start": 0.0,
+     "taux": 0.0,
+     "trend_color": "neutral",
+     "trend_icon": "\u2194"
+    }
+   }
+  }
+ }
+}
