@@ -17,7 +17,7 @@ import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -40,12 +40,12 @@ DESCRIPTION_MAX = 2500
 @dataclass
 class Result:
     ok: bool
-    orange_id: Optional[str] = None
+    orange_id: str | None = None
     retryable: bool = False
-    retry_after: Optional[float] = None
+    retry_after: float | None = None
     ambiguous: bool = False            # requête peut-être traitée côté Orange (timeout après envoi)
     error: str = ""
-    data: Optional[dict] = None
+    data: dict | None = None
 
 
 def format_description(ticket: dict) -> str:
@@ -56,8 +56,8 @@ def format_description(ticket: dict) -> str:
 
 
 class OrangeClient:
-    def __init__(self, session: Optional[requests.Session] = None, bucket: Optional[TokenBucket] = None,
-                 breaker: Optional[CircuitBreaker] = None):
+    def __init__(self, session: requests.Session | None = None, bucket: TokenBucket | None = None,
+                 breaker: CircuitBreaker | None = None):
         s = settings
         self.base = f"{s.orange_server}{s.orange_base_endpoint}/troubleTicket"
         self.token_url = f"{s.orange_server}{s.orange_token_endpoint}"
@@ -70,7 +70,7 @@ class OrangeClient:
         if session is None:
             self.session.mount("https://", HTTPAdapter(pool_connections=2, pool_maxsize=max(2, s.orange_max_concurrency)))
             self.session.mount("http://", HTTPAdapter(pool_connections=2, pool_maxsize=max(2, s.orange_max_concurrency)))
-        self._token: Optional[str] = None
+        self._token: str | None = None
         self._token_exp = 0.0
         self._token_lock = threading.Lock()
 
@@ -79,7 +79,7 @@ class OrangeClient:
         return bool(settings.orange_server and settings.orange_client_id and settings.orange_client_secret)
 
     # ------------------------------------------------------------------ jeton
-    def _get_token(self, force: bool = False) -> Optional[str]:
+    def _get_token(self, force: bool = False) -> str | None:
         with self._token_lock:                       # un seul thread renouvelle, les autres réutilisent
             if not force and self._token and time.monotonic() < self._token_exp - 60:
                 return self._token
@@ -101,8 +101,8 @@ class OrangeClient:
             return None
 
     # ------------------------------------------------------------------ requête protégée
-    def _call(self, method: str, url: str, *, json: Optional[dict] = None, headers: Optional[dict] = None,
-              params: Optional[dict] = None, _retry_auth: bool = True) -> Result:
+    def _call(self, method: str, url: str, *, json: dict | None = None, headers: dict | None = None,
+              params: dict | None = None, _retry_auth: bool = True) -> Result:
         if not self.breaker.allow():
             return Result(False, retryable=True, error="circuit ouvert (API Orange indisponible)")
         token = self._get_token()
@@ -161,7 +161,7 @@ class OrangeClient:
             res.orange_id = str(oid)
         return res
 
-    def find_by_external_id(self, autodo_id: int) -> Optional[str]:
+    def find_by_external_id(self, autodo_id: int) -> str | None:
         """Si l'API le permet : retrouve un ticket déjà créé (anti-doublon après réponse perdue)."""
         res = self._call("GET", self.base, params={"externalId": str(autodo_id)})
         items = (res.data or {}).get("items") or ([res.data] if res.data and res.data.get("id") else [])
@@ -190,7 +190,7 @@ class OrangeClient:
         return {"configured": self.configured, "token_ok": ok, "breaker": self.breaker.state}
 
 
-def _retry_after(r: requests.Response) -> Optional[float]:
+def _retry_after(r: requests.Response) -> float | None:
     v = r.headers.get("Retry-After")
     if not v:
         return None
@@ -203,7 +203,7 @@ def _retry_after(r: requests.Response) -> Optional[float]:
 # ============================================================================
 # SYNCHRONISATION (jobs périodiques)
 # ============================================================================
-def _schedule_retry(t: dict, res: Result, now: str, new_state: str, on_failed: Optional[Callable] = None) -> None:
+def _schedule_retry(t: dict, res: Result, now: str, new_state: str, on_failed: Callable | None = None) -> None:
     attempts = int(t.get("orange_attempts") or 0) + 1
     if not res.retryable or attempts >= settings.orange_max_attempts:
         tickets.update_fields(t["id"], {"orange_sync_state": "failed", "orange_attempts": attempts,
@@ -219,7 +219,7 @@ def _schedule_retry(t: dict, res: Result, now: str, new_state: str, on_failed: O
         "orange_last_error": (("ambiguous: " if res.ambiguous else "") + res.error)[:250]})
 
 
-def sync_outbox(client: OrangeClient, on_failed: Optional[Callable] = None, now: Optional[str] = None) -> dict:
+def sync_outbox(client: OrangeClient, on_failed: Callable | None = None, now: str | None = None) -> dict:
     """Crée les tickets ``pending`` chez Orange puis restaure les ``close_pending``. Lot borné, débit limité."""
     stats = {"created": 0, "restored": 0, "retry": 0, "failed": 0}
     if not client.configured:
@@ -259,7 +259,7 @@ def sync_outbox(client: OrangeClient, on_failed: Optional[Callable] = None, now:
     return stats
 
 
-def reconcile(client: OrangeClient, now: Optional[str] = None, max_tickets: int = 50) -> dict:
+def reconcile(client: OrangeClient, now: str | None = None, max_tickets: int = 50) -> dict:
     """Ferme localement les tickets que Orange a clôturés (liste blanche de statuts terminaux uniquement)."""
     from . import rules
     stats = {"checked": 0, "closed": 0, "unknown": 0}

@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional
 
 from .config import TS_FMT, parse
 
@@ -91,7 +90,7 @@ def detect_pertes(recent: list, cfg: dict) -> Verdict:
     return Verdict(False)
 
 
-def db_freshness(last_update: Optional[datetime], now: datetime, cfg: dict) -> tuple[str, float]:
+def db_freshness(last_update: datetime | None, now: datetime, cfg: dict) -> tuple[str, float]:
     """(« down » | « ok » | « unknown », minutes de retard). Les deux datetimes sont en heure locale naïve."""
     if last_update is None:
         return "unknown", 0.0
@@ -102,7 +101,7 @@ def db_freshness(last_update: Optional[datetime], now: datetime, cfg: dict) -> t
 # ============================================================================
 # VALEUR D'ORIGINE & FERMETURE
 # ============================================================================
-def original_value(ticket_type: str, last_values: list, category: Optional[int], cfg: dict) -> tuple[float, str]:
+def original_value(ticket_type: str, last_values: list, category: int | None, cfg: dict) -> tuple[float, str]:
     """Valeur de référence du ticket (index bornés : jamais d'IndexError)."""
     if not last_values:
         return 0.0, ""
@@ -122,8 +121,8 @@ def original_value(ticket_type: str, last_values: list, category: Optional[int],
     return float(v["value"]), v["timestamp"]
 
 
-def closure_criterion_met(ticket_type: str, current: Optional[float], original: float, category: int,
-                          mode7d: Optional[float], cfg: dict) -> bool:
+def closure_criterion_met(ticket_type: str, current: float | None, original: float, category: int,
+                          mode7d: float | None, cfg: dict) -> bool:
     if current is None:
         return False
     if ticket_type == "pertes":
@@ -151,14 +150,14 @@ def closure_reason(ticket_type: str, current: float, original: float, persistenc
     return f"Resolved and stable for {persistence} minutes."
 
 
-def ttr_seconds(created: str, closed: str) -> Optional[int]:
+def ttr_seconds(created: str, closed: str) -> int | None:
     try:
         return max(int((parse(closed) - parse(created)).total_seconds()), 0)
     except Exception:
         return None
 
 
-def ttr_human(seconds: Optional[int]) -> str:
+def ttr_human(seconds: int | None) -> str:
     if seconds is None:
         return ""
     d, r = divmod(int(seconds), 86400)
@@ -167,7 +166,7 @@ def ttr_human(seconds: Optional[int]) -> str:
     return " ".join(p for p in (f"{d}d" if d else "", f"{h}h" if h else "", f"{m}m" if m or not (d or h) else "") if p)
 
 
-def evaluate_closure(ticket: dict, last_values: list, now: str, cfg: dict, mode7d: Optional[float]) -> dict:
+def evaluate_closure(ticket: dict, last_values: list, now: str, cfg: dict, mode7d: float | None) -> dict:
     """Tentative de fermeture avec fenêtre de persistance. Retourne les CHAMPS à modifier (jamais d'E/S)."""
     persistence = cfg["alert_persistence_duration_minutes"]
     ttype = ticket["type"]

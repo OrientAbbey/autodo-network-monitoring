@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import threading
 from contextlib import contextmanager
-from typing import Iterator
+from collections.abc import Iterator
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import URL, Connection, Engine

@@ -16,7 +16,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from sqlalchemy import bindparam, text
 
@@ -79,8 +79,8 @@ def load_open() -> list[dict]:
         return [_row_to_ticket(r) for r in fetch_all(c, "SELECT * FROM tickets_tb WHERE status = 'open'")]
 
 
-def load_page(limit: int = 1000, offset: int = 0, status: Optional[str] = None,
-              ticket_type: Optional[str] = None, db_key: Optional[str] = None) -> tuple[list[dict], int]:
+def load_page(limit: int = 1000, offset: int = 0, status: str | None = None,
+              ticket_type: str | None = None, db_key: str | None = None) -> tuple[list[dict], int]:
     """Page de tickets (les plus récents d'abord) + total. Les ouverts sont toujours listés avant les fermés."""
     where, p = [], {"limit": max(1, min(limit, 5000)), "offset": max(0, offset)}
     for col, val in (("status", status), ("type", ticket_type), ("database_name", db_key)):
@@ -111,7 +111,7 @@ def invalidate_alert_cache() -> None:
         _alerts_cache.clear()
 
 
-def dashboard_alerts(filters: Optional[dict] = None) -> dict:
+def dashboard_alerts(filters: dict | None = None) -> dict:
     """Alertes du tableau de bord (format historique : {"traffic": [...], "pertes": [...]})."""
     filters = filters or {}
     key = json.dumps(filters, sort_keys=True, default=str)
@@ -227,7 +227,7 @@ def persist(cs: ChangeSet) -> list[int]:
     return conflicts
 
 
-def update_fields(ticket_id: int, fields: dict, *, expected_state: Optional[str] = None) -> bool:
+def update_fields(ticket_id: int, fields: dict, *, expected_state: str | None = None) -> bool:
     """UPDATE ciblé hors cycle de détection (sync Orange). Conditionnel sur l'état Orange si demandé."""
     f = {k: v for k, v in _prepare(fields).items() if k in _UPDATABLE}
     if not f:
@@ -252,7 +252,7 @@ class DbContext:
     loss_values: list
     traffic: rules.Verdict
     pertes: rules.Verdict
-    mode7d: Optional[float]
+    mode7d: float | None
     cfg: dict
     connection_failed: bool = False
     failure_reason: str = ""
@@ -264,8 +264,8 @@ class DbContext:
 
 
 def _new_ticket(ctx: DbContext, ttype: str, values: list, reason: str, category: int,
-                id_factory: Callable[[], int], *, description: Optional[str] = None,
-                timestamp: Optional[str] = None) -> dict:
+                id_factory: Callable[[], int], *, description: str | None = None,
+                timestamp: str | None = None) -> dict:
     value, ts = rules.original_value(ttype, values, category, ctx.cfg)
     ts = timestamp or ts or ctx.now
     desc = description or rules.build_description(ttype, ctx.site, reason, value, ts, ctx.connection_failed, ctx.failure_reason)
@@ -294,7 +294,7 @@ def apply_actions(ctx: DbContext, actions: list[rules.Action], tickets_by_type: 
     """Traduit les actions décidées par ``rules.plan_actions`` en changements (sans toucher à la base)."""
     traffic_t, pertes_t = tickets_by_type.get("traffic"), tickets_by_type.get("pertes")
     loss_last = ctx.loss_values[-1]["value"] if ctx.loss_values else 0.0
-    new_traffic: Optional[dict] = None
+    new_traffic: dict | None = None
     for a in actions:
         if a.kind == "create_traffic":
             new_traffic = _new_ticket(ctx, "traffic", ctx.traffic_values, ctx.traffic.reason, ctx.traffic.category, id_factory)
@@ -330,8 +330,8 @@ def apply_actions(ctx: DbContext, actions: list[rules.Action], tickets_by_type: 
                 cs.events.append((f"close_{a.ticket_type}", t["id"], ctx.db_key))
 
 
-def apply_db_down(ctx_db_key: str, state: str, minutes: float, last_update_str: Optional[str], now: str, cfg: dict,
-                  open_ticket: Optional[dict], cs: ChangeSet, orange_enabled: bool,
+def apply_db_down(ctx_db_key: str, state: str, minutes: float, last_update_str: str | None, now: str, cfg: dict,
+                  open_ticket: dict | None, cs: ChangeSet, orange_enabled: bool,
                   id_factory: Callable[[], int] = next_id) -> None:
     """Tickets « base de données figée » : création / rafraîchissement / fermeture avec hystérésis."""
     site = constants.DB_CONFIGS.get(ctx_db_key, {}).get("site", "Site inconnu")

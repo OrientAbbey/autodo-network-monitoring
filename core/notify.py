@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
-from typing import Iterable
+from collections.abc import Iterable
 
 from sqlalchemy import text
 
