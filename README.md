@@ -22,9 +22,11 @@ core/                   toute la logique, un module = une responsabilité
   monitoring.py         cycle de supervision, tâches périodiques, watchdog, SSE
   auth.py  ratelimit.py  logger.py
 routers/                routes HTTP (dashboard.py, tickets.py)
-templates/ static/      interface (aucun script inline : CSP stricte)
+templates/ static/      interface (aucun script inline : CSP stricte) ; static/js/ = 8 scripts par responsabilité (state, config-panel,
+                        alerts, live, sections, theme-filters-audio, render, main), chargés dans l'ordre par dashboard.html
 tests/                  unitaires + sécurité + intégration MariaDB (tests/e2e : Playwright)
-demo/                   données simulées, faux API Orange, puits SMTP (voir demo/README.md)
+demo/                   données simulées, faux API Orange, puits SMTP, prototype de détection (voir demo/README.md)
+ROADMAP.md              propositions d'évolution (détection ML, UX/UI, son, administration, 25-50 spectateurs)
 ```
 
 ## Installation
@@ -135,6 +137,10 @@ dans les logs, CORS fermé par défaut. Pas de SSO disponible : les utilisateurs
   `alerts_enable_gi` pilotent la création de tickets, les autres interrupteurs ne règlent que l'affichage.
 * Convention horaire : bases DIAGNET en UTC, tickets et affichage en heure de Douala (`core/config.py`, `ZoneInfo`).
 * Chart.js 4.5.1 est embarqué dans `static/` (mettre à jour ce fichier si nécessaire).
+* Capacité mesurée (démo, une machine) : 50 spectateurs + 50 flux SSE → médiane 69-117 ms, p95 169-238 ms, 0 erreur ; JSON du tableau de bord 113 Ko brut / 19 Ko gzip.
+* Interrupteurs « Sections et alertes actives » : Sortie Internationale, Traffic Utilisateur et Roaming masquent la section **et** suspendent la
+  création de tickets de leur catégorie ; TCP Metrics et TDD ne règlent que l'affichage. `zero_traffic_min_samples=2` (défaut) : un « zéro » isolé
+  attend une confirmation au cycle suivant.
 
 ## Tests
 
@@ -142,5 +148,5 @@ dans les logs, CORS fermé par défaut. Pas de SSO disponible : les utilisateurs
 pip install -r requirements-dev.txt
 pytest                                  # unitaires, sécurité, intégration (MariaDB requise ; sinon ignorés)
 ruff check . && bandit -q -r core routers main.py -ll
-playwright install chromium && pytest tests/e2e   # E2E avec la pile simulée (voir demo/README.md)
+playwright install chromium && pytest tests/e2e   # E2E navigateur (Chromium + Chrome stable, mobile, accessibilité, 50 spectateurs)
 ```
