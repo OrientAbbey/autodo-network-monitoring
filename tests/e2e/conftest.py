@@ -71,7 +71,7 @@ def stack():
             wait = ((3 - now.minute) % 5) * 60 - now.second
             print(f"[e2e] alignement sur la fenêtre de 5 min : attente {wait}s"); time.sleep(max(wait, 0))
     # 2. scénarios + données
-    for args in (("clear",), ("zero", "douala_camtel"), ("instant_drop", "kribi"), ("gradual", "oci_sat3", "--minutes-ago", "25"),
+    for args in (("clear",), ("zero", "douala_camtel", "--minutes-ago", "5"), ("instant_drop", "kribi"), ("gradual", "oci_sat3", "--minutes-ago", "25"),
                  ("loss", "wacs_ic", "--minutes-ago", "30"), ("stale", "garoua_camtel", "--minutes-ago", "90")):
         sh("scenario", *args)
     sh("seed", "--reset")
@@ -82,7 +82,8 @@ def stack():
     follow = subprocess.Popen([sys.executable, str(DEMO / "seed_demo_data.py"), "follow", "--interval", "10"], cwd=DEMO)
     app = subprocess.Popen([sys.executable, "main.py"], cwd=REPO, stdout=APP_LOG.open("w"), stderr=subprocess.STDOUT,
                            env={**json.loads(os.environ.get("AUTODO_ORIG_ENV", "{}") or json.dumps(dict(os.environ)), ),
-                                "DATA_DIR": data_dir, "LOG_FILE": str(Path(data_dir) / "app.log")})
+                                "DATA_DIR": data_dir, "LOG_FILE": str(Path(data_dir) / "app.log"),
+                                "AUTH_MAX_FAILURES": "50"})
     try:
         for _ in range(60):
             try:
@@ -107,11 +108,16 @@ def stack():
 
 
 @pytest.fixture(scope="session")
-def browser_ctx(stack):
+def pw(stack):
     with sync_playwright() as p:
-        b = p.chromium.launch()
-        yield b
-        b.close()
+        yield p
+
+
+@pytest.fixture(scope="session")
+def browser_ctx(pw):
+    b = pw.chromium.launch()
+    yield b
+    b.close()
 
 
 @pytest.fixture()
