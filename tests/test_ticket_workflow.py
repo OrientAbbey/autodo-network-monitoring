@@ -353,3 +353,54 @@ def test_ack_by_a_logged_in_user_records_the_account_name(supervisor):
 def test_ack_payload_is_bounded(clean_state):
     import main
     assert TestClient(main.app).post("/api/ack", json={"ticket_ids": list(range(500))}).status_code == 422
+
+
+# ------------------------------------------------------------------ e-mails de création retenus jusqu'à l'approbation
+@pytest.fixture
+def sent_emails(monkeypatch):
+    """Capture les appels à ``notify_new_tickets`` : liste de (ids annoncés, ids listés)."""
+    calls = []
+    monkeypatch.setattr(monitoring.notify, "notify_new_tickets",
+                        lambda new, open_list: calls.append(([t["id"] for t in new], [t["id"] for t in open_list])))
+    return calls
+
+
+def test_no_email_is_sent_for_a_creation_awaiting_validation(clean_state, monkeypatch, sent_emails):
+    governance.save_global_config("alice", "1.1.1.1", {"ticket_validation_required": True})
+    cfg = config.load_config()
+    checkpoint = round5(local_now())
+    _, alert_ts, _ = monitoring.build_windows(checkpoint, cfg)
+    stats = monitoring._process_monitoring({"kribi": crash_snapshot()}, alert_ts, fmt(checkpoint), cfg, {})
+    assert stats["tickets_crees"] == 1 and sent_emails == []
+
+
+def test_without_validation_the_email_is_sent_at_creation(clean_state, monkeypatch, sent_emails):
+    cfg = config.load_config()
+    checkpoint = round5(local_now())
+    _, alert_ts, _ = monitoring.build_windows(checkpoint, cfg)
+    monitoring._process_monitoring({"kribi": crash_snapshot()}, alert_ts, fmt(checkpoint), cfg, {})
+    assert len(sent_emails) == 1 and len(sent_emails[0][0]) == 1
+
+
+def test_approval_sends_the_held_email_and_hides_other_pending_tickets(supervisor, monkeypatch, sent_emails):
+    governance.save_global_config("alice", "1.1.1.1", {"ticket_validation_required": True})
+    cfg = config.load_config()
+    checkpoint = round5(local_now())
+    _, alert_ts, _ = monitoring.build_windows(checkpoint, cfg)
+    monitoring._process_monitoring({"kribi": crash_snapshot("kribi"), "autre": crash_snapshot("autre")}, alert_ts, fmt(checkpoint), cfg, {})
+    first, second = sorted(t["id"] for t in tickets.load_open())
+    assert supervisor.post(f"/tickets/api/{first}/approve").status_code == 200
+    assert sent_emails == [([first], [first])]                       # le 2ᵉ ticket, encore en attente, n'est pas listé
+    assert supervisor.post(f"/tickets/api/{first}/approve").status_code == 409
+    assert len(sent_emails) == 1                                     # pas de second e-mail sur une double validation
+    assert second not in sent_emails[0][1]
+
+
+def test_a_rejected_ticket_never_triggers_an_email(supervisor, monkeypatch, sent_emails):
+    governance.save_global_config("alice", "1.1.1.1", {"ticket_validation_required": True})
+    cfg = config.load_config()
+    checkpoint = round5(local_now())
+    _, alert_ts, _ = monitoring.build_windows(checkpoint, cfg)
+    monitoring._process_monitoring({"kribi": crash_snapshot()}, alert_ts, fmt(checkpoint), cfg, {})
+    supervisor.post(f"/tickets/api/{tickets.load_open()[0]['id']}/reject", json={"reason": "test"})
+    assert sent_emails == []

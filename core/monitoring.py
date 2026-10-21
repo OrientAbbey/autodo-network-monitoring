@@ -224,11 +224,12 @@ def _process_monitoring(snaps: dict, alert_ts: list, now_str: str, cfg: dict, ov
             logger.exception("Échec du traitement de %s (cycle poursuivi pour les autres bases)", db_key)
 
     conflicts = tickets.persist(cs)
-    created = [t for t in cs.inserts]
-    if created:
+    created = list(cs.inserts)
+    announced = tickets.visible_to_recipients(created)           # une création en attente de validation n'est PAS annoncée par e-mail
+    if announced:                                                # (l'e-mail part à l'approbation : voir routers/tickets.py)
         closed_ids = {tid for tid, f in cs.updates.items() if f.get("status") == "closed"}
-        still_open = [t for t in open_list if t["id"] not in closed_ids] + created
-        notify.notify_new_tickets(created, still_open)
+        still_open = tickets.visible_to_recipients([t for t in open_list if t["id"] not in closed_ids] + created)
+        notify.notify_new_tickets(announced, still_open)
     kinds: dict[str, int] = {}
     for kind, *_ in cs.events:
         kinds[kind] = kinds.get(kind, 0) + 1

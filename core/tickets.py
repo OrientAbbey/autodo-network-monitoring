@@ -479,6 +479,11 @@ def get_ticket(ticket_id: int) -> dict | None:
     return _row_to_ticket(row) if row else None
 
 
+def visible_to_recipients(ticket_list: list[dict]) -> list[dict]:
+    """Tickets dont l'existence peut être communiquée (e-mails) : ceux en attente de validation humaine restent confidentiels."""
+    return [t for t in ticket_list if t.get("validation_state") != "pending"]
+
+
 def pending_validation() -> list[dict]:
     """Créations en attente de validation (tickets encore ouverts)."""
     with local_conn() as c:

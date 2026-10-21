@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from core import auth, constants, db, governance, monitoring, ticket_log, tickets
+from core import auth, constants, db, governance, monitoring, notify, ticket_log, tickets
 from core.auth import get_real_ip
 from core.config import load_config, now_local
 from core.logger import get_logger
@@ -73,12 +73,20 @@ async def _announce(request: Request) -> None:
     await monitoring.sse_publish({"type": "tickets_changed", "at": now_local().isoformat(timespec="seconds")}, request.app)
 
 
+def _email_after_approval(ticket_id: int) -> None:
+    """L'e-mail de création, retenu jusqu'ici, part maintenant (les autres tickets encore en attente n'y figurent pas)."""
+    approved = tickets.get_ticket(ticket_id)
+    if approved and approved["status"] == "open":
+        notify.notify_new_tickets([approved], tickets.visible_to_recipients(tickets.load_open()))
+
+
 @tickets_router.post("/api/{ticket_id}/approve")
 async def approve_ticket(ticket_id: int, request: Request, session=supervision):
     ticket = await asyncio.to_thread(tickets.approve, ticket_id, session.username, monitoring.get_orange().configured)
     if ticket is None:
         raise HTTPException(409, "Ce ticket n'est pas (ou plus) en attente de validation")
     governance.audit(session.username, get_real_ip(request), "ticket_approve", str(ticket_id), {"base": ticket["database_name"]})
+    await asyncio.to_thread(_email_after_approval, ticket_id)
     await _announce(request)
     return _json({"ok": True})
 
