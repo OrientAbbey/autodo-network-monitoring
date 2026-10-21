@@ -170,7 +170,9 @@ def run_cycle() -> dict:
 
 def _process_monitoring(snaps: dict, alert_ts: list, now_str: str, cfg: dict, overrides: dict | None = None) -> dict:
     overrides = overrides or {}
-    silenced = governance.silenced_databases(now_str)          # maintenance + silences après rejet : lus UNE fois
+    # maintenance + silences après rejet : lus UNE fois, à l'heure RÉELLE (le checkpoint est arrondi jusqu'à 5 min en arrière :
+    # une fenêtre ouverte « maintenant » ne s'appliquerait pas)
+    silenced = governance.silenced_databases()
     open_list = tickets.load_open()                              # UNE lecture par cycle
     index = {(t["database_name"], t["type"]): t for t in open_list}
     cs = tickets.ChangeSet()

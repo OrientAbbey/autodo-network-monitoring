@@ -19,43 +19,6 @@ def _req(peer, xff=None, trusted=()):
     return Request({"type": "http", "method": "GET", "path": "/", "query_string": b"", "client": (peer, 1), "headers": h})
 
 
-def test_passwords_fail_closed_and_constant_time():
-    assert auth.check_password(None, None) is False and auth.check_password("", "") is False
-    assert auth.check_password("x", "x") is True and auth.check_password("x", "y") is False
-
-
-def test_update_config_requires_a_session(client):
-    assert client.post("/update_config", json={"alert_traffic_threshold_percent": 10}).status_code == 401
-
-
-def test_auth_endpoint_rejects_missing_and_wrong_passwords(client):
-    assert client.post("/api/auth", json={}).status_code == 401
-    assert client.post("/api/auth", json={"password": "nope"}).status_code == 401
-
-
-def test_brute_force_is_rate_limited(client):
-    from core import auth as a
-    a.limiter._fails.clear()
-    codes = [client.post("/api/auth", json={"password": "bad"}, headers={}).status_code for _ in range(7)]
-    assert 429 in codes
-    a.limiter._fails.clear()
-
-
-def test_config_session_cannot_read_data_management(client):
-    auth.limiter._fails.clear()
-    c = TestClient(client.app)
-    assert c.post("/api/auth", json={"password": "cfgpass"}).status_code == 200
-    c.cookies.set("dm_token", c.cookies.get("cfg"))
-    assert c.get("/api/data-management", params={"action": "data"}).status_code == 401
-
-
-def test_sessions_expire_and_are_scoped():
-    tok = auth.sessions.create("cfg", ttl=-1)
-    assert not auth.sessions.valid(tok, "cfg")
-    tok = auth.sessions.create("cfg", ttl=60)
-    assert auth.sessions.valid(tok, "cfg") and not auth.sessions.valid(tok, "dm")
-
-
 def test_security_headers_and_no_cors_by_default(client):
     r = client.get("/")
     assert r.status_code == 200

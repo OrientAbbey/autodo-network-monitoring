@@ -11,7 +11,7 @@ import asyncio
 from functools import partial
 
 import orjson
-from fastapi import APIRouter, Body, HTTPException, Query, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, ValidationError
 
 from core import accounts, analytics, auth, constants, governance, monitoring, tickets

@@ -92,6 +92,17 @@ def client(script, **kw):
     return OrangeClient(session=s, **kw), s
 
 
+def test_add_note_uses_put_with_patch_override_and_the_note_body():
+    c, s = client([resp(200, b"{}")])
+    result = c.add_note("TT9", "AUTODO update: x", author="AUTODO")
+    assert result.ok
+    method, url, kwargs = s.calls[-1]
+    assert method == "PUT" and url.endswith("/troubleTicket/TT9")
+    assert kwargs["headers"]["X-HTTP-Method-Override"] == "PATCH"
+    note = kwargs["json"]["note"][0]
+    assert note["text"] == "AUTODO update: x" and note["author"] == "AUTODO" and note["date"].endswith("Z")
+
+
 def test_create_ticket_success_returns_orange_id():
     c, s = client([resp(201, b'{"id":"TT42"}')])
     r = c.create_ticket({"id": 1, "description": "d", "timestamp": "t"})
