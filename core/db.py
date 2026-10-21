@@ -249,11 +249,27 @@ def _m4_comptes_gouvernance(c: Connection) -> None:
     _add_idx(c, "tickets_tb", "idx_validation", "(validation_state, status)")
 
 
+def _m5_historique_detecteurs(c: Connection) -> None:
+    """Historique local des métriques (D2), état des détecteurs « futurs » et leurs verdicts en mode ombre."""
+    c.execute(text("""CREATE TABLE IF NOT EXISTS metrics_5min (
+        db_key VARCHAR(50) NOT NULL, ts DATETIME NOT NULL, traffic_gbps DOUBLE NULL, loss_pct DOUBLE NULL,
+        latency_ms DOUBLE NULL, tcp_no_response_pct DOUBLE NULL, tcp_block_wp_up_pct DOUBLE NULL, dns_malformed_pct DOUBLE NULL,
+        PRIMARY KEY (db_key, ts), INDEX idx_metrics_ts (ts)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS detector_settings (
+        detector VARCHAR(32) NOT NULL PRIMARY KEY, enabled TINYINT(1) NOT NULL DEFAULT 1, trained_at DATETIME NULL,
+        metrics_json TEXT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS detector_verdicts (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY, detector VARCHAR(32) NOT NULL, db_key VARCHAR(50) NOT NULL, ts DATETIME NOT NULL,
+        score DOUBLE NULL, explanation TEXT NOT NULL, created_at DATETIME NOT NULL,
+        UNIQUE KEY uq_verdict (detector, db_key, ts), INDEX idx_verdict_ts (ts)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+
+
 MIGRATIONS = [
     (1, "baseline", _m1_baseline),
     (2, "tickets: version + outbox Orange + index", _m2_tickets_outbox),
     (3, "logs.access_time en DATETIME", _m3_logs_datetime),
     (4, "comptes, audit, versions, maintenance, accusés, journal de ticket", _m4_comptes_gouvernance),
+    (5, "historique 5 min, détecteurs et verdicts (mode ombre)", _m5_historique_detecteurs),
 ]
 
 

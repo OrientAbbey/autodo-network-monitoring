@@ -119,6 +119,9 @@ class Settings:
     email_recipients_file: str = field(default_factory=lambda: _env("EMAIL_RECIPIENTS_FILE", str(BASE_DIR / "email_recipients.txt")))
     # --- exploitation
     data_dir: Path = field(default_factory=lambda: Path(_env("DATA_DIR", str(BASE_DIR / "data"))))
+    models_dir: Path = field(default_factory=lambda: Path(_env("MODELS_DIR") or str(Path(_env("DATA_DIR", str(BASE_DIR / "data"))) / "models")))
+    history_retention_days: int = field(default_factory=lambda: _env_int("HISTORY_RETENTION_DAYS", 400))
+    min_labeled_tickets: int = field(default_factory=lambda: _env_int("MIN_LABELED_TICKETS", 100))
     retention_days: int = field(default_factory=lambda: _env_int("RETENTION_DAYS", 90))
     watchdog_max_age_min: int = field(default_factory=lambda: _env_int("WATCHDOG_MAX_AGE_MIN", 15))
     dns_reference_ips: tuple = field(default_factory=lambda: tuple(
