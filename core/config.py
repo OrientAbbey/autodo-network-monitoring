@@ -58,7 +58,11 @@ class Settings:
     # --- application
     app_port: int = field(default_factory=lambda: _env_int("APP_PORT_UNIFIED", 8501))
     app_tickets_url: str = field(default_factory=lambda: _env("APP_TICKETS_URL", "http://localhost:8501/tickets"))
-    token_ttl: int = field(default_factory=lambda: _env_int("TOKEN_TTL", 180))
+    admin_username: str = field(default_factory=lambda: _env("ADMIN_USERNAME"))
+    admin_password: str = field(default_factory=lambda: _env("ADMIN_PASSWORD"))
+    session_idle_minutes: int = field(default_factory=lambda: _env_int("SESSION_IDLE_MINUTES", 120))
+    session_max_hours: int = field(default_factory=lambda: _env_int("SESSION_MAX_HOURS", 12))
+    login_max_failures_per_ip: int = field(default_factory=lambda: _env_int("AUTH_MAX_FAILURES", 10))
     cookie_secure: bool = field(default_factory=lambda: _env_bool("COOKIE_SECURE", False))
     cors_origins: tuple = field(default_factory=lambda: tuple(o.strip() for o in _env("CORS_ORIGINS").split(",") if o.strip()))
     trusted_proxies: frozenset = field(default_factory=lambda: frozenset(x.strip() for x in _env("TRUSTED_PROXIES").split(",") if x.strip()))
@@ -158,18 +162,66 @@ class ConfigParams(BaseModel):
     alerts_enable_international_gi: bool = True
     alerts_enable_roaming: bool = False
     alerts_enable_tdd: bool = False
+    # Gouvernance (phase A) : validation humaine des tickets, silence après rejet, notes envoyées à Orange.
+    ticket_validation_required: bool = False                         # True : un superviseur valide chaque création de ticket
+    rejection_silence_minutes: int = Field(120, ge=0, le=10080)      # silence de la base après rejet/suppression d'un ticket
+    orange_note_min_change_percent: float = Field(10.0, ge=0, le=1000)
+    orange_note_min_interval_minutes: int = Field(30, ge=1, le=1440)
+    shadow_detectors: bool = True                                    # exécute (sans jamais créer de ticket) les détecteurs « futurs »
 
     model_config = ConfigDict(extra="ignore")
 
 
 _ALERT_KEYS = {k for k in ConfigParams.model_fields if k.startswith("alerts_enable_")}
+
+# Paramètres qu'un superviseur peut régler base par base (A6). Les interrupteurs et la gouvernance restent globaux.
+OVERRIDABLE_KEYS = (
+    "alert_traffic_threshold_percent", "alert_pertes_threshold", "pertes_consecutive_count", "traffic_up_threshold_percent",
+    "traffic_consecutive_drops_count", "traffic_consecutive_drops_min_percent", "alert_persistence_duration_minutes",
+    "traffic_recovery_ratio", "mode7days_recovery_ratio", "db_down_threshold_minutes", "db_recovery_threshold_minutes",
+    "zero_traffic_min_samples", "alert_tcp_no_response_threshold", "alert_tcp_block_wp_up_threshold",
+    "alert_latence_threshold_ms",
+)
+
 _cfg_lock = threading.Lock()
-_cfg_cache: dict = {"mtime": None, "params": None}
+_cfg_cache: dict = {"mtime": None, "params": None, "overrides": None}
+
+
+def _empty_raw() -> dict:
+    return {"criteria": {}, "alerts": {}, "overrides": {}}
+
+
+def _normalize_raw(data: dict) -> dict:
+    """Garantit la présence des trois sections du fichier (anciens fichiers : sans « overrides »)."""
+    raw = _empty_raw()
+    for section in raw:
+        if isinstance(data.get(section), dict):
+            raw[section] = data[section]
+    return raw
+
+
+def _flat(raw: dict) -> dict:
+    return {**raw["criteria"], **raw["alerts"]}
+
+
+def validate_overrides(raw: dict) -> dict:
+    """Valide les surcharges (clé de base libre, paramètres surchargeables, bornes de ``ConfigParams``). Retourne les surcharges nettoyées."""
+    base = _flat(raw)
+    clean: dict = {}
+    for db_key, params in (raw.get("overrides") or {}).items():
+        if not isinstance(params, dict):
+            raise ValueError(f"Surcharges de {db_key} : objet attendu")
+        unknown = set(params) - set(OVERRIDABLE_KEYS)
+        if unknown:
+            raise ValueError(f"Paramètre(s) non surchargeable(s) pour {db_key} : {sorted(unknown)}")
+        if params:
+            ConfigParams(**{**base, **params})                 # lève ValidationError si une valeur sort des bornes
+            clean[db_key] = dict(params)
+    return clean
 
 
 def _read_file(path: Path) -> dict:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return {**data.get("criteria", {}), **data.get("alerts", {})}
+    return _normalize_raw(json.loads(path.read_text(encoding="utf-8")))
 
 
 LEGACY_CONFIG_FILE = BASE_DIR / "config.json"      # ancien emplacement (versionné, réécrit par l'application)
@@ -184,41 +236,84 @@ def _ensure_config_file() -> None:
         if CONFIG_DEFAULT_FILE.exists():
             shutil.copyfile(CONFIG_DEFAULT_FILE, CONFIG_FILE)
         else:
-            CONFIG_FILE.write_text(json.dumps({"criteria": {}, "alerts": {}}, indent=4), encoding="utf-8")
+            CONFIG_FILE.write_text(json.dumps(_empty_raw(), indent=4), encoding="utf-8")
         logger.info("Configuration initialisée dans %s", CONFIG_FILE)
 
 
+def _refresh_cache_if_needed() -> None:
+    """À appeler verrou pris : relit le fichier seulement si sa date de modification a changé."""
+    _ensure_config_file()
+    mtime = CONFIG_FILE.stat().st_mtime_ns
+    if _cfg_cache["mtime"] != mtime or _cfg_cache["params"] is None:
+        raw = _read_file(CONFIG_FILE)
+        _cfg_cache.update(mtime=mtime, params=ConfigParams(**_flat(raw)).model_dump(), overrides=raw["overrides"])
+
+
 def load_config() -> dict:
-    """Paramètres d'alerte (dict). Relus uniquement si le fichier a changé (cache par mtime)."""
+    """Paramètres d'alerte GLOBAUX (dict). Relus uniquement si le fichier a changé (cache par mtime)."""
     with _cfg_lock:
         try:
-            _ensure_config_file()
-            mtime = CONFIG_FILE.stat().st_mtime_ns
-            if _cfg_cache["mtime"] != mtime or _cfg_cache["params"] is None:
-                params = ConfigParams(**_read_file(CONFIG_FILE)).model_dump()
-                _cfg_cache.update(mtime=mtime, params=params)
+            _refresh_cache_if_needed()
             return dict(_cfg_cache["params"])
         except Exception:
             logger.exception("Lecture de la configuration impossible — valeurs par défaut utilisées")
             return ConfigParams().model_dump()
 
 
-def save_config_updates(updates: dict) -> dict:
-    """Fusionne ``updates`` (champs présents uniquement) dans le fichier, de façon atomique. Retourne la config."""
+def load_overrides() -> dict:
+    """Surcharges par base : ``{db_key: {paramètre: valeur}}`` (le cycle les lit UNE fois)."""
+    with _cfg_lock:
+        try:
+            _refresh_cache_if_needed()
+            return {key: dict(values) for key, values in (_cfg_cache["overrides"] or {}).items()}
+        except Exception:
+            logger.exception("Lecture des surcharges impossible — aucune surcharge appliquée")
+            return {}
+
+
+def config_for(db_key: str, base_config: dict | None = None, overrides: dict | None = None) -> dict:
+    """Configuration effective d'une base = paramètres globaux + surcharges de cette base."""
+    merged = dict(base_config if base_config is not None else load_config())
+    merged.update((overrides if overrides is not None else load_overrides()).get(db_key, {}))
+    return merged
+
+
+def read_raw() -> dict:
+    """Contenu du fichier de configuration (copie) : ``{criteria, alerts, overrides}``."""
     with _cfg_lock:
         _ensure_config_file()
-        raw = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        raw.setdefault("criteria", {})
-        raw.setdefault("alerts", {})
-        for k, v in updates.items():
-            raw["alerts" if k in _ALERT_KEYS else "criteria"][k] = v
-        merged = ConfigParams(**{**raw["criteria"], **raw["alerts"]})        # revalide l'ensemble
+        return json.loads(json.dumps(_read_file(CONFIG_FILE)))
+
+
+def write_raw(raw: dict) -> dict:
+    """Valide puis écrit ``raw`` de façon atomique. Retourne la configuration globale effective."""
+    raw = _normalize_raw(raw)
+    merged = ConfigParams(**_flat(raw))                                  # revalide l'ensemble
+    raw["overrides"] = validate_overrides(raw)
+    with _cfg_lock:
+        _ensure_config_file()
         fd, tmp = tempfile.mkstemp(dir=CONFIG_FILE.parent, suffix=".tmp")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(raw, f, indent=4, ensure_ascii=False)
-        os.replace(tmp, CONFIG_FILE)                                          # atomique
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(raw, handle, indent=4, ensure_ascii=False)
+        os.replace(tmp, CONFIG_FILE)                                      # atomique
         _cfg_cache["mtime"] = None
-        return merged.model_dump()
+    return merged.model_dump()
+
+
+def save_config_updates(updates: dict) -> dict:
+    """Fusionne ``updates`` (champs présents uniquement) dans le fichier. Retourne la configuration globale."""
+    raw = read_raw()
+    for key, value in updates.items():
+        raw["alerts" if key in _ALERT_KEYS else "criteria"][key] = value
+    return write_raw(raw)
+
+
+def save_overrides(overrides: dict) -> dict:
+    """Remplace l'ensemble des surcharges par base (validées). Retourne les surcharges enregistrées."""
+    raw = read_raw()
+    raw["overrides"] = overrides
+    write_raw(raw)
+    return load_overrides()
 
 
 # ============================================================================

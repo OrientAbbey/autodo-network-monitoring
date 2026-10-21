@@ -22,7 +22,7 @@ from collections.abc import Callable
 import requests
 from requests.adapters import HTTPAdapter
 
-from . import tickets
+from . import ticket_log, tickets
 from .config import fmt, now_local, parse, settings
 from .logger import get_logger
 from .ratelimit import CircuitBreaker, TokenBucket, backoff_delay
@@ -181,6 +181,16 @@ class OrangeClient:
                    "troubleCause": RESTORE_CAUSE}
         return self._call("PUT", f"{self.base}/{orange_id}", json=payload, headers={"X-HTTP-Method-Override": "PATCH"})
 
+    def add_note(self, orange_id: str, message: str, author: str = "AUTODO", when: datetime | None = None) -> Result:
+        """Ajoute une note au ticket distant (PUT + ``X-HTTP-Method-Override: PATCH``).
+
+        ⚠ FORMAT À CONFIRMER avec l'API Orange réelle : corps ``{"note": [{"text", "author", "date"}]}`` supposé.
+        Toute adaptation du format se fait ICI, nulle part ailleurs.
+        """
+        stamp = (when or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        payload = {"note": [{"text": message[:2000], "author": author, "date": stamp}]}
+        return self._call("PUT", f"{self.base}/{orange_id}", json=payload, headers={"X-HTTP-Method-Override": "PATCH"})
+
     def test_connection_light(self) -> dict:
         """État sans appel réseau (pour /api/status)."""
         return {"configured": self.configured, "breaker": self.breaker.state}
@@ -209,6 +219,7 @@ def _schedule_retry(t: dict, res: Result, now: str, new_state: str, on_failed: C
         tickets.update_fields(t["id"], {"orange_sync_state": "failed", "orange_attempts": attempts,
                                         "orange_last_error": res.error[:250]})
         logger.error("Orange: abandon du ticket %s après %s tentative(s) : %s", t["id"], attempts, res.error)
+        ticket_log.log_event(t["id"], "orange_failed", f"Abandon de la synchronisation Orange : {res.error}"[:500])
         if on_failed:
             on_failed(t, res.error)
         return
@@ -240,6 +251,7 @@ def sync_outbox(client: OrangeClient, on_failed: Callable | None = None, now: st
                                        expected_state="pending")
             if not ok:
                 tickets.update_fields(t["id"], {"external_api_ticket_id": res.orange_id})
+            ticket_log.log_event(t["id"], "orange_created", f"Ticket créé chez Orange : {res.orange_id}")
             stats["created"] += 1
         else:
             _schedule_retry(t, res, now, "pending", on_failed)
@@ -250,12 +262,49 @@ def sync_outbox(client: OrangeClient, on_failed: Callable | None = None, now: st
         res = client.restore(t["external_api_ticket_id"])
         if res.ok:
             tickets.update_fields(t["id"], {"orange_sync_state": "closed", "orange_next_retry_at": None, "orange_last_error": None})
+            ticket_log.log_event(t["id"], "orange_restored", f"Ticket {t['external_api_ticket_id']} restauré chez Orange")
             stats["restored"] += 1
         else:
             _schedule_retry(t, res, now, "close_pending", on_failed)
             stats["retry" if res.retryable else "failed"] += 1
     if any(stats.values()):
         logger.info("Orange sync: %s", stats)
+    return stats
+
+
+def sync_notes(client: OrangeClient, limit: int = 20) -> dict:
+    """Envoie à Orange les notes en attente (``ticket_events.to_orange``) des tickets DÉJÀ créés chez Orange.
+
+    * ticket pas encore créé chez Orange (``pending`` / ``held``) : la note attend ;
+    * ticket fermé, supprimé, jamais envoyé ou abandonné : la note n'a plus d'objet, on la marque traitée ;
+    * erreur définitive (4xx) : marquée traitée (pas de boucle infinie) ; erreur temporaire : réessayée au prochain passage.
+    """
+    stats = {"sent": 0, "waiting": 0, "dropped": 0, "retry": 0}
+    if not client.configured:
+        return stats
+    for note in ticket_log.unsent_orange_notes(limit):
+        state, orange_id = note["orange_sync_state"], note["external_api_ticket_id"]
+        if note["status"] != "open" or state in ("skipped", "failed", "closed", "close_pending"):
+            ticket_log.mark_note_sent(note["id"])
+            stats["dropped"] += 1
+            continue
+        if state != "synced" or not orange_id:
+            stats["waiting"] += 1
+            continue
+        if client.breaker.state == "open":
+            break
+        result = client.add_note(orange_id, note["message"])
+        if result.ok:
+            ticket_log.mark_note_sent(note["id"])
+            stats["sent"] += 1
+        elif not result.retryable:
+            logger.error("Orange: note refusée pour le ticket %s (%s) — abandonnée", note["ticket_id"], result.error)
+            ticket_log.mark_note_sent(note["id"])
+            stats["dropped"] += 1
+        else:
+            stats["retry"] += 1
+    if stats["sent"] or stats["dropped"]:
+        logger.info("Orange notes: %s", stats)
     return stats
 
 

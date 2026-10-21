@@ -210,10 +210,50 @@ def _m3_logs_datetime(c: Connection) -> None:
         c.execute(text("ALTER TABLE logs MODIFY access_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"))
 
 
+def _m4_comptes_gouvernance(c: Connection) -> None:
+    """Comptes nominatifs, audit, versions de configuration, maintenance, accusés, journal de ticket, pics d'usage."""
+    c.execute(text("""CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(64) NOT NULL, display_name VARCHAR(100) NOT NULL,
+        role VARCHAR(16) NOT NULL, password_hash VARCHAR(255) NOT NULL, active TINYINT(1) NOT NULL DEFAULT 1,
+        must_change_password TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL, last_login_at DATETIME NULL,
+        failed_logins INT NOT NULL DEFAULT 0, locked_until DATETIME NULL,
+        UNIQUE KEY uq_users_username (username)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS audit_log (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY, at DATETIME NOT NULL, actor VARCHAR(64) NOT NULL, ip VARCHAR(45) NOT NULL,
+        action VARCHAR(64) NOT NULL, target VARCHAR(128) NOT NULL DEFAULT '', details JSON NULL,
+        INDEX idx_audit_at (at), INDEX idx_audit_action (action)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS config_versions (
+        id INT AUTO_INCREMENT PRIMARY KEY, at DATETIME NOT NULL, actor VARCHAR(64) NOT NULL, comment VARCHAR(200) NOT NULL DEFAULT '',
+        config_json LONGTEXT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS maintenance_windows (
+        id INT AUTO_INCREMENT PRIMARY KEY, db_key VARCHAR(50) NOT NULL, starts_at DATETIME NOT NULL, ends_at DATETIME NOT NULL,
+        reason VARCHAR(200) NOT NULL DEFAULT '', created_by VARCHAR(64) NOT NULL, auto_silence TINYINT(1) NOT NULL DEFAULT 0,
+        INDEX idx_maintenance_db (db_key, ends_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS alert_acks (
+        ticket_id BIGINT NOT NULL PRIMARY KEY, acked_at DATETIME NOT NULL, acked_by VARCHAR(64) NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS ticket_events (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY, ticket_id BIGINT NOT NULL, at DATETIME NOT NULL, kind VARCHAR(32) NOT NULL,
+        message TEXT NOT NULL, actor VARCHAR(64) NOT NULL DEFAULT 'système', to_orange TINYINT(1) NOT NULL DEFAULT 0,
+        orange_sent TINYINT(1) NOT NULL DEFAULT 0, INDEX idx_events_ticket (ticket_id, at),
+        INDEX idx_events_orange (to_orange, orange_sent)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS usage_peaks (
+        `day` DATE NOT NULL PRIMARY KEY, peak_viewers INT NOT NULL, peak_at DATETIME NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS ticket_feedback (
+        ticket_id BIGINT NOT NULL PRIMARY KEY, label VARCHAR(8) NOT NULL, given_by VARCHAR(64) NOT NULL, given_at DATETIME NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    _add_col(c, "tickets_tb", "validation_state", "VARCHAR(16) NOT NULL DEFAULT 'auto'")
+    _add_col(c, "tickets_tb", "last_note_value", "DECIMAL(10,3) NULL")
+    _add_col(c, "tickets_tb", "last_note_at", "DATETIME NULL")
+    _add_idx(c, "tickets_tb", "idx_validation", "(validation_state, status)")
+
+
 MIGRATIONS = [
     (1, "baseline", _m1_baseline),
     (2, "tickets: version + outbox Orange + index", _m2_tickets_outbox),
     (3, "logs.access_time en DATETIME", _m3_logs_datetime),
+    (4, "comptes, audit, versions, maintenance, accusés, journal de ticket", _m4_comptes_gouvernance),
 ]
 
 
