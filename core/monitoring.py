@@ -144,9 +144,7 @@ def run_cycle() -> dict:
             cps_dash = {i: {**c, "end": c["end"].replace(tzinfo=constants.CAMEROON_TZ),
                             "start": c["start"].replace(tzinfo=constants.CAMEROON_TZ)} for i, c in cps.items()}
             data = metrics.build_dashboard(dash, tdd, cps_dash, checkpoint.replace(tzinfo=constants.CAMEROON_TZ))
-            with constants.DASHBOARD_CACHE_LOCK:
-                constants.DASHBOARD_CACHE.clear()
-                constants.DASHBOARD_CACHE.update(data)
+            constants.set_dashboard(data)
         except Exception:
             logger.exception("Calcul du tableau de bord en échec (la supervision continue)")
 
@@ -157,6 +155,7 @@ def run_cycle() -> dict:
         state.last_ok_at, state.last_ok_iso = time.monotonic(), fmt(now_local().replace(tzinfo=None))
         state.last_error, state.watchdog_notified = "", False
         logger.info("Cycle terminé en %.1fs : %s", time.monotonic() - t0, {k: v for k, v in stats.items() if k != "sources_failed"})
+        publish_threadsafe({"type": "data_version", "version": constants.DASHBOARD_VERSION})      # les navigateurs rechargent (avec gigue)
     except Exception as e:
         state.cycles_failed += 1
         state.last_error = f"{type(e).__name__}: {e}"
@@ -288,6 +287,7 @@ def register_jobs(scheduler) -> None:
                       max_instances=1, coalesce=True)
     scheduler.add_job(_safe(analytics.purge, "purge"), CronTrigger(hour=3, minute=17, timezone=tz), id="purge",
                       max_instances=1, coalesce=True)
+    scheduler.add_job(_safe(job_viewer_peak, "viewer_peak"), "interval", minutes=1, id="viewer_peak", max_instances=1, coalesce=True)
     scheduler.add_job(_safe(history.purge, "purge_history"), CronTrigger(hour=3, minute=27, timezone=tz), id="purge_history",
                       max_instances=1, coalesce=True)
     scheduler.add_job(_safe(job_watchdog, "watchdog"), IntervalTrigger(minutes=5), id="watchdog",
@@ -304,6 +304,41 @@ def status() -> dict:
 # ============================================================================
 # SSE (appelé depuis l'API ; les abonnés sont dans app.state)
 # ============================================================================
+class _Runtime:
+    """Boucle asyncio et application FastAPI, liées au démarrage : le cycle (thread APScheduler) s'en sert pour publier en SSE."""
+    loop: asyncio.AbstractEventLoop | None = None
+    app = None
+
+
+runtime = _Runtime()
+
+
+def bind_runtime(loop: asyncio.AbstractEventLoop, app) -> None:
+    runtime.loop, runtime.app = loop, app
+
+
+def publish_threadsafe(event: dict) -> None:
+    """Publie un évènement SSE depuis un AUTRE thread (cycle, tâches). Sans effet hors serveur ; ne lève jamais."""
+    loop, app = runtime.loop, runtime.app
+    if loop is None or app is None or loop.is_closed():
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(sse_publish({**event, "at": now_local().isoformat(timespec="seconds")}, app), loop)
+    except Exception:
+        logger.exception("Publication SSE impossible")
+
+
+def viewer_count() -> int:
+    """Nombre de flux SSE ouverts (= spectateurs connectés)."""
+    subscribers = getattr(getattr(runtime.app, "state", None), "sse_subscribers", None)
+    return len(subscribers) if subscribers is not None else 0
+
+
+def job_viewer_peak() -> None:
+    """Chaque minute : conserve le pic de spectateurs simultanés de la journée (T5)."""
+    analytics.record_viewer_peak(viewer_count())
+
+
 async def sse_publish(event: dict, app) -> None:
     subs = getattr(app.state, "sse_subscribers", None)
     if not subs:

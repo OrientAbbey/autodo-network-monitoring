@@ -4,10 +4,11 @@ Règle : aucun accès base de données dans la boucle d'événements. Les endpoi
 (exécutés dans le pool de threads, borné à 20) ou passent par ``asyncio.to_thread``.
 """
 import asyncio
+import zlib
 from urllib.parse import quote
 
 import orjson
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from fastapi.responses import RedirectResponse, StreamingResponse
 
@@ -37,23 +38,38 @@ async def data_management_page():
 
 
 # ---------------------------------------------------------------- données
-@dashboard_router.post("/api/dashboard_data")
-async def api_dashboard_data(request: Request, response: Response):
-    """Cache pré-calculé + alertes. Jamais de calcul lourd dans la requête : 503 tant que le 1er cycle n'est pas fini."""
-    body = await request.body()
-    try:
-        filters = orjson.loads(body) if body else {}
-    except orjson.JSONDecodeError:
-        raise HTTPException(400, "JSON invalide") from None
-    if not isinstance(filters, dict):
-        raise HTTPException(400, "Corps JSON attendu : objet")
+def _etag_matches(header: str | None, etag: str) -> bool:
+    """``If-None-Match`` peut lister plusieurs ETag ; la comparaison faible ignore le préfixe W/."""
+    if not header:
+        return False
+    wanted = etag.removeprefix("W/")
+    return header.strip() == "*" or any(part.strip().removeprefix("W/") == wanted for part in header.split(","))
+
+
+@dashboard_router.get("/api/dashboard_data")
+async def api_dashboard_data(request: Request, response: Response, status: str | None = Query(None, pattern="^(open|closed)$"),
+                             type: str | None = Query(None, max_length=40), period: str | None = Query(None, pattern="^(today|week|month)$")):
+    """Tableau de bord pré-calculé (JSON sérialisé UNE fois par cycle) + alertes filtrées, avec ETag : 304 si rien n'a changé.
+
+    Jamais de calcul lourd dans la requête : 503 tant que le 1er cycle n'est pas fini.
+    """
     analytics.track_user(request, response.headers)                 # tampon mémoire : aucune E/S
     with constants.DASHBOARD_CACHE_LOCK:
-        cached = dict(constants.DASHBOARD_CACHE)
-    if not cached:
+        cached_json, version = constants.DASHBOARD_JSON, constants.DASHBOARD_VERSION
+    if not cached_json:
         raise HTTPException(503, "Données en cours de préparation", headers={"Retry-After": "10"})
-    cached["alertes"] = await asyncio.to_thread(tickets.dashboard_alerts, filters)
-    return _json(cached, headers=response.headers)
+    filters = {key: value for key, value in (("status", status), ("type", type), ("period", period)) if value}
+    alerts_json = orjson.dumps(await asyncio.to_thread(tickets.dashboard_alerts, filters), default=str)
+    etag = f'W/"{version}-{zlib.crc32(alerts_json):08x}"'
+    headers = {**dict(response.headers), "ETag": etag, "Cache-Control": "no-cache"}
+    if _etag_matches(request.headers.get("if-none-match"), etag):
+        return Response(status_code=304, headers=headers)
+    return Response(cached_json + b',"alertes":' + alerts_json + b"}", media_type="application/json", headers=headers)
+
+
+def format_sse(event: dict) -> str:
+    """Évènement SSE SANS nom (``data: {...}``) : seul ce format atteint ``EventSource.onmessage`` côté navigateur."""
+    return f"data: {orjson.dumps(event).decode()}\n\n"
 
 
 @dashboard_router.get("/events")
@@ -73,7 +89,7 @@ async def sse_events(request: Request):
                     break
                 try:
                     ev = await asyncio.wait_for(queue.get(), timeout=15)
-                    yield f"event: update\ndata: {orjson.dumps(ev).decode()}\n\n"
+                    yield format_sse(ev)
                 except asyncio.TimeoutError:
                     yield ": keep-alive\n\n"
         finally:
@@ -88,6 +104,12 @@ async def sse_events(request: Request):
 @dashboard_router.get("/api/config")
 async def get_config():
     return _json(load_config())
+
+
+@dashboard_router.get("/api/presence")
+async def api_presence():
+    """Spectateurs connectés maintenant et pic du jour (public : ni nom ni adresse)."""
+    return {"viewers": monitoring.viewer_count(), "peak_today": await asyncio.to_thread(analytics.peak_today)}
 
 
 @dashboard_router.get("/api/sparklines")

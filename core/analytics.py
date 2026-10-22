@@ -93,6 +93,13 @@ def record_viewer_peak(viewers_now: int) -> None:
                   {"d": now.strftime("%Y-%m-%d"), "n": int(viewers_now), "t": fmt(now)})
 
 
+def peak_today() -> int:
+    with local_conn() as c:
+        value = c.execute(text("SELECT peak_viewers FROM usage_peaks WHERE `day` = :d"),
+                          {"d": now_local().replace(tzinfo=None).strftime("%Y-%m-%d")}).scalar()
+    return int(value or 0)
+
+
 def viewer_peaks(period: str = "7days") -> list[dict]:
     cutoff = period_to_cutoff(period).strftime("%Y-%m-%d")
     with local_conn() as c:

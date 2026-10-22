@@ -24,7 +24,7 @@ def test_security_headers_and_no_cors_by_default(client):
     assert r.status_code == 200
     assert "script-src 'self'" in r.headers["content-security-policy"] and "'unsafe-inline'" not in r.headers["content-security-policy"].split("style-src")[0]
     assert r.headers["x-frame-options"] == "DENY"
-    pre = client.options("/api/dashboard_data", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"})
+    pre = client.options("/api/dashboard_data", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "GET"})
     assert "access-control-allow-origin" not in pre.headers
 
 
@@ -71,12 +71,12 @@ def test_large_json_is_gzipped_but_the_sse_stream_is_not(client, monkeypatch):
     from core import constants, tickets
     monkeypatch.setattr(tickets, "dashboard_alerts", lambda filters=None: {"traffic": [], "pertes": []})
     with constants.DASHBOARD_CACHE_LOCK:
-        constants.DASHBOARD_CACHE.clear()
-        constants.DASHBOARD_CACHE.update({"recap": {f"db{i}": {"v": "x" * 50} for i in range(400)}})
+        constants.set_dashboard({"recap": {f"db{i}": {"v": "x" * 50} for i in range(400)}})
     try:
-        r = client.post("/api/dashboard_data", json={}, headers={"Accept-Encoding": "gzip"})
+        r = client.get("/api/dashboard_data", headers={"Accept-Encoding": "gzip"})
         assert r.status_code == 200 and r.headers.get("content-encoding") == "gzip"
     finally:
         with constants.DASHBOARD_CACHE_LOCK:
             constants.DASHBOARD_CACHE.clear()
+            constants.DASHBOARD_JSON = b""
     assert client.get("/static/js/state.js").headers.get("cache-control") == "no-cache"

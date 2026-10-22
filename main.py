@@ -36,6 +36,7 @@ async def lifespan(app: FastAPI):
     governance.ensure_initial_version()             # point de retour : la configuration au premier démarrage
     app.state.sse_subscribers = set()
     app.state.sse_subscribers_lock = asyncio.Lock()
+    monitoring.bind_runtime(asyncio.get_running_loop(), app)
 
     scheduler = BackgroundScheduler(timezone=constants.CAMEROON_TZ, executors={"default": ApsThreadPool(6)},
                                     job_defaults={"coalesce": True, "misfire_grace_time": 120})

@@ -170,6 +170,21 @@ CAMEROON_TZ = ZoneInfo("Africa/Douala")
 scheduler = None
 DASHBOARD_CACHE: dict[str, Any] = {}
 DASHBOARD_CACHE_LOCK = threading.RLock()
+DASHBOARD_JSON: bytes = b""         # JSON du tableau de bord SANS l'accolade finale (T2) : sérialisé UNE fois par cycle, partagé par tous les spectateurs
+DASHBOARD_VERSION: int = 0          # +1 à chaque cycle ; sert d'ETag et de « data_version » SSE
+
+
+def set_dashboard(data: dict) -> int:
+    """Publie le tableau de bord calculé par le cycle (dict + JSON prêt à servir). Retourne la nouvelle version."""
+    import orjson
+    serialized = orjson.dumps(data, default=str)
+    global DASHBOARD_JSON, DASHBOARD_VERSION
+    with DASHBOARD_CACHE_LOCK:
+        DASHBOARD_CACHE.clear()
+        DASHBOARD_CACHE.update(data)
+        DASHBOARD_JSON = serialized[:-1] if serialized.endswith(b"}") and len(serialized) > 2 else b'{"vide":true'
+        DASHBOARD_VERSION += 1
+        return DASHBOARD_VERSION
 
 
 # ============================================================================
