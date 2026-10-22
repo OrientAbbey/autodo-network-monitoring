@@ -334,6 +334,7 @@ class TrainBody(BaseModel):
 
 
 def _train(key: str, body: TrainBody) -> dict:
+    anomaly_ml.require_ml()                       # « bibliothèque absente » (501) prime sur « pas assez de données » (422)
     if key == "quality":
         metrics = anomaly_ml.train_quality()
         shadow.record_training(key, metrics)

@@ -40,8 +40,10 @@ def fill_history(db_key: str, days: int, *, end=None, noise=0.03, seed=1, modify
         ts = end - (total - 1 - i) * STEP
         gbps = profile(ts.hour * 12 + ts.minute // 5) * (1 + rnd.gauss(0, noise))
         gbps = modify(ts, gbps) if modify else gbps
-        rows.append({"db_key": db_key, "ts": fmt(ts), "traffic_gbps": gbps, "loss_pct": 1.0, "latency_ms": 50.0,
-                     "tcp_no_response_pct": 1.0, "tcp_block_wp_up_pct": 0.0, "dns_malformed_pct": 0.0})
+        # (les vraies séries varient : des mesures strictement constantes ne permettraient à aucun modèle d'en déduire une anomalie)
+        rows.append({"db_key": db_key, "ts": fmt(ts), "traffic_gbps": gbps, "loss_pct": max(0.0, rnd.gauss(1.0, 0.3)),
+                     "latency_ms": max(1.0, rnd.gauss(50.0, 4.0)), "tcp_no_response_pct": max(0.0, rnd.gauss(1.0, 0.2)),
+                     "tcp_block_wp_up_pct": 0.0, "dns_malformed_pct": 0.0})
     with history.local_tx() as conn:
         conn.execute(history._REPLACE_SQL, rows)
 

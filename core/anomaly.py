@@ -100,8 +100,10 @@ def holt_winters_forecast(values: list[float | None], season: int = POINTS_PER_D
     Modèle additif : niveau + tendance + profil saisonnier (une journée = 288 points de 5 min). Il faut au moins DEUX saisons.
     La bande « lower/upper » est ±1,96 écart-type des erreurs de prévision à un pas (≈ 95 %).
     """
-    if len(values) < 2 * season:
-        raise ValueError("Il faut au moins 2 jours d'historique pour prévoir une journée.")
+    present = sum(v is not None for v in values)
+    if len(values) < 2 * season or present < 1.5 * season:
+        # (une prévision bâtie sur des trous « comblés » ne vaut rien : on exige des données réellement mesurées)
+        raise ValueError("Il faut au moins 2 jours d'historique (dont 1,5 jour de relevés présents) pour prévoir une journée.")
     series = _fill_gaps(values, season)
     first, second = series[:season], series[season:2 * season]
     level = statistics.fmean(first)

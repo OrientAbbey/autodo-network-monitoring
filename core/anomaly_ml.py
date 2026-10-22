@@ -52,7 +52,7 @@ def ml_available() -> bool:
     return True
 
 
-def _require_ml() -> None:
+def require_ml() -> None:
     if not ml_available():
         raise MlUnavailable("scikit-learn et joblib ne sont pas installés (pip install -r requirements-ml.txt)")
 
@@ -125,7 +125,7 @@ def isolation_training_matrix(db_key: str, days: int = ISOLATION_TRAINING_DAYS) 
 
 def train_isolation(db_key: str, days: int = ISOLATION_TRAINING_DAYS) -> dict:
     """Entraîne et sauvegarde le modèle d'une base. Retourne ses métriques (nombre de relevés, part isolée à l'entraînement)."""
-    _require_ml()
+    require_ml()
     import joblib
     from sklearn.ensemble import IsolationForest
     matrix = isolation_training_matrix(db_key, days)
@@ -202,7 +202,7 @@ def labeled_tickets() -> list[dict]:
 
 def train_quality() -> dict:
     """Entraîne le modèle de qualité d'alerte. Évalué par découpage temporel 80/20, puis ré-entraîné sur tout le jeu."""
-    _require_ml()
+    require_ml()
     import joblib
     from sklearn.ensemble import RandomForestClassifier
     from sklearn.metrics import accuracy_score, precision_score, recall_score
