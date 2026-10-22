@@ -1,5 +1,4 @@
 // Script extrait du template (CSP : aucun script inline).
-        const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         // State Management
         const State = {
             allTickets: [],
@@ -121,7 +120,7 @@
                                 <span class="ticket-id">#${esc(ticket.id)}</span>
                                 ${hasPertes ? '<span class="pertes-indicator">Pertes: High</span>' : ''}
                             </div>
-                            <span class="ticket-status status-${esc(ticket.status)}">${esc(ticket.status)}</span>
+                            <span class="ticket-status status-${esc(ticket.status)}">${esc(ticket.status)}${ticket.validation_state === 'pending' ? ` <span class="badge-pending">${esc(t('alert.pending'))}</span>` : ''}</span>
                         </div>
                         <div class="ticket-info">
                             <div class="info-row"><span class="info-label">Agent:</span><span>${esc(ticket.agent || '-')}</span></div>
@@ -156,6 +155,7 @@
                                 </div>
                             ` : ''}
                         </div>
+                        <div class="ticket-actions">${TicketActions.buttons(ticket)}</div>
                     </div>
                 `;
             },
@@ -267,3 +267,6 @@ document.addEventListener('click', (e) => {
     };
     (actions[el.dataset.action] || (() => {}))();
 });
+
+// Les boutons dépendent du rôle de la session et de la langue : on redessine quand l'un des deux change
+['session-changed', 'prefs-changed'].forEach(name => document.addEventListener(name, () => { if (State.allTickets.length) UI.displayTickets(); }));

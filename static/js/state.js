@@ -11,13 +11,9 @@ const STATE = {
     currentAlertes: [],
     sections: ['international', 'gi', 'international_gi', 'roaming', 'tdd'],
     refreshInProgress: false,
-    theme: localStorage.getItem('theme') || 'dark',
     isFirstLoad: true,
-
-    // ====== NOTIFICATION SOUND ======
-    soundOscillators: [],
-    soundInterval: null,
-    audioContext: null
+    shownIds: new Set(),        // alertes déjà présentées dans la pop-up pendant cette session de page
+    popupIds: []                // alertes actuellement listées dans la pop-up
 };
 
 // ====== ACCÈS DOM ======

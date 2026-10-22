@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="{{ title_key }}">{{ title_default }}</title>
+    <link rel="stylesheet" type="text/css" href="/static/styles.css">
+    <link rel="stylesheet" type="text/css" href="/static/app-ui.css">
+</head>
+
+<body data-requires="{{ requires }}" class="app-page">
+    <div class="main-container">
+        <header class="header">
+            <div class="header-content">
+                <h1 class="page-title" data-i18n="{{ title_key }}">{{ title_default }}</h1>
+                <div class="controls">
+                    <a class="btn-secondary" href="/" data-i18n="nav.dashboard">Tableau de bord</a>
+                    <a class="btn-secondary" href="/tickets/" data-i18n="header.tickets">Tickets</a>
+                    <button id="prefsBtn" class="btn-secondary" type="button" data-action="openPrefs" data-i18n-attr="title:prefs.title;aria-label:prefs.title"
+                        title="Préférences" aria-label="Préférences">🎛️</button>
+                    <div id="account-widget" class="account-widget"></div>
+                </div>
+            </div>
+        </header>
+        <main id="app" class="page-content" aria-live="polite"></main>
+    </div>
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+    <script src="/static/js/common.js"></script>
+    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/prefs.js"></script>
+    <script src="/static/js/session.js"></script>
+    <script src="/static/js/sound.js"></script>
+    <script src="/static/js/a11y.js"></script>
+    <script src="/static/js/ui.js"></script>
+    <script src="/static/js/param-labels.js"></script>
+    <script src="/static/js/page-kit.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
@@ -450,12 +450,14 @@
             }
         }
     </style>
+    <link rel="stylesheet" type="text/css" href="/static/app-ui.css">
 </head>
 
 <body>
     <div class="container">
         <div class="header">
             <h1>Network Monitoring Tickets</h1>
+            <div class="header-tools"><button id="prefsBtn" class="btn btn-secondary" type="button" data-action="openPrefs" data-i18n-attr="title:prefs.title;aria-label:prefs.title" title="Préférences" aria-label="Préférences">🎛️</button><div id="account-widget" class="account-widget"></div></div>
             <div class="filters-toggle-container">
                 <button class="btn btn-orange" data-action="toggleFilters" aria-label="Afficher ou masquer les filtres">
                     🔍 Filters <span id="filter-arrow">▼</span>
@@ -533,6 +535,15 @@
     </div>
 
 
+    <script src="/static/js/common.js"></script>
+    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/prefs.js"></script>
+    <script src="/static/js/session.js"></script>
+    <script src="/static/js/sound.js"></script>
+    <script src="/static/js/a11y.js"></script>
+    <script src="/static/js/ui.js"></script>
+    <script src="/static/js/page-kit.js"></script>
+    <script src="/static/js/ticket-actions.js"></script>
     <script src="/static/tickets.js"></script>
 </body>
 

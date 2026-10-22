@@ -177,8 +177,9 @@ def test_phase_b_routes_are_protected_by_role(app):
                   "/api/admin/analysis/level-shifts?db_key=x"]
     for url in admin_urls:
         assert visitor.get(url).status_code == 401 and supervisor.get(url).status_code == 403, url
-    assert visitor.post("/api/supervision/simulation", json={}).status_code == 401
-    assert supervisor.post("/api/supervision/simulation", json={}).status_code == 200            # la simulation sert aux superviseurs
+    assert visitor.post("/api/admin/simulation", json={}).status_code == 401
+    assert supervisor.post("/api/admin/simulation", json={}).status_code == 403                  # la simulation est réservée à l'admin
+    assert client_for(app, "adm", "admin").post("/api/admin/simulation", json={}).status_code == 200
     assert visitor.get("/api/sparklines").status_code == 200                                      # mini-courbes : publiques
 
 
@@ -257,12 +258,12 @@ def test_capacity_and_level_shift_endpoints(admin):
 
 
 def test_simulation_endpoint(app):
-    supervisor = client_for(app, "sup", "supervision")
+    supervisor = client_for(app, "adm", "admin")
     flat_history("kribi", aligned_now())
     body = {"config": {"traffic_consecutive_drops_min_percent": 10.0}, "days": 2}
-    result = supervisor.post("/api/supervision/simulation", json=body).json()
+    result = supervisor.post("/api/admin/simulation", json=body).json()
     assert result["delta"] == 1 and result["new_alerts_without_ticket"] == 1
-    assert supervisor.post("/api/supervision/simulation", json={"config": {"inconnu": 1}}).status_code == 422
-    assert supervisor.post("/api/supervision/simulation", json={"config": {"alert_traffic_threshold_percent": 400}}).status_code == 422
-    assert supervisor.post("/api/supervision/simulation", json={"days": 90}).status_code == 422
+    assert supervisor.post("/api/admin/simulation", json={"config": {"inconnu": 1}}).status_code == 422
+    assert supervisor.post("/api/admin/simulation", json={"config": {"alert_traffic_threshold_percent": 400}}).status_code == 422
+    assert supervisor.post("/api/admin/simulation", json={"days": 90}).status_code == 422
     assert governance.list_config_versions() == [] and config.read_raw()["overrides"] == {}        # rien n'a été enregistré

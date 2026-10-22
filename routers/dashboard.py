@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from fastapi.responses import RedirectResponse, StreamingResponse
 
-from core import analytics, auth, constants, db, history, monitoring, tickets
+from core import analytics, auth, constants, db, governance, history, monitoring, tickets
 from core.config import load_config, now_local, settings
 from core.logger import get_logger
 
@@ -29,6 +29,29 @@ def _json(data, status_code: int = 200, headers=None) -> Response:
 @dashboard_router.get("/")
 async def index(request: Request):
     return request.app.state.templates.TemplateResponse(request, "dashboard.html")
+
+
+def _app_page(request: Request, template: str, requires: str, title_key: str, title_default: str):
+    """Coquille HTML d'une page réservée : aucun secret dedans, l'accès aux DONNÉES est contrôlé par les API (401/403)."""
+    return request.app.state.templates.TemplateResponse(
+        request, template, {"requires": requires, "title_key": title_key, "title_default": title_default})
+
+
+@dashboard_router.get("/supervision")
+async def supervision_page(request: Request):
+    return _app_page(request, "supervision.html", "supervision", "page.supervision", "Supervision")
+
+
+@dashboard_router.get("/admin")
+async def admin_page(request: Request):
+    return _app_page(request, "admin.html", "admin", "page.admin", "Administration")
+
+
+@dashboard_router.get("/api/maintenance/active")
+async def api_active_maintenance():
+    """Fenêtres de maintenance en cours (public : le visiteur doit comprendre pourquoi une base ne remonte plus d'alerte)."""
+    windows = await asyncio.to_thread(governance.list_windows, True)
+    return {"windows": [{"db_key": w["db_key"], "ends_at": w["ends_at"], "reason": (w["reason"] or "")[:80]} for w in windows]}
 
 
 @dashboard_router.get("/data-management")

@@ -29,20 +29,16 @@ function refreshDashboardData() {
     const typeFilter = document.querySelector('input[name="typeFilter"]:checked')?.value || 'all';
     const periodFilter = document.querySelector('input[name="periodFilter"]:checked')?.value || 'all';
 
-    // Send filters in request body
+    // Filtres → paramètres d'URL (GET) ; le navigateur revalide seul avec l'ETag du serveur (304 = rien n'a changé)
     const clientId = getClientId();
+    const query = new URLSearchParams();
+    if (['open', 'closed'].includes(statusFilter)) query.set('status', statusFilter);
+    if (typeFilter !== 'all') query.set('type', typeFilter);
+    if (['today', 'week', 'month'].includes(periodFilter)) query.set('period', periodFilter);
 
-    fetch('/api/dashboard_data', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            "X-Client-Id": clientId
-        },
-        body: JSON.stringify({
-            status: statusFilter,
-            type: typeFilter,
-            period: periodFilter
-        })
+    fetch('/api/dashboard_data' + (query.toString() ? '?' + query.toString() : ''), {
+        credentials: 'same-origin',
+        headers: { 'X-Client-Id': clientId }
     })
         .then(response => {
             const newId = response.headers.get("X-Client-Id");
@@ -76,7 +72,7 @@ function updateDashboardDOM(data) {
     // Si le backend renvoie une erreur, ne pas tenter de rendre
     if (!data || data.error) {
         if (data && data.error) {
-            Toasts.show(`Erreur serveur: ${data.error}`, { type: 'error' });
+            Toasts.show(t('live.server_error', { error: data.error }), { type: 'error' });
         }
         return;
     }
@@ -89,7 +85,7 @@ function updateDashboardDOM(data) {
         const linkPertes = nowRecap?.link?.pertes && nowRecap.link.pertes !== '#' ? nowRecap.link.pertes : null;
         const locationName = names[loc] || loc;
 
-        let row = `<tr${isTotal ? ' class="total-row"' : ''}><td class="location-cell">${locationName}</td>`;
+        let row = `<tr${isTotal ? ' class="total-row"' : ` data-db="${esc(loc)}"`}><td class="location-cell">${locationName}</td>`;
 
         // Traffic columns
         const nowVal = nowRecap?.total?.end ?? '';
@@ -212,7 +208,7 @@ function updateDashboardDOM(data) {
     // Helper function to build TCP metrics table row (for international+gi section)
     const buildTcpMetricsRow = (loc, combinedNames, recapData) => {
         const locationName = combinedNames[loc] || loc;
-        let row = `<tr><td class="location-cell">${locationName}</td>`;
+        let row = `<tr data-db="${esc(loc)}"><td class="location-cell">${locationName}</td>`;
 
         // Get links for this location
         const links = recapData['5min'] && recapData['5min'][loc]?.link;
@@ -295,7 +291,7 @@ function updateDashboardDOM(data) {
         return row + `</tr>`;
     };
 
-    const tableHeader = `<table class="data-table"><thead><tr><th rowspan="2">Location</th><th colspan="4">Traffic (Gbits/s)</th><th class="separator-col" colspan="4">Pertes (%)</th></tr><tr><th>Now</th><th>5min</th><th>1D</th><th>1W</th><th class="separator-col">Now</th><th>5min</th><th>1D</th><th>1W</th></tr></thead><tbody>`;
+    const tableHeader = `<table class="data-table"><thead><tr><th rowspan="2">${t('table.location')}</th><th colspan="4">${t('table.traffic')}</th><th class="separator-col" colspan="4">${t('table.loss')}</th></tr><tr><th>Now</th><th>5min</th><th>1D</th><th>1W</th><th class="separator-col">Now</th><th>5min</th><th>1D</th><th>1W</th></tr></thead><tbody>`;
 
     // === Sortie Internationale ===
     let intlTable = tableHeader;
@@ -326,7 +322,7 @@ function updateDashboardDOM(data) {
     }
 
     // === International + GI (TCP Metrics) ===
-    const tcpMetricsHeader = `<table class="data-table"><thead><tr><th rowspan="2">Location</th><th colspan="4">Latence (ms)</th><th class="separator-col" colspan="4">TCP No Response (%)</th><th class="separator-col" colspan="4">TCP Block WP Up (%)</th><th class="separator-col" colspan="4">DNS Malformed (%)</th><th class="separator-col" colspan="4">DNS No Response (%)</th></tr><tr><th>Now</th><th>5min</th><th>1D</th><th>1W</th><th class="separator-col">Now</th><th>5min</th><th>1D</th><th>1W</th><th class="separator-col">Now</th><th>5min</th><th>1D</th><th>1W</th><th class="separator-col">Now</th><th>5min</th><th>1D</th><th>1W</th><th class="separator-col">Now</th><th>5min</th><th>1D</th><th>1W</th></tr></thead><tbody>`;
+    const tcpMetricsHeader = `<table class="data-table"><thead><tr><th rowspan="2">${t('table.location')}</th><th colspan="4">${t('table.latency')}</th><th class="separator-col" colspan="4">${t('table.tcp_no_response')}</th><th class="separator-col" colspan="4">TCP Block WP Up (%)</th><th class="separator-col" colspan="4">DNS Malformed (%)</th><th class="separator-col" colspan="4">DNS No Response (%)</th></tr><tr><th>Now</th><th>5min</th><th>1D</th><th>1W</th><th class="separator-col">Now</th><th>5min</th><th>1D</th><th>1W</th><th class="separator-col">Now</th><th>5min</th><th>1D</th><th>1W</th><th class="separator-col">Now</th><th>5min</th><th>1D</th><th>1W</th><th class="separator-col">Now</th><th>5min</th><th>1D</th><th>1W</th></tr></thead><tbody>`;
 
     let internationalGiTable = tcpMetricsHeader;
 
@@ -375,7 +371,7 @@ function updateDashboardDOM(data) {
     // === Roaming Utilisateur ===
     const roamingIntervals = ['now', '5min', '1day', '1week'];
     roamingIntervals.forEach(interval => {
-        let roamingTable = `<table class="data-table"><thead><tr><th>Ville</th><th>Roaming IN UP Gp</th><th>Roaming IN UP S8</th><th>Roaming OUT UP</th></tr></thead><tbody>`;
+        let roamingTable = `<table class="data-table"><thead><tr><th>${t('table.city')}</th><th>Roaming IN UP Gp</th><th>Roaming IN UP S8</th><th>Roaming OUT UP</th></tr></thead><tbody>`;
 
         data.roaming_cities.forEach(city => {
             roamingTable += `<tr><td class="location-cell">${city.charAt(0).toUpperCase() + city.slice(1)}</td>`;
@@ -453,4 +449,7 @@ function updateDashboardDOM(data) {
     if (DOM.lastUpdateValue && data.current_time) {
         DOM.lastUpdateValue.textContent = data.current_time;
     }
+
+    // Les tableaux viennent d'être redessinés : mini-courbes, cartes mobiles et accessibilité s'y raccrochent
+    document.dispatchEvent(new CustomEvent('dashboard-updated', { detail: data }));
 }

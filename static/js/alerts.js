@@ -2,140 +2,97 @@
 // Script classique (partage la portée globale avec les autres fichiers de static/js/, chargés dans l'ordre de dashboard.html).
 
 // ====== GESTIONNAIRE DES ALERTES ======
-const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const AlertManager = {
+    /** Une alerte « en attente de validation » n'est pas encore un ticket officiel : ni son, ni pop-up, ni compteur. */
+    isActionable(alerte) {
+        return alerte.status === 'open' && alerte.validation_state !== 'pending';
+    },
+
     updateBadge(allAlertes) {
         document.querySelectorAll('#alertes-badge-open, #alertes-badge').forEach(e => e.remove());
 
-        const openAlertes = allAlertes.filter(a => a.status === 'open');
+        const openAlertes = allAlertes.filter(a => this.isActionable(a));
         const totalOpenAlertes = openAlertes.length;
         const badgeColor = totalOpenAlertes > 0 ? 'var(--danger)' : 'var(--success)';
 
-        let badge = document.createElement('div');
-        badge.id = 'alertes-badge';
-        badge.className = 'alertes-badge';
-        badge.style.background = badgeColor;
-        badge.style.display = 'none';
-
-        let openBtn = document.createElement('div');
-        openBtn.id = 'alertes-badge-open';
-        openBtn.className = 'alertes-badge-open';
-        openBtn.innerHTML = '🔔';
-        openBtn.title = 'Afficher le badge alertes';
-        openBtn.style.background = badgeColor;
-        openBtn.style.display = 'flex';
-
-        badge.innerHTML = `<span>🚨 ${openAlertes.filter(a => a.type === 'TRAFFIC').length} traffic</span> <span style='margin-left:10px;'>⚠️ ${openAlertes.filter(a => a.type === 'PERTES').length} pertes</span>`;
+        const badge = el('div', { id: 'alertes-badge', class: 'alertes-badge', style: `background:${badgeColor};display:none` },
+            el('span', { text: `🚨 ${openAlertes.filter(a => a.type === 'TRAFFIC').length} ${t('badge.traffic')}` }),
+            el('span', { style: 'margin-left:10px;', text: `⚠️ ${openAlertes.filter(a => a.type === 'PERTES').length} ${t('badge.losses')}` }));
+        const openBtn = el('div', { id: 'alertes-badge-open', class: 'alertes-badge-open', title: t('badge.show'), role: 'button', tabindex: '0',
+            'aria-label': t('badge.show'), style: `background:${badgeColor};display:flex` }, '🔔',
+            el('span', { class: 'badge-count', style: `background:${badgeColor};display:${totalOpenAlertes > 0 ? 'block' : 'none'}`, text: totalOpenAlertes }));
 
         const closeBtn = DOM.createCloseBtn();
-        closeBtn.onclick = (e) => {
-            badge.style.display = 'none';
-            openBtn.style.display = 'flex';
-            e.stopPropagation();
-        };
+        closeBtn.setAttribute('aria-label', t('common.close'));
+        closeBtn.addEventListener('click', e => { badge.style.display = 'none'; openBtn.style.display = 'flex'; e.stopPropagation(); });
         badge.appendChild(closeBtn);
+        const reveal = () => { badge.style.display = 'flex'; openBtn.style.display = 'none'; };
+        openBtn.addEventListener('click', reveal);
+        openBtn.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); reveal(); } });
 
-        openBtn.onclick = () => {
-            badge.style.display = 'flex';
-            openBtn.style.display = 'none';
-        };
-
-        // Badge count on bell
-        const badgeCount = document.createElement('span');
-        badgeCount.className = 'badge-count';
-        badgeCount.textContent = totalOpenAlertes;
-        badgeCount.style.display = totalOpenAlertes > 0 ? 'block' : 'none';
-        badgeCount.style.background = badgeColor;
-        openBtn.appendChild(badgeCount);
-
-        // === Insertion dans l'entête (zone .controls) au lieu du body ===
-        const controls = DOM.controls;
-        if (controls) {
-            controls.appendChild(badge);
-            controls.appendChild(openBtn);
-        } else {
-            // Fallback au body si .controls introuvable
-            document.body.appendChild(badge);
-            document.body.appendChild(openBtn);
-        }
+        const host = DOM.controls || document.body;
+        host.appendChild(badge);
+        host.appendChild(openBtn);
     },
 
+    /**
+     * Pop-up d'alerte PARTAGÉE : elle liste les alertes ouvertes que PERSONNE n'a encore acquittées.
+     * Quand quelqu'un clique « Ok », l'accusé est enregistré côté serveur : la pop-up se ferme chez tous les spectateurs.
+     */
     checkNewAlertes(allAlertes) {
+        const actionable = allAlertes.filter(a => this.isActionable(a));
+        STATE.currentAlertes = actionable;
+        const unacked = actionable.filter(a => !a.acked);
+        const popupVisible = DOM.alertPopup && getComputedStyle(DOM.alertPopup).display !== 'none';
 
-        const openAlertes = allAlertes.filter(a => a.status === 'open');
-        STATE.currentAlertes = openAlertes;
-
-        // On first load, play sound for all open alerts
-        if (STATE.isFirstLoad) {
-            if (openAlertes.length > 0) {
-                // Show popup for the first open alert (sound will start automatically)
-                this.showAlertPopup(openAlertes[0]);
-                // this.showAlertToast(openAlertes[0]);
-            }
-            STATE.isFirstLoad = false;
-        } else {
-            // On subsequent loads, only check for truly new alerts
-            const newAlertes = openAlertes.filter(alerte =>
-                !STATE.previousAlertes.some(prev => prev.id === alerte.id)
-            );
-            // Show popup for new alerts
-            if (newAlertes.length > 0) {
-                // Show popup for the first new alert (sound will start automatically)
-                this.showAlertPopup(newAlertes[0]);
-            }
-            // newAlertes.forEach(alerte => this.showAlertToast(alerte));
+        if (popupVisible && !(STATE.popupIds || []).some(id => unacked.some(a => a.id === id))) {
+            this.closeAlertPopup();                         // acquittée ailleurs (ou fermée) : plus rien à signaler
         }
-
+        const fresh = unacked.filter(a => !STATE.shownIds.has(a.id));
+        if (fresh.length > 0) {
+            unacked.forEach(a => STATE.shownIds.add(a.id));
+            this.showAlertPopup(unacked);
+        }
+        STATE.isFirstLoad = false;
         this.updateSectionAlertes(allAlertes);
-        STATE.previousAlertes = [...openAlertes];
+        STATE.previousAlertes = [...actionable];
     },
 
-    showAlertToast(alerte) {
-        // Affiche uniquement le titre/message, un seul toast d'alerte à la fois
-        const container = Toasts.ensureContainer();
-        if (!container) return;
-        // Supprime tout toast d'alerte déjà affiché
-        container.querySelectorAll('.toast.alert').forEach(t => t.remove());
-        const toast = document.createElement('div');
-        toast.className = 'toast alert';
-        toast.innerHTML = `
-            <div style="margin-bottom: 10px; font-weight:bold;">${alerte.title || alerte.message}</div>
-            <button class="toast-ok-btn" style="margin-top:4px;padding:4px 16px;font-size:1em;cursor:pointer;">OK</button>
-        `;
-        container.appendChild(toast);
-        requestAnimationFrame(() => {
-            toast.classList.add('visible');
-        });
-
-        toast.querySelector('.toast-ok-btn').addEventListener('click', () => {
-            Toasts.close(toast);
-            stopAlertSound(); // Arrête le son quand le toast est fermé
-        });
-
-        // Play alert sound when toast is shown
-        playAlertSound();
-    },
-
-    showAlertPopup(alerte) {
+    showAlertPopup(alertes) {
         const popup = DOM.alertPopup;
         const message = DOM.alertPopupMessage;
-
-        if (popup && message) {
-            message.textContent = alerte.title || alerte.message || '';
-            popup.style.display = 'flex';
-            this._lastFocus = document.activeElement;
-            popup.querySelector('button')?.focus();        // focus sur « Ok » (lecteurs d'écran, clavier)
-
-            // Start the looping alert sound
-            playAlertSound();
-        }
+        if (!popup || !message || alertes.length === 0) return;
+        STATE.popupIds = alertes.map(a => a.id);
+        const label = a => a.title || a.message || '';
+        clear(message);
+        message.appendChild(el('ul', { class: 'popup-alerts' }, alertes.slice(0, 5).map(a => el('li', { text: label(a) }))));
+        if (alertes.length > 5) message.appendChild(el('p', { class: 'hint', text: t('alert.and_more', { count: alertes.length - 5 }) }));
+        popup.style.display = 'flex';
+        this._lastFocus = document.activeElement;
+        popup.querySelector('button')?.focus();             // focus sur « Ok » (lecteurs d'écran, clavier)
+        announce(`${t('alert.new')} : ${alertes.map(label).slice(0, 3).join(' ; ')}`);
+        AlertChannels.raise(label(alertes[0]), alertes.length);
     },
 
+    /** Ferme la pop-up SANS acquitter (acquittement fait ailleurs, changement de configuration…). */
     closeAlertPopup() {
         DOM.alertPopup?.style.setProperty('display', 'none');
-        stopAlertSound(); // Stop the looping sound when popup is closed
+        AlertChannels.clear();
         this._lastFocus?.focus?.();                         // rend le focus à l'élément précédent
         this._lastFocus = null;
+        STATE.popupIds = [];
+    },
+
+    /** Bouton « Ok » / Échap : enregistre l'accusé de réception partagé puis ferme la pop-up. */
+    async acknowledge() {
+        const ids = STATE.popupIds || [];
+        this.closeAlertPopup();
+        if (ids.length === 0) return;
+        try {
+            await api('/api/ack', { method: 'POST', body: { ticket_ids: ids } });
+        } catch (e) {
+            Toasts.show(t('alert.ack_failed', { error: e.message }), { type: 'error' });
+        }
     },
 
     updateSectionAlertes(alertesData) {
@@ -241,11 +198,11 @@ const AlertManager = {
             if (alertesCount) {
                 let countText = '';
                 if (filteredClosedAlertes.length > 0 && filteredOpenAlertes.length > 0) {
-                    countText = `(<span class="badge-closed">${filteredClosedAlertes.length} fermées</span>, <span class="badge-open">${filteredOpenAlertes.length} ouvertes</span>)`;
+                    countText = `(<span class="badge-closed">${filteredClosedAlertes.length} ${t('alert.closed_n')}</span>, <span class="badge-open">${filteredOpenAlertes.length} ${t('alert.open_n')}</span>)`;
                 } else if (filteredClosedAlertes.length > 0) {
-                    countText = `(<span class="badge-closed">${filteredClosedAlertes.length} fermées</span>)`;
+                    countText = `(<span class="badge-closed">${filteredClosedAlertes.length} ${t('alert.closed_n')}</span>)`;
                 } else if (filteredOpenAlertes.length > 0) {
-                    countText = `(<span class="badge-open">${filteredOpenAlertes.length} ouvertes</span>)`;
+                    countText = `(<span class="badge-open">${filteredOpenAlertes.length} ${t('alert.open_n')}</span>)`;
                 }
                 alertesCount.innerHTML = countText;
             }
@@ -276,10 +233,10 @@ const AlertManager = {
                             ${titreMessage}
                             <span style="margin-left:8px;padding:2px 8px;border-radius:8px;font-size:0.95em;font-weight:bold;vertical-align:middle;background:${isOpen ? 'var(--danger)' : 'var(--success)'};color:white;">
                                 ${isOpen ? 'OPEN' : 'CLOSED'}
-                            </span><br>
-                            Valeurs: ${(a.valeurs || []).map(v => (v == null ? '—' : Number(v).toFixed(3))).join(' → ')}<br>Date: ${esc(a.creation_time || a.date || 'N/A')}
+                            </span>${a.validation_state === 'pending' ? `<span class="badge-pending">${esc(t('alert.pending'))}</span>` : ''}${a.acked ? `<span class="badge-acked" title="${esc(a.acked_by || '')}">✓ ${esc(t('alert.acked'))}</span>` : ''}<br>
+                            ${esc(t('alert.values'))}: ${(a.valeurs || []).map(v => (v == null ? '—' : Number(v).toFixed(3))).join(' → ')}<br>${esc(t('alert.date'))}: ${esc(a.creation_time || a.date || 'N/A')}
                         </span>
-                        ${isOpen ? `<button class="btn-secondary" style="font-size:0.8em;padding:2px 8px;" data-action="dismissAlerte" data-id="${esc(a.id)}" aria-label="Masquer l'alerte">✕</button>` : ''}
+                        ${isOpen ? `<button class="btn-secondary" style="font-size:0.8em;padding:2px 8px;" data-action="dismissAlerte" data-id="${esc(a.id)}" aria-label="${esc(t('alert.hide'))}">✕</button>` : ''}
                     </div>`;
                 }).join('');
             }
@@ -290,15 +247,15 @@ const AlertManager = {
                 const hasStatusFilter = statusFilter !== 'all';
 
                 if (hasTimeFilter || hasTypeFilter || hasStatusFilter) {
-                    html = '<div class="no-data">Aucune alerte trouvée pour les filtres sélectionnés</div>';
+                    html = `<div class="no-data">${esc(t('alert.none_filtered'))}</div>`;
                 } else if (statusFilter === 'open') {
                     if (closedAlertes.length > 0) {
-                        html = '<div class="no-data">Aucune alerte ouverte. <i>(Utilisez les filtres pour voir les alertes fermées)</i></div>';
+                        html = `<div class="no-data">${esc(t('alert.none_open'))} <i>(${esc(t('alert.use_filters'))})</i></div>`;
                     } else {
-                        html = '<div class="no-data">Aucune alerte détectée pour cette section</div>';
+                        html = `<div class="no-data">${esc(t('alert.none_section'))}</div>`;
                     }
                 } else {
-                    html = '<div class="no-data">Aucune alerte détectée pour cette section</div>';
+                    html = `<div class="no-data">${esc(t('alert.none_section'))}</div>`;
                 }
             }
 
@@ -321,18 +278,18 @@ const AlertManager = {
             STATE.sections.forEach(section => {
                 const container = document.getElementById(`alertes-list-${section}`);
                 if (container && container.children.length === 0) {
-                    container.innerHTML = '<div class="no-data">Aucune alerte détectée pour cette section</div>';
+                    container.innerHTML = `<div class="no-data">${esc(t('alert.none_section'))}</div>`;
                 }
             });
 
             // Mettre à jour l'interface
             refreshDashboardData();
 
-            Toasts.show(`Alerte ${alerteId} supprimée`, { type: 'success', durationMs: 1000 });
+            Toasts.show(t('alert.hidden', { id: alerteId }), { type: 'success', durationMs: 1000 });
 
         } catch (error) {
             console.error('Erreur lors de la suppression de l\'alerte:', error);
-            Toasts.show(`Erreur lors de la suppression de l'alerte ${alerteId}`, { type: 'error' });
+            Toasts.show(t('alert.hide_failed', { id: alerteId }), { type: 'error' });
         }
     },
 
@@ -345,7 +302,7 @@ const AlertManager = {
     },
 
     clearDismissedAlerts() {
-        if (confirm("Êtes-vous sûr de vouloir effacer toutes les alertes masquées ?")) {
+        if (confirm(t('alert.confirm_clear'))) {
             localStorage.removeItem('dismissedAlertes');
             refreshDashboardData();
         }

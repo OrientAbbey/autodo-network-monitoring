@@ -408,7 +408,7 @@ async def analysis_level_shifts(db_key: str = Query(pattern=DB_KEY_PATTERN), day
 
 
 # ============================================================================
-# SUPERVISION — simulation « et si ? » avant d'enregistrer une configuration
+# ADMIN — simulation « et si ? » avant d'enregistrer une configuration
 # ============================================================================
 class SimulationBody(BaseModel):
     config: dict = Field(default_factory=dict)
@@ -416,8 +416,8 @@ class SimulationBody(BaseModel):
     days: int = Field(7, ge=1, le=simulation.MAX_DAYS)
 
 
-@admin_router.post("/api/supervision/simulation")
-async def run_simulation(body: SimulationBody, _s=supervision):
+@admin_router.post("/api/admin/simulation")
+async def run_simulation(body: SimulationBody, _s=admin_only):
     """Rejoue la configuration candidate sur l'historique local. N'enregistre RIEN."""
     unknown = [k for k in body.config if k not in ConfigParams.model_fields]
     if unknown:
