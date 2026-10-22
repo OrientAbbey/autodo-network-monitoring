@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from fastapi.responses import RedirectResponse, StreamingResponse
 
-from core import analytics, auth, constants, db, monitoring, tickets
+from core import analytics, auth, constants, db, history, monitoring, tickets
 from core.config import load_config, now_local, settings
 from core.logger import get_logger
 
@@ -88,6 +88,12 @@ async def sse_events(request: Request):
 @dashboard_router.get("/api/config")
 async def get_config():
     return _json(load_config())
+
+
+@dashboard_router.get("/api/sparklines")
+async def api_sparklines():
+    """Mini-courbes 24 h de toutes les bases + bande « attendu » (calcul mis en cache 60 s : N spectateurs = 1 calcul)."""
+    return await asyncio.to_thread(history.sparklines)
 
 
 class AckBody(BaseModel):

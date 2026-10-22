@@ -14,7 +14,7 @@ import orjson
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, ValidationError
 
-from core import accounts, analytics, auth, constants, governance, monitoring, tickets
+from core import accounts, analytics, anomaly, anomaly_ml, auth, constants, governance, history, monitoring, shadow, simulation, tickets
 from core.auth import get_real_ip
 from core.config import OVERRIDABLE_KEYS, ConfigParams, load_config, load_overrides, now_local
 
@@ -267,3 +267,163 @@ def health(_s=admin_only):
                 "failed_cycles": monitoring.state.source_failures.get(key, 0)} for key in constants.DB_CONFIGS]
     return _json({"monitoring": monitoring.status(), "sources": sources, "orange_queue": tickets.orange_queue_counts(),
                   "tickets": tickets.counts(), "jobs": jobs, "generated_at": now_local().isoformat()})
+
+
+# ============================================================================
+# ADMIN — historique local (D2)
+# ============================================================================
+DB_KEY_PATTERN = "^[A-Za-z0-9_-]{1,50}$"
+
+
+class BackfillBody(BaseModel):
+    days: int = Field(30, ge=1, le=90)
+
+
+@admin_router.get("/api/admin/history")
+async def history_stats(_s=admin_only):
+    return _json(await _run(history.stats))
+
+
+@admin_router.post("/api/admin/history/backfill", status_code=202)
+def history_backfill(body: BackfillBody, request: Request, session=admin_only):
+    """Importe l'historique en arrière-plan (suivi via GET /api/admin/history)."""
+    if not history.start_backfill(body.days):
+        raise HTTPException(409, "Un import est déjà en cours")
+    governance.audit(session.username, get_real_ip(request), "history_backfill", "", {"days": body.days})
+    return _json({"started": True, "days": body.days}, 202)
+
+
+# ============================================================================
+# ADMIN — détecteurs « futurs » (mode ombre)
+# ============================================================================
+@admin_router.get("/api/admin/detectors")
+async def list_detectors(_s=admin_only):
+    def build():
+        states, counts = shadow.get_states(), shadow.verdict_counts(24)
+        items = []
+        for key, info in shadow.DETECTORS.items():
+            item = {"key": key, "code": info.code, "title": info.title, "description": info.description,
+                    "needs_training": info.needs_training, "shadow": info.shadow, **states[key], "verdicts_24h": counts.get(key, 0)}
+            if info.needs_training:
+                item["available"] = anomaly_ml.ml_available()
+            if key == "isolation":
+                item["models"] = [b for b in history.stats()["bases"] if anomaly_ml.has_model(f"iforest_{b}")]
+            elif key == "quality":
+                item["model_trained"] = anomaly_ml.has_model("quality")
+            items.append(item)
+        return {"detectors": items, "ml_available": anomaly_ml.ml_available(), "shadow_enabled": bool(load_config().get("shadow_detectors"))}
+    return _json(await _run(build))
+
+
+class DetectorToggle(BaseModel):
+    enabled: bool
+
+
+@admin_router.post("/api/admin/detectors/{key}")
+def toggle_detector(key: str, body: DetectorToggle, request: Request, session=admin_only):
+    if key not in shadow.DETECTORS:
+        raise HTTPException(404, "Détecteur inconnu")
+    shadow.set_enabled(key, body.enabled)
+    governance.audit(session.username, get_real_ip(request), "detector_toggle", key, {"enabled": body.enabled})
+    return _json({"key": key, "enabled": body.enabled})
+
+
+class TrainBody(BaseModel):
+    db_key: str | None = Field(None, pattern=DB_KEY_PATTERN)
+    days: int = Field(anomaly_ml.ISOLATION_TRAINING_DAYS, ge=7, le=120)
+
+
+def _train(key: str, body: TrainBody) -> dict:
+    if key == "quality":
+        metrics = anomaly_ml.train_quality()
+        shadow.record_training(key, metrics)
+        return metrics
+    bases = [body.db_key] if body.db_key else list(history.stats()["bases"])
+    trained, skipped = [], []
+    for db_key in bases:
+        try:
+            trained.append(anomaly_ml.train_isolation(db_key, body.days))
+        except anomaly_ml.NotEnoughData as error:
+            skipped.append({"db_key": db_key, "reason": str(error)})
+    if not trained:
+        raise anomaly_ml.NotEnoughData("Aucune base n'a assez d'historique : " + "; ".join(s["reason"] for s in skipped[:3]) if skipped
+                                       else "Aucun historique : importez-le d'abord.")
+    summary = {"bases": len(trained), "rows": sum(t["rows"] for t in trained), "skipped": skipped}
+    shadow.record_training(key, summary)
+    return {**summary, "trained": trained}
+
+
+@admin_router.post("/api/admin/detectors/{key}/train")
+async def train_detector(key: str, request: Request, body: TrainBody = TrainBody(), session=admin_only):
+    if key not in shadow.DETECTORS or not shadow.DETECTORS[key].needs_training:
+        raise HTTPException(400, "Ce détecteur n'a pas d'entraînement")
+    try:
+        result = await _run(_train, key, body)
+    except anomaly_ml.MlUnavailable as error:
+        raise HTTPException(501, str(error)) from None
+    except anomaly_ml.NotEnoughData as error:
+        raise HTTPException(422, str(error)) from None
+    governance.audit(session.username, get_real_ip(request), "detector_train", key, {k: v for k, v in result.items() if k != "trained"})
+    return _json(result)
+
+
+@admin_router.get("/api/admin/detectors/report")
+async def detectors_report(days: int = Query(7, ge=1, le=90), _s=admin_only):
+    return _json(await _run(shadow.shadow_report, days))
+
+
+# ============================================================================
+# ADMIN — analyses à la demande (D3 prévision / capacité, D5 ruptures)
+# ============================================================================
+@admin_router.get("/api/admin/analysis/forecast")
+async def analysis_forecast(db_key: str = Query(pattern=DB_KEY_PATTERN), days: int = Query(14, ge=2, le=60), _s=admin_only):
+    """Courbe attendue pour les 24 h suivant le dernier relevé (bande ≈ 95 %)."""
+    grid = await _run(history.traffic_grid, db_key, days)
+    if grid is None:
+        raise HTTPException(404, "Aucun historique pour cette base")
+    latest, values = grid
+    try:
+        forecast = await _run(anomaly.holt_winters_forecast, values)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    first = latest + anomaly.STEP
+    return _json({"db_key": db_key, "history_days": days, "last_point": history.fmt(latest), "forecast_start": history.fmt(first),
+                  "step_minutes": history.STEP_MINUTES, **forecast})
+
+
+@admin_router.get("/api/admin/analysis/capacity")
+async def analysis_capacity(db_key: str = Query(pattern=DB_KEY_PATTERN), capacity_gbps: float = Query(gt=0, le=10000),
+                            days: int = Query(60, ge=7, le=180), _s=admin_only):
+    daily = await _run(history.daily_stats, db_key, days)
+    return _json({"db_key": db_key, **anomaly.capacity_projection([d["peak"] for d in daily], capacity_gbps)})
+
+
+@admin_router.get("/api/admin/analysis/level-shifts")
+async def analysis_level_shifts(db_key: str = Query(pattern=DB_KEY_PATTERN), days: int = Query(90, ge=20, le=400), _s=admin_only):
+    daily = await _run(history.daily_stats, db_key, days)
+    shifts = anomaly.level_shifts([(d["day"], d["mean"]) for d in daily])
+    return _json({"db_key": db_key, "days_of_data": len(daily),
+                  "shifts": [{**shift, "explanation": anomaly.shift_explanation(shift)} for shift in shifts]})
+
+
+# ============================================================================
+# SUPERVISION — simulation « et si ? » avant d'enregistrer une configuration
+# ============================================================================
+class SimulationBody(BaseModel):
+    config: dict = Field(default_factory=dict)
+    overrides: dict[str, dict[str, float | int]] | None = None
+    days: int = Field(7, ge=1, le=simulation.MAX_DAYS)
+
+
+@admin_router.post("/api/supervision/simulation")
+async def run_simulation(body: SimulationBody, _s=supervision):
+    """Rejoue la configuration candidate sur l'historique local. N'enregistre RIEN."""
+    unknown = [k for k in body.config if k not in ConfigParams.model_fields]
+    if unknown:
+        raise HTTPException(422, f"Paramètre(s) inconnu(s) : {unknown}")
+    try:
+        result = await _run(simulation.simulate, body.config, body.overrides, body.days)
+    except (ValidationError, ValueError) as error:
+        message = _validation_message(error) if isinstance(error, ValidationError) else str(error)
+        raise HTTPException(422, message) from None
+    return _json(result)

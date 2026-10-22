@@ -187,6 +187,21 @@ def traffic_by_slot(rows: list[dict]) -> dict[datetime, float]:
     return {row["ts"]: row["traffic_gbps"] for row in rows if row["traffic_gbps"] is not None}
 
 
+def traffic_grid(db_key: str, days: int) -> tuple[datetime, list[float | None]] | None:
+    """Trafic des ``days`` derniers jours sur une grille régulière de 5 min (None = relevé absent), ou None si la base n'a pas d'historique.
+
+    Retourne ``(instant du dernier relevé, valeurs du plus ancien au plus récent)`` — entrée directe de ``anomaly.holt_winters_forecast``.
+    """
+    with local_conn() as conn:
+        latest = conn.execute(text("SELECT MAX(ts) FROM metrics_5min WHERE db_key = :k"), {"k": db_key}).scalar()
+    if latest is None:
+        return None
+    count = days * POINTS_PER_DAY
+    start = latest - timedelta(minutes=STEP_MINUTES * (count - 1))
+    by_slot = traffic_by_slot(load_series(db_key, start, latest))
+    return latest, [by_slot.get(start + timedelta(minutes=STEP_MINUTES * i)) for i in range(count)]
+
+
 MIN_POINTS_PER_FULL_DAY = 200        # un jour est « complet » s'il compte au moins 200 relevés sur 288
 
 

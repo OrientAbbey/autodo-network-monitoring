@@ -21,7 +21,7 @@ from collections.abc import Callable
 from sqlalchemy import bindparam, text
 
 from . import constants, rules, ticket_log
-from .config import fmt, now_local, parse, period_to_cutoff
+from .config import fmt, local_to_utc_naive, now_local, parse, period_to_cutoff
 from .db import fetch_all, fetch_one, local_conn, local_tx
 from .logger import get_logger
 
@@ -482,6 +482,20 @@ def get_ticket(ticket_id: int) -> dict | None:
 def visible_to_recipients(ticket_list: list[dict]) -> list[dict]:
     """Tickets dont l'existence peut être communiquée (e-mails) : ceux en attente de validation humaine restent confidentiels."""
     return [t for t in ticket_list if t.get("validation_state") != "pending"]
+
+
+def real_tickets_since(since_utc: datetime) -> list[dict]:
+    """Vrais tickets (hors supprimés et rejetés) depuis ``since_utc``, avec leur début converti en UTC (clé ``utc``).
+
+    Les bases DIAGNET sont en UTC et les tickets en heure locale : on compare toujours des instants de même référence.
+    """
+    with local_conn() as c:
+        rows = fetch_all(c, "SELECT id, type, database_name, timestamp FROM tickets_tb WHERE timestamp >= :s "
+                            "AND status <> 'deleted' AND validation_state <> 'rejected'", s=fmt(since_utc))
+    for row in rows:
+        row["utc"] = local_to_utc_naive(row["timestamp"])
+        row["timestamp"] = fmt(row["timestamp"])
+    return rows
 
 
 def pending_validation() -> list[dict]:

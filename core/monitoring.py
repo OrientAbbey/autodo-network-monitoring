@@ -18,7 +18,7 @@ import time
 from contextlib import suppress
 from datetime import datetime, timedelta
 
-from . import analytics, collector, constants, governance, metrics, notify, orange, rules, tickets
+from . import analytics, collector, constants, governance, history, metrics, notify, orange, rules, shadow, tickets
 from .config import (config_for, fmt, load_config, load_overrides, local_to_utc_naive, now_local, parse, round5,
                      settings, utc_naive_to_local_naive)
 from .logger import get_logger
@@ -102,7 +102,7 @@ def widest_drop_window(cfg: dict, overrides: dict) -> int:
     return max(wanted)
 
 
-def _alerts_enabled(db_key: str, cfg: dict) -> bool:
+def alerts_enabled(db_key: str, cfg: dict) -> bool:
     """Interrupteurs « alerts_enable_* » : créer (ou non) des tickets par catégorie de base (international, gi, roaming)."""
     if db_key in constants.LABELS.get("international", {}):
         return bool(cfg.get("alerts_enable_international", True))
@@ -195,7 +195,7 @@ def _process_monitoring(snaps: dict, alert_ts: list, now_str: str, cfg: dict, ov
             if state.source_failures.pop(db_key, 0) and db_key in state.unreachable_notified:
                 state.unreachable_notified.discard(db_key)
                 logger.info("Source %s de nouveau joignable", db_key)
-            if not _alerts_enabled(db_key, cfg):
+            if not alerts_enabled(db_key, cfg):
                 continue
             if governance.is_silenced(db_key, silenced):
                 n_silenced += 1                      # aucune création ni mise à jour de ticket pendant la maintenance
@@ -230,10 +230,13 @@ def _process_monitoring(snaps: dict, alert_ts: list, now_str: str, cfg: dict, ov
         closed_ids = {tid for tid, f in cs.updates.items() if f.get("status") == "closed"}
         still_open = tickets.visible_to_recipients([t for t in open_list if t["id"] not in closed_ids] + created)
         notify.notify_new_tickets(announced, still_open)
+    # Historique local puis détecteurs « futurs » en mode ombre : aucun des deux ne peut faire échouer le cycle ni toucher un ticket
+    rows_recorded = history.record_snapshots(snaps)
+    shadow_verdicts = sum(shadow.run_shadow(snaps, created).values())
     kinds: dict[str, int] = {}
     for kind, *_ in cs.events:
         kinds[kind] = kinds.get(kind, 0) + 1
-    return {"bases_evaluees": n_db, "bases_en_silence": n_silenced, "tickets_crees": len(created), "tickets_maj": len(cs.updates), "conflits": len(conflicts), **kinds}
+    return {"bases_evaluees": n_db, "bases_en_silence": n_silenced, "tickets_crees": len(created), "tickets_maj": len(cs.updates), "conflits": len(conflicts), "historique": rows_recorded, "ombre": shadow_verdicts, **kinds}
 
 
 # ============================================================================
@@ -284,6 +287,8 @@ def register_jobs(scheduler) -> None:
     scheduler.add_job(_safe(analytics.flush_visits, "flush_visits"), IntervalTrigger(seconds=10), id="flush_visits",
                       max_instances=1, coalesce=True)
     scheduler.add_job(_safe(analytics.purge, "purge"), CronTrigger(hour=3, minute=17, timezone=tz), id="purge",
+                      max_instances=1, coalesce=True)
+    scheduler.add_job(_safe(history.purge, "purge_history"), CronTrigger(hour=3, minute=27, timezone=tz), id="purge_history",
                       max_instances=1, coalesce=True)
     scheduler.add_job(_safe(job_watchdog, "watchdog"), IntervalTrigger(minutes=5), id="watchdog",
                       max_instances=1, coalesce=True)

@@ -48,7 +48,7 @@ def test_db():
 
 # Tables de la phase A : vidées avant chaque test qui en dépend (fixture réutilisable)
 PHASE_A_TABLES = ("users", "audit_log", "config_versions", "maintenance_windows", "alert_acks", "ticket_events", "ticket_feedback",
-                  "tickets_tb", "ticket_counters", "usage_peaks")
+                  "tickets_tb", "ticket_counters", "usage_peaks", "metrics_5min", "detector_settings", "detector_verdicts")
 
 
 @pytest.fixture
