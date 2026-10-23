@@ -126,6 +126,13 @@ def test_only_one_backfill_runs_at_a_time(clean_state, monkeypatch):
 
 
 # ------------------------------------------------------------------ mini-courbes
+def test_an_import_refreshes_the_sparklines_immediately(clean_state, monkeypatch):
+    history.reset_sparkline_cache()
+    assert history.sparklines()["bases"] == {}                                   # mis en cache : vide
+    monkeypatch.setattr(collector, "read_range", lambda key, a, b: {fmt(aligned_now() - i * STEP): raw_row(5.0) for i in range(12)})
+    history.backfill(1, ["kribi"])
+    assert "kribi" in history.sparklines()["bases"]                              # pas d'attente de l'expiration des 60 s
+
 def test_sparklines_give_96_points_and_an_expected_band(clean_state):
     fill_history("kribi", 9)
     history.reset_sparkline_cache()

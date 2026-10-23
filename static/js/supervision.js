@@ -13,7 +13,7 @@ const Supervision = {
     },
 
     // ---------------------------------------------------------------- 1. paramètres globaux
-    async loadParams(panel) {
+    async loadParams(panel, saved = null) {
         const { fields, config } = await this.loadSchema();
         clear(panel);
         const inputs = new Map();
@@ -45,11 +45,10 @@ const Supervision = {
             if (!Object.keys(updates).length) { clear(result).appendChild(el('p', { class: 'hint', text: t('config.no_change') })); return; }
             const outcome = await PageKit.guard(() => api('/api/supervision/config', { method: 'POST', body: updates }));
             if (!outcome) return;
-            clear(result).append(el('p', { class: 'success', text: t('config.saved', { version: outcome.version ?? '—' }) }), PageKit.changeList(outcome.changes));
             Toasts.show(t('config.saved', { version: outcome.version ?? '—' }), { type: 'success', durationMs: 3000 });
-            await this.loadParams(panel);
-            panel.appendChild(result);
+            await this.loadParams(panel, outcome);                          // le formulaire est reconstruit avec les nouvelles valeurs de référence
         });
+        if (saved) result.append(el('p', { class: 'success', text: t('config.saved', { version: saved.version ?? '—' }) }), PageKit.changeList(saved.changes));
         panel.appendChild(form);
         panel.appendChild(result);
     },

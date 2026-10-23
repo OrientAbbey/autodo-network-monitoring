@@ -3,10 +3,6 @@
 
 // ====== INITIALISATION ======
 document.addEventListener('DOMContentLoaded', () => {
-    if (navigator.credentials?.preventSilentAccess) {
-        navigator.credentials.preventSilentAccess();
-    }
-
     initTheme();
 
     requestAnimationFrame(() => {

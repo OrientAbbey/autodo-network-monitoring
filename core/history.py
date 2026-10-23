@@ -138,6 +138,7 @@ def backfill(days: int, db_keys: list[str] | None = None) -> dict[str, dict]:
             logger.warning("Import d'historique %s en échec : %s", db_key, error)
         result[db_key] = {"rows": written, "error": error}
         backfill_state.progress[db_key] = result[db_key]
+    reset_sparkline_cache()          # les mini-courbes reflètent tout de suite l'historique importé (sinon : jusqu'à 60 s de retard)
     return result
 
 

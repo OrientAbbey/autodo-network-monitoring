@@ -156,3 +156,16 @@ def test_old_shared_password_endpoints_are_gone(app_client):
     assert client.post("/api/auth", json={"password": "x"}).status_code in (404, 405)
     assert client.get("/api/data-management").status_code in (404, 405)
     assert client.get("/data-management", follow_redirects=False).headers["location"] == "/admin"
+
+
+def test_health_and_usage_endpoints_have_the_shape_the_admin_page_reads(app_client):
+    """La page Admin lit ces champs : un renommage côté serveur casserait l'écran sans qu'aucun autre test ne s'en aperçoive."""
+    admin = make_client(app_client, "adm", role="admin")
+    health = admin.get("/api/admin/health").json()
+    assert {"monitoring", "sources", "orange_queue", "tickets", "jobs", "generated_at"} <= set(health)
+    assert {"cycles_ok", "cycles_failed", "last_duration_s", "uptime_s", "last_ok", "last_error", "last_stats", "orange"} <= set(health["monitoring"])
+    assert all({"key", "failing", "failed_cycles"} <= set(source) for source in health["sources"])
+    usage = admin.get("/api/admin/usage?period=7days").json()
+    assert {"viewers_now", "access_stats", "access_logs", "alerts_stats", "peaks"} <= set(usage)
+    assert {"total_unique_ips", "avg_daily_unique", "today_unique_count"} <= set(usage["access_stats"])
+    assert admin.get("/api/admin/usage?period=jamais").status_code == 422

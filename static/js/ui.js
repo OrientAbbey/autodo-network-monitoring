@@ -85,8 +85,15 @@ const AppUI = {
         setInterval(() => this.refreshPresence(), 30000);
         setInterval(() => this.refreshMaintenance(), 60000);
         document.addEventListener('prefs-changed', event => {
+            const link = document.getElementById('prefs-link');
+            if (link) link.value = Prefs.shareLink();                   // le lien affiché suit toujours les réglages courants
             if (event.detail.key === 'lang') {
+                const reopen = this.prefsDialog?.open;
                 applyI18n();
+                if (reopen) {                                           // le dialogue se retraduit sans se fermer
+                    this.openPrefs();
+                    this.prefsDialog.querySelector('input[name="lang"]:checked')?.focus();
+                }
                 this.refreshPresence();
                 this.refreshMaintenance();
                 if (typeof window.lastDashboardData === 'object' && window.lastDashboardData && typeof updateDashboardDOM === 'function') updateDashboardDOM(window.lastDashboardData);

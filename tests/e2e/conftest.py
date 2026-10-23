@@ -25,7 +25,7 @@ BASE = "http://127.0.0.1:8501"
 APP_LOG = Path("/tmp/e2e_app.out")
 SHOTS = DEMO / "screenshots"
 SHOTS.mkdir(exist_ok=True)
-CFG_PASSWORD, DM_PASSWORD = "cfgpass", "dmpass"
+ADMIN_USER, ADMIN_INITIAL_PASSWORD = "admin", "Admin-Initial-1"      # voir demo/env.demo
 XSS_IP = "<img src=x onerror=window.__xss=1>"   # 34 car. -> VARCHAR(45) l'accepte
 
 
@@ -39,7 +39,9 @@ def db(sql, params=()):
     try:
         with c.cursor() as cur:
             cur.execute(sql, params)
-            return list(cur.fetchall())
+            rows = list(cur.fetchall())
+        c.commit()
+        return rows
     finally:
         c.close()
 
@@ -77,6 +79,12 @@ def stack():
     sh("seed", "--reset")
     # 3. application
     data_dir = tempfile.mkdtemp(prefix="autodo_e2e_")
+    for table in ("users", "audit_log", "config_versions", "maintenance_windows", "alert_acks", "ticket_events", "ticket_feedback",
+                  "metrics_5min", "detector_settings", "detector_verdicts", "usage_peaks"):
+        try:                                    # état initial déterministe : aucun compte, l'admin initial sera recréé au démarrage
+            db(f"DELETE FROM {table}")
+        except Exception:
+            pass                                # table pas encore créée (1ʳᵉ exécution : les migrations la créeront)
     (REPO / "db_config.json").write_text((DEMO / "db_config.json").read_text())
     requests.post("http://127.0.0.1:9001/_debug/reset", timeout=5)
     follow = subprocess.Popen([sys.executable, str(DEMO / "seed_demo_data.py"), "follow", "--interval", "10"], cwd=DEMO)
@@ -123,6 +131,7 @@ def browser_ctx(pw):
 @pytest.fixture()
 def page(browser_ctx):
     ctx = browser_ctx.new_context(viewport={"width": 1500, "height": 950}, locale="fr-FR")
+    ctx.set_default_timeout(10000)                      # échec rapide : les écrans attendus apparaissent en quelques secondes
     pg = ctx.new_page()
     pg.on("dialog", lambda d: d.dismiss())
     yield pg

@@ -92,8 +92,10 @@ const Session = (() => {
             await load();
             Toasts.show(t('auth.password_changed'), { type: 'success', durationMs: 4000 });
         }, { cancellable: !forced });
-        passwordDialog.showModal();
-        passwordDialog.querySelector('input').focus();
+        const dialog = passwordDialog;
+        dialog.addEventListener('close', () => dialog.remove());          // un dialogue fermé ne reste pas dans le DOM
+        dialog.showModal();
+        dialog.querySelector('input').focus();
     }
 
     async function logout() {
