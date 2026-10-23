@@ -1,0 +1,9 @@
+name: runner-probe
+on:
+  push:
+    branches: [diagnostics/actions-runner-probe]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo github-actions-runner-ok
