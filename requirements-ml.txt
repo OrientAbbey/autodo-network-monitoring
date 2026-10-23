@@ -1,0 +1,5 @@
+# Dépendances OPTIONNELLES (détecteurs D4 « Isolation Forest » et D7 « qualité d'alerte »).
+# Sans elles, l'application fonctionne : D1/D3/D5 et la simulation « et si ? » restent disponibles,
+# D4/D7 répondent « indisponible » (HTTP 501).
+scikit-learn<=1.8.0
+joblib<=1.5.3

@@ -66,8 +66,19 @@ async def get_one(tid: str):
 
 
 @app.put(f"{BASE}/troubleTicket/{{tid}}")
-async def restore(tid: str, request: Request):
-    CALLS.append({"op": "restore", "id": tid, "override": request.headers.get("x-http-method-override")})
+async def update_ticket(tid: str, request: Request):
+    """PUT (+ X-HTTP-Method-Override: PATCH) : ajout d'une note (corps avec « note ») ou restauration (corps avec « status »)."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    override = request.headers.get("x-http-method-override")
+    if isinstance(body, dict) and "note" in body:
+        CALLS.append({"op": "note", "id": tid, "override": override})
+        if tid in TICKETS:
+            TICKETS[tid].setdefault("notes", []).extend(body["note"])
+        return Response(status_code=204)
+    CALLS.append({"op": "restore", "id": tid, "override": override})
     if tid in TICKETS:
         TICKETS[tid]["status"] = "Restored"
     return Response(status_code=204)

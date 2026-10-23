@@ -20,20 +20,22 @@ from collections.abc import Callable
 
 from sqlalchemy import bindparam, text
 
-from . import constants, rules
-from .config import fmt, now_local, parse, period_to_cutoff, settings
+from . import constants, rules, ticket_log
+from .config import fmt, local_to_utc_naive, now_local, parse, period_to_cutoff, settings
 from .db import fetch_all, fetch_one, local_conn, local_tx
 from .logger import get_logger
 
 logger = get_logger(__name__)
 
 JSON_COLS = ("last_values", "pertes_warnings")
-DT_COLS = ("timestamp", "closure_timestamp", "closure_pending_timestamp", "orange_next_retry_at")
+DT_COLS = ("timestamp", "closure_timestamp", "closure_pending_timestamp", "orange_next_retry_at", "last_note_at")
 INSERT_COLS = ("id", "type", "site", "database_name", "timestamp", "value", "status", "agent", "severity",
                "closure_timestamp", "closure_pending_timestamp", "closure_reason", "autin_id", "external_api_ticket_id",
                "ttr_seconds", "category", "pertes", "last_values", "description", "reason", "pertes_warnings",
-               "orange_sync_state", "orange_attempts", "orange_next_retry_at", "orange_last_error")
+               "orange_sync_state", "orange_attempts", "orange_next_retry_at", "orange_last_error",
+               "validation_state", "last_note_value", "last_note_at")
 _UPDATABLE = set(INSERT_COLS) - {"id"}
+INSERT_DEFAULTS = {"validation_state": "auto"}      # colonnes NOT NULL sans valeur fournie par l'appelant
 
 
 # ============================================================================
@@ -53,8 +55,9 @@ def _row_to_ticket(row: dict) -> dict:
                 t[c] = []
         elif v is None:
             t[c] = []
-    if isinstance(t.get("value"), Decimal):
-        t["value"] = float(t["value"])
+    for numeric in ("value", "last_note_value"):
+        if isinstance(t.get(numeric), Decimal):
+            t[numeric] = float(t[numeric])
     t["ttr_human"] = t["human_readable"] = rules.ttr_human(t.get("ttr_seconds"))
     return t
 
@@ -80,9 +83,14 @@ def load_open() -> list[dict]:
 
 
 def load_page(limit: int = 1000, offset: int = 0, status: str | None = None,
-              ticket_type: str | None = None, db_key: str | None = None) -> tuple[list[dict], int]:
-    """Page de tickets (les plus récents d'abord) + total. Les ouverts sont toujours listés avant les fermés."""
+              ticket_type: str | None = None, db_key: str | None = None, include_deleted: bool = False) -> tuple[list[dict], int]:
+    """Page de tickets (les plus récents d'abord) + total. Les ouverts sont toujours listés avant les fermés.
+
+    Les tickets supprimés (suppression logique) sont masqués sauf demande explicite.
+    """
     where, p = [], {"limit": max(1, min(limit, 5000)), "offset": max(0, offset)}
+    if not include_deleted and status != "deleted":
+        where.append("status <> 'deleted'")
     for col, val in (("status", status), ("type", ticket_type), ("database_name", db_key)):
         if val:
             where.append(f"{col} = :{col}")
@@ -96,7 +104,7 @@ def load_page(limit: int = 1000, offset: int = 0, status: str | None = None,
 
 def counts() -> dict:
     with local_conn() as c:
-        r = fetch_one(c, "SELECT COUNT(*) AS total, COALESCE(SUM(status = 'open'), 0) AS open_n FROM tickets_tb")
+        r = fetch_one(c, "SELECT COUNT(*) AS total, COALESCE(SUM(status = 'open'), 0) AS open_n FROM tickets_tb WHERE status <> 'deleted'")
     return {"total": int(r["total"]), "open": int(r["open_n"])}
 
 
@@ -120,22 +128,24 @@ def dashboard_alerts(filters: dict | None = None) -> dict:
         hit = _alerts_cache.get(key)
         if hit and now - hit[0] < ALERTS_TTL:
             return hit[1]
-    where, p = [], {"lim": ALERTS_LIMIT}
+    where, p = ["t.status <> 'deleted'"], {"lim": ALERTS_LIMIT}
     if filters.get("status") in ("open", "closed"):
-        where.append("status = :status")
+        where.append("t.status = :status")
         p["status"] = filters["status"]
     types = [t for t in str(filters.get("type") or "").split(",") if t in ("traffic", "pertes", "db_down")]
     if types:
-        where.append("type IN :types")
+        where.append("t.type IN :types")
         p["types"] = tuple(types)
     period = filters.get("period")
     today = now_local().replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
     start = {"today": today, "week": today - timedelta(days=today.weekday()), "month": today.replace(day=1)}.get(period)
     if start:
-        where.append("timestamp >= :start")
+        where.append("t.timestamp >= :start")
         p["start"] = fmt(start)
-    sql = "SELECT id, type, database_name, timestamp, status, reason, value, last_values, external_api_ticket_id, autin_id " \
-          "FROM tickets_tb" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY timestamp DESC LIMIT :lim"
+    sql = ("SELECT t.id, t.type, t.database_name, t.timestamp, t.status, t.reason, t.value, t.last_values, "
+           "t.external_api_ticket_id, t.autin_id, t.validation_state, (a.ticket_id IS NOT NULL) AS acked, a.acked_by "
+           "FROM tickets_tb t LEFT JOIN alert_acks a ON a.ticket_id = t.id WHERE " + " AND ".join(where) +
+           " ORDER BY t.timestamp DESC LIMIT :lim")
     stmt = text(sql)
     if "types" in p:
         stmt = stmt.bindparams(bindparam("types", expanding=True))
@@ -154,7 +164,8 @@ def dashboard_alerts(filters: dict | None = None) -> dict:
         item = {"id": a["id"], "type": a["type"].upper(), "location": loc, "title": f"Alerte {a['type'].upper()} - {loc}",
                 "message": a["reason"], "valeurs": vals, "status": a["status"],
                 "date": ts_str, "creation_time": ts_str,
-                "external_id": a.get("external_api_ticket_id"), "autin_id": a.get("autin_id")}
+                "external_id": a.get("external_api_ticket_id"), "autin_id": a.get("autin_id"),
+                "validation_state": a.get("validation_state"), "acked": bool(a.get("acked")), "acked_by": a.get("acked_by")}
         result["pertes" if a["type"] == "pertes" else "traffic"].append(item)
     with _alerts_lock:
         _alerts_cache[key] = (now, result)
@@ -202,6 +213,10 @@ class ChangeSet:
     updates: dict[int, dict] = field(default_factory=dict)       # id -> champs modifiés
     versions: dict[int, int] = field(default_factory=dict)       # id -> version lue
     events: list[tuple] = field(default_factory=list)            # (kind, ticket_id, db_key) pour journal/notifications
+    log: list[dict] = field(default_factory=list)                # lignes de ticket_events, écrites avec les tickets
+
+    def add_event(self, ticket_id: int, kind: str, message: str, *, to_orange: bool = False, at: str | None = None) -> None:
+        self.log.append(ticket_log.make_event(ticket_id, kind, message, to_orange=to_orange, at=at))
 
     def update(self, ticket: dict, fields: dict) -> None:
         if fields:
@@ -213,13 +228,13 @@ class ChangeSet:
 def persist(cs: ChangeSet) -> list[int]:
     """Applique le ChangeSet dans UNE transaction. Retourne les ID en conflit de version (réévalués au cycle suivant)."""
     conflicts: list[int] = []
-    if not cs.inserts and not cs.updates:
+    if not cs.inserts and not cs.updates and not cs.log:
         return conflicts
     cols = ", ".join(f"`{c}`" for c in INSERT_COLS)
     vals = ", ".join(f":{c}" for c in INSERT_COLS)
     with local_tx() as c:
         if cs.inserts:
-            rows = [_prepare({k: t.get(k) for k in INSERT_COLS}) for t in cs.inserts]
+            rows = [_prepare({k: (t.get(k) if t.get(k) is not None else INSERT_DEFAULTS.get(k)) for k in INSERT_COLS}) for t in cs.inserts]
             c.execute(text(f"INSERT INTO tickets_tb ({cols}) VALUES ({vals})"), rows)      # strict : jamais d'écrasement
         for tid, fields in cs.updates.items():
             f = {k: v for k, v in _prepare(fields).items() if k in _UPDATABLE}
@@ -230,6 +245,7 @@ def persist(cs: ChangeSet) -> list[int]:
                             {**f, "_id": tid, "_v": cs.versions.get(tid, 0)})
             if res.rowcount == 0:
                 conflicts.append(tid)
+        ticket_log.insert_events(c, cs.log)                     # même transaction : chronologie toujours cohérente avec les tickets
     if conflicts:
         logger.warning("Conflit de version sur les tickets %s (modifiés en parallèle) — réévaluation au prochain cycle", conflicts)
     invalidate_alert_cache()
@@ -266,6 +282,7 @@ class DbContext:
     connection_failed: bool = False
     failure_reason: str = ""
     orange_enabled: bool = True
+    # (la validation humaine des créations se lit dans cfg["ticket_validation_required"])
 
     @property
     def site(self) -> str:
@@ -278,13 +295,19 @@ def _new_ticket(ctx: DbContext, ttype: str, values: list, reason: str, category:
     value, ts = rules.original_value(ttype, values, category, ctx.cfg)
     ts = timestamp or ts or ctx.now
     desc = description or rules.build_description(ttype, ctx.site, reason, value, ts, ctx.connection_failed, ctx.failure_reason)
+    validation_required = bool(ctx.cfg.get("ticket_validation_required"))
+    if validation_required:
+        orange_state = "held"                       # rien n'est envoyé à Orange tant qu'un superviseur n'a pas validé
+    else:
+        orange_state = "pending" if ctx.orange_enabled else "skipped"
     return {"id": id_factory(), "type": ttype, "site": ctx.site, "database_name": ctx.db_key, "timestamp": ts,
             "value": value, "status": "open", "agent": "DIAGNET", "severity": "critical", "description": desc,
             "reason": reason, "autin_id": None, "pertes": "No", "external_api_ticket_id": None,
             "closure_timestamp": None, "closure_pending_timestamp": None, "closure_reason": None, "ttr_seconds": None,
             "last_values": values, "category": category, "pertes_warnings": [], "version": 0,
-            "orange_sync_state": "pending" if ctx.orange_enabled else "skipped", "orange_attempts": 0,
-            "orange_next_retry_at": None, "orange_last_error": None}
+            "orange_sync_state": orange_state, "orange_attempts": 0, "orange_next_retry_at": None,
+            "orange_last_error": None, "validation_state": "pending" if validation_required else "auto",
+            "last_note_value": None, "last_note_at": None}
 
 
 def _close_fields(ticket: dict, fields: dict) -> dict:
@@ -293,9 +316,58 @@ def _close_fields(ticket: dict, fields: dict) -> dict:
         state = ticket.get("orange_sync_state")
         if state == "synced" and ticket.get("external_api_ticket_id"):
             fields["orange_sync_state"], fields["orange_attempts"], fields["orange_next_retry_at"] = "close_pending", 0, None
-        elif state in ("pending", "failed"):
+        elif state in ("pending", "failed", "held"):
             fields["orange_sync_state"] = "closed"        # jamais créé chez Orange : rien à restaurer
     return fields
+
+
+def _log_creation(cs: ChangeSet, ticket: dict, now: str) -> None:
+    cs.add_event(ticket["id"], "created", ticket.get("reason") or str(ticket.get("description", ""))[:200], at=now)
+    if ticket.get("validation_state") == "pending":
+        cs.add_event(ticket["id"], "validation_requested", "Création en attente de validation par un superviseur", at=now)
+
+
+def _update_and_log(cs: ChangeSet, ticket: dict, fields: dict, now: str) -> None:
+    """Applique ``fields`` au ticket et journalise ce qui compte (pas la simple actualisation des valeurs récentes)."""
+    if not fields:
+        return
+    before_category = ticket.get("category")
+    before_pending = ticket.get("closure_pending_timestamp")
+    before_warnings = len(ticket.get("pertes_warnings") or [])
+    cs.update(ticket, fields)
+    if fields.get("status") == "closed":
+        cs.add_event(ticket["id"], "closed", fields.get("closure_reason") or "Ticket fermé", at=now)
+    elif fields.get("closure_pending_timestamp") and not before_pending:
+        cs.add_event(ticket["id"], "closure_pending", "Critère de fermeture rempli : fermeture si la situation persiste", at=now)
+    elif fields.get("category") not in (None, before_category):
+        # (le motif change à chaque cycle car il cite les valeurs courantes : seul un changement de catégorie est un fait marquant)
+        cs.add_event(ticket["id"], "update", f"Catégorie {before_category} → {fields['category']} : {fields.get('reason') or ''}", at=now)
+    if len(fields.get("pertes_warnings") or []) > before_warnings:
+        cs.add_event(ticket["id"], "pertes_warning", fields["pertes_warnings"][-1]["message"], at=now)
+
+
+def _maybe_note(cs: ChangeSet, ticket: dict, current: float | None, cfg: dict, now: str) -> None:
+    """Prépare une note pour Orange quand la valeur a assez changé ET que la dernière note est assez ancienne."""
+    if current is None or ticket.get("status") != "open":
+        return
+    if ticket.get("orange_sync_state") not in ("pending", "synced", "held"):
+        return                                           # ticket jamais envoyé / abandonné : aucune note à transmettre
+    reference = ticket.get("last_note_value")
+    if reference is None:
+        reference = ticket.get("value")
+    reference = float(reference or 0.0)
+    if abs(rules.percent_variation(reference, current)) < cfg.get("orange_note_min_change_percent", 10.0):
+        return
+    since = ticket.get("last_note_at") or ticket.get("timestamp")
+    minimum_gap = timedelta(minutes=cfg.get("orange_note_min_interval_minutes", 30))
+    if since and parse(now) - parse(since) < minimum_gap:
+        return
+    cs.add_event(ticket["id"], "orange_note", ticket_log.note_message(ticket["type"], current, reference), to_orange=True, at=now)
+    cs.update(ticket, {"last_note_value": round(float(current), 3), "last_note_at": now})
+
+
+def _last_value(values: list) -> float | None:
+    return values[-1]["value"] if values else None
 
 
 def apply_actions(ctx: DbContext, actions: list[rules.Action], tickets_by_type: dict, cs: ChangeSet,
@@ -311,21 +383,26 @@ def apply_actions(ctx: DbContext, actions: list[rules.Action], tickets_by_type: 
                 new_traffic.update(rules.attach_pertes(new_traffic, loss_last, ctx.now))
             cs.inserts.append(new_traffic)
             cs.events.append(("create_traffic", new_traffic["id"], ctx.db_key))
+            _log_creation(cs, new_traffic, ctx.now)
         elif a.kind == "create_pertes":
             t = _new_ticket(ctx, "pertes", ctx.loss_values, ctx.pertes.reason, ctx.pertes.category, id_factory)
             cs.inserts.append(t)
             cs.events.append(("create_pertes", t["id"], ctx.db_key))
+            _log_creation(cs, t, ctx.now)
         elif a.kind in ("update_traffic", "update_pertes"):
             t = traffic_t if a.kind == "update_traffic" else pertes_t
             if t is None:
                 continue
             if a.kind == "update_traffic":
                 fields = rules.evaluate_update(t, ctx.traffic_values, ctx.traffic.reason, ctx.traffic.category, ctx.cfg)
+                current = _last_value(ctx.traffic_values)
             else:
                 fields = rules.evaluate_update(t, ctx.loss_values, ctx.pertes.reason, ctx.pertes.category, ctx.cfg)
-            cs.update(t, fields)
+                current = _last_value(ctx.loss_values)
+            _update_and_log(cs, t, fields, ctx.now)
             if a.attach_pertes:
-                cs.update(t, rules.attach_pertes(t, loss_last, ctx.now))
+                _update_and_log(cs, t, rules.attach_pertes(t, loss_last, ctx.now), ctx.now)
+            _maybe_note(cs, t, current, ctx.cfg, ctx.now)
             cs.events.append((a.kind, t["id"], ctx.db_key))
         elif a.kind == "try_close":
             t = traffic_t if a.ticket_type == "traffic" else pertes_t
@@ -334,7 +411,7 @@ def apply_actions(ctx: DbContext, actions: list[rules.Action], tickets_by_type: 
             values = ctx.traffic_values if a.ticket_type == "traffic" else ctx.loss_values
             fields = rules.evaluate_closure(t, values, ctx.now, ctx.cfg, ctx.mode7d)
             fields = _close_fields(t, fields)
-            cs.update(t, fields)
+            _update_and_log(cs, t, fields, ctx.now)
             if fields.get("status") == "closed":
                 cs.events.append((f"close_{a.ticket_type}", t["id"], ctx.db_key))
 
@@ -354,13 +431,15 @@ def apply_db_down(ctx_db_key: str, state: str, minutes: float, last_update_str: 
             t = _new_ticket(c, "db_down", values, reason, 1, id_factory, description=desc, timestamp=last_update_str or now)
             cs.inserts.append(t)
             cs.events.append(("create_db_down", t["id"], ctx_db_key))
+            _log_creation(cs, t, now)
         else:
-            cs.update(open_ticket, {"value": minutes, "reason": reason, "category": 1, "last_values": values,
-                                    "description": desc, "closure_pending_timestamp": None})
+            _update_and_log(cs, open_ticket, {"value": minutes, "reason": reason, "category": 1, "last_values": values,
+                                              "description": desc, "closure_pending_timestamp": None}, now)
+            _maybe_note(cs, open_ticket, minutes, cfg, now)
     elif state == "ok" and open_ticket is not None:
         fields = rules.evaluate_closure(open_ticket, values, now, cfg, None)
         fields = _close_fields(open_ticket, fields)
-        cs.update(open_ticket, fields)
+        _update_and_log(cs, open_ticket, fields, now)
         if fields.get("status") == "closed":
             cs.events.append(("close_db_down", open_ticket["id"], ctx_db_key))
 
@@ -386,8 +465,136 @@ def claim_for_orange(states: tuple, limit: int, now: str) -> list[dict]:
     return claimed
 
 
+def orange_queue_counts() -> dict:
+    """Nombre de tickets par état de synchronisation Orange (page « santé » de l'admin)."""
+    with local_conn() as c:
+        rows = fetch_all(c, "SELECT orange_sync_state AS state, COUNT(*) AS n FROM tickets_tb GROUP BY orange_sync_state")
+    return {r["state"]: int(r["n"]) for r in rows}
+
+
 def open_with_orange_id() -> list[dict]:
     with local_conn() as c:
         return [_row_to_ticket(r) for r in fetch_all(
             c, "SELECT * FROM tickets_tb WHERE status = 'open' AND orange_sync_state = 'synced' "
                "AND external_api_ticket_id IS NOT NULL AND external_api_ticket_id <> ''")]
+
+
+# ============================================================================
+# Décisions humaines (superviseur) : validation, rejet, suppression, commentaire, retour d'expérience
+# ============================================================================
+def get_ticket(ticket_id: int) -> dict | None:
+    with local_conn() as c:
+        row = fetch_one(c, "SELECT * FROM tickets_tb WHERE id = :id", id=ticket_id)
+    return _row_to_ticket(row) if row else None
+
+
+def visible_to_recipients(ticket_list: list[dict]) -> list[dict]:
+    """Tickets dont l'existence peut être communiquée (e-mails) : ceux en attente de validation humaine restent confidentiels."""
+    return [t for t in ticket_list if t.get("validation_state") != "pending"]
+
+
+def real_tickets_since(since_utc: datetime) -> list[dict]:
+    """Vrais tickets (hors supprimés et rejetés) depuis ``since_utc``, avec leur début converti en UTC (clé ``utc``).
+
+    Les bases DIAGNET sont en UTC et les tickets en heure locale : on compare toujours des instants de même référence.
+    """
+    with local_conn() as c:
+        rows = fetch_all(c, "SELECT id, type, database_name, timestamp FROM tickets_tb WHERE timestamp >= :s "
+                            "AND status <> 'deleted' AND validation_state <> 'rejected'", s=fmt(since_utc))
+    for row in rows:
+        row["utc"] = local_to_utc_naive(row["timestamp"])
+        row["timestamp"] = fmt(row["timestamp"])
+    return rows
+
+
+def pending_validation() -> list[dict]:
+    """Créations en attente de validation (tickets encore ouverts)."""
+    with local_conn() as c:
+        rows = fetch_all(c, "SELECT * FROM tickets_tb WHERE validation_state = 'pending' AND status = 'open' ORDER BY timestamp")
+    return [_row_to_ticket(r) for r in rows]
+
+
+def _decide(ticket_id: int, condition: str, build_fields: Callable[[dict], dict], kind: str, message: str, actor: str) -> dict | None:
+    """Modification conditionnelle d'un ticket + évènement de chronologie, dans UNE transaction.
+
+    ``condition`` (SQL fixe, jamais issu de l'utilisateur) garantit qu'une décision ne s'applique qu'une fois :
+    si un autre superviseur est passé avant, la ligne n'est plus sélectionnée et on retourne None.
+    """
+    with local_tx() as c:
+        row = fetch_one(c, f"SELECT * FROM tickets_tb WHERE id = :id AND {condition} FOR UPDATE", id=ticket_id)
+        if row is None:
+            return None
+        fields = {k: v for k, v in _prepare(build_fields(row)).items() if k in _UPDATABLE}
+        sets = ", ".join(f"`{k}` = :{k}" for k in fields)
+        c.execute(text(f"UPDATE tickets_tb SET {sets}, version = version + 1 WHERE id = :_id"), {**fields, "_id": ticket_id})
+        ticket_log.insert_events(c, [ticket_log.make_event(ticket_id, kind, message, actor)])
+    invalidate_alert_cache()
+    return _row_to_ticket(row)
+
+
+def approve(ticket_id: int, actor: str, orange_enabled: bool) -> dict | None:
+    """Valide la création : le ticket peut partir chez Orange (ou reste local si Orange n'est pas configuré)."""
+    return _decide(ticket_id, "validation_state = 'pending' AND status = 'open'",
+                   lambda row: {"validation_state": "approved", "orange_sync_state": "pending" if orange_enabled else "skipped"},
+                   "approved", f"Création validée par {actor}", actor)
+
+
+def reject(ticket_id: int, actor: str, reason: str) -> dict | None:
+    """Refuse la création : le ticket disparaît (jamais envoyé à Orange)."""
+    now = fmt(now_local().replace(tzinfo=None))
+    return _decide(ticket_id, "validation_state = 'pending' AND status = 'open'",
+                   lambda row: {"validation_state": "rejected", "status": "deleted", "orange_sync_state": "closed",
+                                "closure_timestamp": now, "closure_reason": f"Rejeté par {actor} : {reason}"[:1000]},
+                   "rejected", f"Création rejetée par {actor} : {reason}", actor)
+
+
+def delete(ticket_id: int, actor: str, reason: str) -> dict | None:
+    """Suppression logique. Si le ticket existe chez Orange, sa restauration est programmée (outbox ``close_pending``)."""
+    now = fmt(now_local().replace(tzinfo=None))
+
+    def fields_for(row: dict) -> dict:
+        synced = row["orange_sync_state"] == "synced" and row["external_api_ticket_id"]
+        return {"status": "deleted", "closure_timestamp": now, "closure_reason": f"Supprimé par {actor} : {reason}"[:1000],
+                "orange_sync_state": "close_pending" if synced else "closed", "orange_attempts": 0, "orange_next_retry_at": None}
+
+    return _decide(ticket_id, "status <> 'deleted'", fields_for, "deleted", f"Ticket supprimé par {actor} : {reason}", actor)
+
+
+def add_comment(ticket_id: int, actor: str, message: str, send_to_orange: bool) -> bool:
+    """Commentaire de supervision dans la chronologie ; transmis à Orange (note) si demandé."""
+    if get_ticket(ticket_id) is None:
+        return False
+    orange_text = f"{actor}: {message}" if send_to_orange else message
+    ticket_log.log_event(ticket_id, "comment", orange_text, actor, to_orange=send_to_orange)
+    return True
+
+
+def set_feedback(ticket_id: int, label: str, actor: str) -> bool:
+    """Retour d'expérience « real » / « false » (alimente l'apprentissage de la qualité d'alerte)."""
+    if label not in ("real", "false") or get_ticket(ticket_id) is None:
+        return False
+    with local_tx() as c:
+        c.execute(text("REPLACE INTO ticket_feedback (ticket_id, label, given_by, given_at) VALUES (:t, :l, :a, :d)"),
+                  {"t": ticket_id, "l": label, "a": actor[:64], "d": fmt(now_local().replace(tzinfo=None))})
+        ticket_log.insert_events(c, [ticket_log.make_event(
+            ticket_id, "feedback", "Alerte jugée " + ("réelle" if label == "real" else "fausse (faux positif)") + f" par {actor}", actor)])
+    return True
+
+
+# ============================================================================
+# Accusés de réception (partagés entre tous les navigateurs)
+# ============================================================================
+def ack_alerts(ticket_ids: list[int], actor: str) -> int:
+    """Acquitte des alertes (ouvert aux visiteurs). Retourne le nombre de nouveaux accusés."""
+    now = fmt(now_local().replace(tzinfo=None))
+    new = 0
+    verb = "INSERT OR IGNORE" if settings.db_backend == "sqlite" else "INSERT IGNORE"
+    with local_tx() as c:
+        for tid in ticket_ids[:200]:
+            res = c.execute(text(f"{verb} INTO alert_acks (ticket_id, acked_at, acked_by) "
+                                 "SELECT id, :n, :a FROM tickets_tb WHERE id = :id"), {"n": now, "a": actor[:64], "id": int(tid)})
+            if res.rowcount:
+                new += 1
+                ticket_log.insert_events(c, [ticket_log.make_event(int(tid), "acked", f"Alerte acquittée par {actor}", actor)])
+    invalidate_alert_cache()
+    return new

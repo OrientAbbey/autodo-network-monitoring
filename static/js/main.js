@@ -3,21 +3,12 @@
 
 // ====== INITIALISATION ======
 document.addEventListener('DOMContentLoaded', () => {
-    if (navigator.credentials?.preventSilentAccess) {
-        navigator.credentials.preventSilentAccess();
-    }
-
-    // Initialize theme
     initTheme();
-
-    // Initialize audio context (ready for alerts)
-    initAudioContext();
 
     requestAnimationFrame(() => {
         TabManager.initializeTabs();
         AutoUpdateManager.initializeAutoUpdate();
         UIUtils.insertHelpIcon();
-        ConfigPanel.init();
         GridManager.init();
 
         // Initialize filter sidebar event listeners
@@ -79,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('error', (event) => {
         console.error('[Global] Erreur:', event.error);
-        Toasts.show(`Erreur: ${event.error?.message || 'Erreur inconnue'}`, { type: 'error' });
+        Toasts.show(t('live.js_error', { error: event.error?.message || '?' }), { type: 'error' });
     }, { passive: true });
 });
 
@@ -90,7 +81,7 @@ Object.assign(window, {
     showTab: TabManager.showTab,
     toggleAutoUpdate: AutoUpdateManager.toggleAutoUpdate.bind(AutoUpdateManager),
     toggleTheme: toggleTheme,
-    acknowledgeAlert: AlertManager.closeAlertPopup,
+    acknowledgeAlert: () => AlertManager.acknowledge(),
     AlertManager,
     lastDashboardData: null,
     handleTypeFilterChange: handleTypeFilterChange
@@ -112,11 +103,9 @@ updateDashboardDOM = function (data) {
 
 // ====== ACTIONS (remplacent les attributs onclick= inline, incompatibles avec la CSP) ======
 const ACTIONS = {
-    acknowledgeAlert: () => acknowledgeAlert(),
+    acknowledgeAlert: () => AlertManager.acknowledge(),
     toggleAutoUpdate: () => toggleAutoUpdate(),
     toggleTheme: () => toggleTheme(),
-    playAlertSound: () => playAlertSound(),
-    stopAlertSound: () => stopAlertSound(),
     clearDismissedAlerts: () => AlertManager.clearDismissedAlerts(),
     toggleSection: (el) => toggleSection(el),
     showTab: (el, e) => showTab(el.dataset.tab, el.dataset.interval, e),

@@ -20,6 +20,8 @@ ignore = ["E701", "E702", "E731"]
 "core/tickets.py" = ["S608"]
 "core/collector.py" = ["S608"]
 "core/analytics.py" = ["S608"]
+"core/history.py" = ["S608"]         # LIMIT = entier forcé par int(), toutes les valeurs liées
+"core/governance.py" = ["S608"]      # colonnes de filtre issues d'une liste fixe ; toutes les valeurs sont liées
 "tests/*" = ["B017", "B905", "E402", "S110", "S608"]
 "demo/*" = ["S110", "S113", "B905", "S608"]
 

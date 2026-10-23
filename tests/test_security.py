@@ -19,49 +19,12 @@ def _req(peer, xff=None, trusted=()):
     return Request({"type": "http", "method": "GET", "path": "/", "query_string": b"", "client": (peer, 1), "headers": h})
 
 
-def test_passwords_fail_closed_and_constant_time():
-    assert auth.check_password(None, None) is False and auth.check_password("", "") is False
-    assert auth.check_password("x", "x") is True and auth.check_password("x", "y") is False
-
-
-def test_update_config_requires_a_session(client):
-    assert client.post("/update_config", json={"alert_traffic_threshold_percent": 10}).status_code == 401
-
-
-def test_auth_endpoint_rejects_missing_and_wrong_passwords(client):
-    assert client.post("/api/auth", json={}).status_code == 401
-    assert client.post("/api/auth", json={"password": "nope"}).status_code == 401
-
-
-def test_brute_force_is_rate_limited(client):
-    from core import auth as a
-    a.limiter._fails.clear()
-    codes = [client.post("/api/auth", json={"password": "bad"}, headers={}).status_code for _ in range(7)]
-    assert 429 in codes
-    a.limiter._fails.clear()
-
-
-def test_config_session_cannot_read_data_management(client):
-    auth.limiter._fails.clear()
-    c = TestClient(client.app)
-    assert c.post("/api/auth", json={"password": "cfgpass"}).status_code == 200
-    c.cookies.set("dm_token", c.cookies.get("cfg"))
-    assert c.get("/api/data-management", params={"action": "data"}).status_code == 401
-
-
-def test_sessions_expire_and_are_scoped():
-    tok = auth.sessions.create("cfg", ttl=-1)
-    assert not auth.sessions.valid(tok, "cfg")
-    tok = auth.sessions.create("cfg", ttl=60)
-    assert auth.sessions.valid(tok, "cfg") and not auth.sessions.valid(tok, "dm")
-
-
 def test_security_headers_and_no_cors_by_default(client):
     r = client.get("/")
     assert r.status_code == 200
     assert "script-src 'self'" in r.headers["content-security-policy"] and "'unsafe-inline'" not in r.headers["content-security-policy"].split("style-src")[0]
     assert r.headers["x-frame-options"] == "DENY"
-    pre = client.options("/api/dashboard_data", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"})
+    pre = client.options("/api/dashboard_data", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "GET"})
     assert "access-control-allow-origin" not in pre.headers
 
 
@@ -108,12 +71,12 @@ def test_large_json_is_gzipped_but_the_sse_stream_is_not(client, monkeypatch):
     from core import constants, tickets
     monkeypatch.setattr(tickets, "dashboard_alerts", lambda filters=None: {"traffic": [], "pertes": []})
     with constants.DASHBOARD_CACHE_LOCK:
-        constants.DASHBOARD_CACHE.clear()
-        constants.DASHBOARD_CACHE.update({"recap": {f"db{i}": {"v": "x" * 50} for i in range(400)}})
+        constants.set_dashboard({"recap": {f"db{i}": {"v": "x" * 50} for i in range(400)}})
     try:
-        r = client.post("/api/dashboard_data", json={}, headers={"Accept-Encoding": "gzip"})
+        r = client.get("/api/dashboard_data", headers={"Accept-Encoding": "gzip"})
         assert r.status_code == 200 and r.headers.get("content-encoding") == "gzip"
     finally:
         with constants.DASHBOARD_CACHE_LOCK:
             constants.DASHBOARD_CACHE.clear()
+            constants.DASHBOARD_JSON = b""
     assert client.get("/static/js/state.js").headers.get("cache-control") == "no-cache"

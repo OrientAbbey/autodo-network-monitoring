@@ -1,19 +1,19 @@
-"""ROUTES TABLEAU DE BORD — pages, API de données, SSE, configuration, administration.
+"""ROUTES TABLEAU DE BORD — pages, API de données, SSE, accusés de réception, liens, santé.
 
 Règle : aucun accès base de données dans la boucle d'événements. Les endpoints qui touchent MySQL sont des ``def``
 (exécutés dans le pool de threads, borné à 20) ou passent par ``asyncio.to_thread``.
 """
 import asyncio
-import os
+import zlib
 from urllib.parse import quote
 
 import orjson
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
+from pydantic import BaseModel, Field
 from fastapi.responses import RedirectResponse, StreamingResponse
 
-from core import analytics, auth, constants, db, monitoring, tickets
-from core.auth import get_real_ip
-from core.config import ConfigParams, load_config, now_local, save_config_updates, settings
+from core import analytics, auth, constants, db, governance, history, monitoring, tickets
+from core.config import load_config, now_local, settings
 from core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -31,29 +31,68 @@ async def index(request: Request):
     return request.app.state.templates.TemplateResponse(request, "dashboard.html")
 
 
+def _app_page(request: Request, template: str, requires: str, title_key: str, title_default: str):
+    """Coquille HTML d'une page réservée : aucun secret dedans, l'accès aux DONNÉES est contrôlé par les API (401/403)."""
+    return request.app.state.templates.TemplateResponse(
+        request, template, {"requires": requires, "title_key": title_key, "title_default": title_default})
+
+
+@dashboard_router.get("/supervision")
+async def supervision_page(request: Request):
+    return _app_page(request, "supervision.html", "supervision", "page.supervision", "Supervision")
+
+
+@dashboard_router.get("/admin")
+async def admin_page(request: Request):
+    return _app_page(request, "admin.html", "admin", "page.admin", "Administration")
+
+
+@dashboard_router.get("/api/maintenance/active")
+async def api_active_maintenance():
+    """Fenêtres de maintenance en cours (public : le visiteur doit comprendre pourquoi une base ne remonte plus d'alerte)."""
+    windows = await asyncio.to_thread(governance.list_windows, True)
+    return {"windows": [{"db_key": w["db_key"], "ends_at": w["ends_at"], "reason": (w["reason"] or "")[:80]} for w in windows]}
+
+
 @dashboard_router.get("/data-management")
-async def data_management_page(request: Request):
-    return request.app.state.templates.TemplateResponse(request, "data_management.html")
+async def data_management_page():
+    """Ancienne page d'administration des données : remplacée par la page /admin (comptes nominatifs)."""
+    return RedirectResponse("/admin", status_code=307)
 
 
 # ---------------------------------------------------------------- données
-@dashboard_router.post("/api/dashboard_data")
-async def api_dashboard_data(request: Request, response: Response):
-    """Cache pré-calculé + alertes. Jamais de calcul lourd dans la requête : 503 tant que le 1er cycle n'est pas fini."""
-    body = await request.body()
-    try:
-        filters = orjson.loads(body) if body else {}
-    except orjson.JSONDecodeError:
-        raise HTTPException(400, "JSON invalide") from None
-    if not isinstance(filters, dict):
-        raise HTTPException(400, "Corps JSON attendu : objet")
+def _etag_matches(header: str | None, etag: str) -> bool:
+    """``If-None-Match`` peut lister plusieurs ETag ; la comparaison faible ignore le préfixe W/."""
+    if not header:
+        return False
+    wanted = etag.removeprefix("W/")
+    return header.strip() == "*" or any(part.strip().removeprefix("W/") == wanted for part in header.split(","))
+
+
+@dashboard_router.get("/api/dashboard_data")
+async def api_dashboard_data(request: Request, response: Response, status: str | None = Query(None, pattern="^(open|closed)$"),
+                             type: str | None = Query(None, max_length=40), period: str | None = Query(None, pattern="^(today|week|month)$")):
+    """Tableau de bord pré-calculé (JSON sérialisé UNE fois par cycle) + alertes filtrées, avec ETag : 304 si rien n'a changé.
+
+    Jamais de calcul lourd dans la requête : 503 tant que le 1er cycle n'est pas fini.
+    """
     analytics.track_user(request, response.headers)                 # tampon mémoire : aucune E/S
     with constants.DASHBOARD_CACHE_LOCK:
-        cached = dict(constants.DASHBOARD_CACHE)
-    if not cached:
+        cached_json, version = constants.DASHBOARD_JSON, constants.DASHBOARD_VERSION
+    if not cached_json:
         raise HTTPException(503, "Données en cours de préparation", headers={"Retry-After": "10"})
-    cached["alertes"] = await asyncio.to_thread(tickets.dashboard_alerts, filters)
-    return _json(cached, headers=response.headers)
+    filters = {key: value for key, value in (("status", status), ("type", type), ("period", period)) if value}
+    alerts_json = orjson.dumps(await asyncio.to_thread(tickets.dashboard_alerts, filters), default=str)
+    etag = f'W/"{version}-{zlib.crc32(alerts_json):08x}"'
+    headers = {**dict(response.headers), "ETag": etag, "Cache-Control": "no-cache"}
+    if _etag_matches(request.headers.get("if-none-match"), etag):
+        return Response(status_code=304, headers=headers)
+    return Response(cached_json + b',"alertes":' + alerts_json + b"}", media_type="application/json", headers=headers)
+
+
+def format_sse(event: dict) -> str:
+    """Évènement SSE SANS nom (``data: {...}``) : seul ce format atteint ``EventSource.onmessage`` côté navigateur."""
+    return f"data: {orjson.dumps(event).decode()}\n\n"
 
 
 @dashboard_router.get("/events")
@@ -73,7 +112,7 @@ async def sse_events(request: Request):
                     break
                 try:
                     ev = await asyncio.wait_for(queue.get(), timeout=15)
-                    yield f"event: update\ndata: {orjson.dumps(ev).decode()}\n\n"
+                    yield format_sse(ev)
                 except asyncio.TimeoutError:
                     yield ": keep-alive\n\n"
         finally:
@@ -90,41 +129,30 @@ async def get_config():
     return _json(load_config())
 
 
-@dashboard_router.post("/update_config")
-async def update_config(new_config: ConfigParams, request: Request, _=auth.require_session(auth.SCOPE_CONFIG)):
-    """Authentification requise ; champs absents conservés ; écriture atomique ; ancienne/nouvelle valeur journalisées."""
-    updates = new_config.model_dump(exclude_unset=True)
-    before = load_config()
-    try:
-        await asyncio.to_thread(save_config_updates, updates)
-    except Exception:
-        logger.exception("Échec de l'enregistrement de la configuration")
-        raise HTTPException(500, "Échec de l'enregistrement de la configuration") from None
-    changed = {k: (before.get(k), v) for k, v in updates.items() if before.get(k) != v}
-    ip = get_real_ip(request)
-    logger.info("Configuration modifiée par %s : %s", ip, changed or "aucun changement")
-    await asyncio.to_thread(analytics.log_action, ip, "criteria_change")
-    task = asyncio.create_task(monitoring.sse_publish(
-        {"type": "config_updated", "at": now_local().isoformat(timespec="seconds")}, request.app))
-    bg = request.app.state.__dict__.setdefault("bg_tasks", set())      # référence conservée jusqu'à la fin de la tâche
-    bg.add(task)
-    task.add_done_callback(bg.discard)
-    return {"message": "Configuration mise à jour avec succès.", "changed": list(changed)}
+@dashboard_router.get("/api/presence")
+async def api_presence():
+    """Spectateurs connectés maintenant et pic du jour (public : ni nom ni adresse)."""
+    return {"viewers": monitoring.viewer_count(), "peak_today": await asyncio.to_thread(analytics.peak_today)}
 
 
-@dashboard_router.api_route("/api/auth", methods=["GET", "POST"])
-async def auth_endpoint(request: Request, response: Response):
-    if request.method == "GET":
-        if not auth.sessions.valid(request.cookies.get(auth.COOKIE_NAMES[auth.SCOPE_CONFIG]), auth.SCOPE_CONFIG):
-            raise HTTPException(401, "Token expired or invalid")
-        return {"valid": True}
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-    auth.login(request, response, data.get("password") if isinstance(data, dict) else None,
-               os.getenv("CONFIG_PASSWORD"), auth.SCOPE_CONFIG, settings.token_ttl)
-    return {"ok": True}
+@dashboard_router.get("/api/sparklines")
+async def api_sparklines():
+    """Mini-courbes 24 h de toutes les bases + bande « attendu » (calcul mis en cache 60 s : N spectateurs = 1 calcul)."""
+    return await asyncio.to_thread(history.sparklines)
+
+
+class AckBody(BaseModel):
+    ticket_ids: list[int] = Field(max_length=200)
+
+
+@dashboard_router.post("/api/ack")
+async def acknowledge_alerts(body: AckBody, request: Request):
+    """Accusé de réception PARTAGÉ : ouvert aux visiteurs (auteur « visiteur » sans compte). La pop-up se ferme chez tous."""
+    session = auth.current_session(request)
+    created = await asyncio.to_thread(tickets.ack_alerts, body.ticket_ids, auth.actor_name(session))
+    if created:
+        await monitoring.sse_publish({"type": "ack", "at": now_local().isoformat(timespec="seconds")}, request.app)
+    return {"acked": created}
 
 
 # ---------------------------------------------------------------- liens ExNet (le nom d'hôte reste côté serveur)
@@ -154,33 +182,5 @@ def health_check():
 
 
 @dashboard_router.get("/api/status")
-def api_status(_=auth.require_any_session()):
+def api_status(_s=auth.require_role("supervision")):
     return _json({**monitoring.status(), "tickets": tickets.counts()})
-
-
-# ---------------------------------------------------------------- administration (données d'usage)
-@dashboard_router.post("/api/data-management")
-async def data_management_login(request: Request, response: Response):
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-    if not isinstance(data, dict) or data.get("action", "login") != "login":
-        raise HTTPException(400, "Invalid action")
-    auth.login(request, response, data.get("password"), os.getenv("DATA_MANAGEMENT_PASSWORD"),
-               auth.SCOPE_DATA, settings.token_ttl)
-    await asyncio.to_thread(analytics.log_action, get_real_ip(request), "data_management_login")
-    return {"success": True, "message": "Login successful"}
-
-
-@dashboard_router.get("/api/data-management")
-def data_management_data(request: Request, action: str = "data", period: str = "7days"):
-    if action != "data":
-        raise HTTPException(400, "Invalid action")
-    if not auth.sessions.valid(request.cookies.get(auth.COOKIE_NAMES[auth.SCOPE_DATA]), auth.SCOPE_DATA):
-        logger.warning("Data management : accès refusé depuis %s", get_real_ip(request))
-        raise HTTPException(401, "Not authenticated")
-    access = analytics.access_logs(period)
-    return _json({"period": period, "access_logs": access["access_logs"], "access_stats": access["access_stats"],
-                  "alerts_stats": tickets.alerts_stats(period), "config_changes": analytics.config_changes(period),
-                  "generated_at": now_local().isoformat()})

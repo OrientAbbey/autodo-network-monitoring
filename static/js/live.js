@@ -47,6 +47,7 @@ const TabManager = {
 // ====== AUTO-UPDATE ET SSE ======
 const AutoUpdateManager = {
     sse: null,
+    refreshTimer: null,
     sseErrorCount: 0,
     maxSseRetries: 10,
 
@@ -59,6 +60,12 @@ const AutoUpdateManager = {
         STATE.isAutoUpdateEnabled = !STATE.isAutoUpdateEnabled;
         STATE.isAutoUpdateEnabled ? this.startAutoUpdate() : this.stopAutoUpdate();
         this.updateAutoUpdateStatus();
+    },
+
+    /** Planifie UN rechargement (les évènements rapprochés sont fusionnés). */
+    scheduleRefresh(delayMs) {
+        if (this.refreshTimer) return;
+        this.refreshTimer = setTimeout(() => { this.refreshTimer = null; refreshDashboardData(); }, delayMs);
     },
 
     startAutoUpdate() {
@@ -83,37 +90,43 @@ const AutoUpdateManager = {
                     console.error('SSE connection failed after', this.maxSseRetries, 'attempts. Stopping auto-update.');
                     this.stopAutoUpdate();
                     // Optionally show user notification
-                    Toasts.show(`Connexion SSE échouée après ${this.maxSseRetries} tentatives. Mise à jour automatique désactivée.`, { type: 'error' });
+                    Toasts.show(t('live.sse_failed', { count: this.maxSseRetries }), { type: 'error' });
                 }
             };
+            // Les évènements arrivent SANS NOM (`data: {...}`) : c'est ce qui les fait atteindre `onmessage`.
             this.sse.onmessage = (ev) => {
                 try {
                     const payload = JSON.parse(ev.data || '{}');
-
-                    if (payload.type === 'config_updated') {
-                        AlertManager.updateBadge([]);
-                        AlertManager.updateSectionAlertes([]);
-                        AlertManager.closeAlertPopup();
-                        refreshDashboardData();
-                    } else if (payload.type === 'alertes_updated' || payload.type === 'scheduled_update') {
-                        refreshDashboardData();
-                    } else if (payload.type === 'shutdown') {
-                        this.stopAutoUpdate();
-                        Toasts.show('Le serveur est en maintenance. L\'update a été arrêté.', { type: 'error' });
-                        return;
+                    switch (payload.type) {
+                        case 'data_version':            // un cycle vient de finir : recharge après une gigue de 0–3 s (étale 50 navigateurs)
+                        case 'tickets_changed':
+                            this.scheduleRefresh(jitter(3000));
+                            break;
+                        case 'ack':                     // acquittement par un autre spectateur : la pop-up doit se fermer vite
+                            this.scheduleRefresh(jitter(300));
+                            break;
+                        case 'config_updated':
+                            AlertManager.updateBadge([]);
+                            AlertManager.updateSectionAlertes([]);
+                            AlertManager.closeAlertPopup();
+                            this.scheduleRefresh(jitter(1000));
+                            break;
+                        case 'scheduled_update':        // simple repère d'horloge pour le compte à rebours (le rechargement vient de data_version)
+                            if (payload.at) CountdownManager.scheduleNext(null, payload.at);
+                            break;
+                        case 'shutdown':
+                            this.stopAutoUpdate();
+                            Toasts.show(t('live.maintenance'), { type: 'error' });
+                            break;
+                        default:
+                            break;
                     }
-
-                    // Use server timestamp for accurate countdown synchronization if available
-                    if (payload.type === 'scheduled_update' && payload.at) {
-                        CountdownManager.scheduleNext(null, payload.at);
-                    } else {
-                        CountdownManager.scheduleNext(UIUtils.secondsToNextFiveMinute());
-                    }
-                } catch (e) { /* ignore */ }
+                    if (payload.type === 'data_version') AppUI.refreshPresence?.();
+                } catch (e) { /* message illisible : ignoré */ }
             };
         } catch (e) {
             console.error('SSE init error:', e);
-            Toasts.show(`Erreur SSE: ${e?.message || e}`, { type: 'error' });
+            Toasts.show(t('live.sse_error', { error: e?.message || e }), { type: 'error' });
         }
     },
 
@@ -197,37 +210,4 @@ const CountdownManager = {
         }
     }
 
-};
-
-
-// Notifications (toast) à droite sous le header
-const Toasts = {
-    container: null,
-    ensureContainer() {
-        if (!this.container) {
-            this.container = document.getElementById('toast-container');
-        }
-        return this.container;
-    },
-    show(message, { type = 'info', durationMs = 10000 } = {}) {
-        const container = this.ensureContainer();
-        if (!container) { alert(message); return; }
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.innerHTML = `<span class="toast-message">${message}</span>`;
-        container.appendChild(toast);
-        // Animation d'entrée
-        requestAnimationFrame(() => {
-            toast.classList.add('visible');
-        });
-        // Fermeture auto
-        const timer = setTimeout(() => this.close(toast), durationMs);
-        // Fermeture au clic
-        toast.addEventListener('click', () => { clearTimeout(timer); this.close(toast); });
-    },
-    close(toast) {
-        if (!toast) return;
-        toast.classList.remove('visible');
-        setTimeout(() => toast.remove(), 300);
-    }
 };

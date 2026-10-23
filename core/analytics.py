@@ -90,6 +90,38 @@ def flush_visits() -> int:
         return 0
 
 
+def record_viewer_peak(viewers_now: int) -> None:
+    """Conserve le plus haut nombre de spectateurs simultanés de la journée (appelé chaque minute)."""
+    if viewers_now <= 0:
+        return
+    now = now_local().replace(tzinfo=None)
+    with local_tx() as c:
+        if settings.db_backend == "sqlite":
+            sql = ("INSERT INTO usage_peaks (`day`, peak_viewers, peak_at) VALUES (:d, :n, :t) "
+                   "ON CONFLICT(`day`) DO UPDATE SET "
+                   "peak_at = CASE WHEN excluded.peak_viewers > usage_peaks.peak_viewers "
+                   "THEN excluded.peak_at ELSE usage_peaks.peak_at END, "
+                   "peak_viewers = MAX(usage_peaks.peak_viewers, excluded.peak_viewers)")
+        else:
+            sql = ("INSERT INTO usage_peaks (`day`, peak_viewers, peak_at) VALUES (:d, :n, :t) ON DUPLICATE KEY UPDATE "
+                   "peak_at = IF(:n > peak_viewers, :t, peak_at), peak_viewers = GREATEST(peak_viewers, :n)")
+        c.execute(text(sql), {"d": now.strftime("%Y-%m-%d"), "n": int(viewers_now), "t": fmt(now)})
+
+
+def peak_today() -> int:
+    with local_conn() as c:
+        value = c.execute(text("SELECT peak_viewers FROM usage_peaks WHERE `day` = :d"),
+                          {"d": now_local().replace(tzinfo=None).strftime("%Y-%m-%d")}).scalar()
+    return int(value or 0)
+
+
+def viewer_peaks(period: str = "7days") -> list[dict]:
+    cutoff = period_to_cutoff(period).strftime("%Y-%m-%d")
+    with local_conn() as c:
+        rows = fetch_all(c, "SELECT `day`, peak_viewers, peak_at FROM usage_peaks WHERE `day` >= :c ORDER BY `day` DESC", c=cutoff)
+    return [{"day": str(r["day"]), "peak_viewers": int(r["peak_viewers"]), "peak_at": fmt(r["peak_at"])} for r in rows]
+
+
 def log_action(ip: str, action: str) -> bool:
     try:
         with local_tx() as c:

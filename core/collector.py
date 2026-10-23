@@ -42,6 +42,12 @@ SQL_DNS = text("SELECT SAUV_td32, SUM(qtype_MALFORMED) + SUM(tooshort_src) AS dn
                "SUM(queries_woresp) AS dns_queries_woresp, SUM(queries) AS dns_queries FROM dns_5min "
                "WHERE SAUV_td32 IN :ts AND ip IN :ips AND supra='*' "
                "GROUP BY SAUV_td32").bindparams(bindparam("ts", expanding=True), bindparam("ips", expanding=True))
+SQL_WHOLE_RANGE = text("SELECT SAUV_td32, " + ", ".join(f"`{c}`" for c in NUM_COLS) +
+                       " FROM whole_5min WHERE SAUV_td32 BETWEEN :a AND :b ORDER BY SAUV_td32")
+SQL_DNS_RANGE = text("SELECT SAUV_td32, SUM(qtype_MALFORMED) + SUM(tooshort_src) AS dns_malformed_ul, "
+                     "SUM(queries_woresp) AS dns_queries_woresp, SUM(queries) AS dns_queries FROM dns_5min "
+                     "WHERE SAUV_td32 BETWEEN :a AND :b AND ip IN :ips AND supra='*' "
+                     "GROUP BY SAUV_td32").bindparams(bindparam("ips", expanding=True))
 SQL_LAST = text("SELECT MAX(SAUV_td32) FROM whole_5min")
 SQL_MODE = text("""
 WITH computed AS (
@@ -131,6 +137,28 @@ def _collect_one(db_key: str, timestamps: list, latest_alert_ts: datetime, want_
         logger.warning("Collecte %s en échec : %s", db_key, snap.error)
     snap.duration_s = time.monotonic() - t0
     return snap
+
+
+def read_range(db_key: str, start_utc: str, end_utc: str) -> dict[str, dict]:
+    """Lecture SEULE d'une plage de relevés (UTC, bornes incluses) : ``{"YYYY-mm-dd HH:MM:SS": ligne}``.
+
+    Sert à l'import d'historique (``history.backfill``). Même session READ ONLY que la collecte ; lève l'exception
+    de la base en cas d'échec (l'appelant décide : l'import continue avec les autres bases).
+    """
+    cfg = constants.DB_CONFIGS.get(db_key, {})
+    host, db_name = cfg.get("host"), cfg.get("db_name")
+    if not host or not db_name:
+        raise ValueError(f"configuration incomplète pour {db_key}")
+    with diag_engine(host, db_name, cfg.get("port")).connect() as conn:
+        params = {"a": start_utc, "b": end_utc}
+        dns = {str(r["SAUV_td32"]): {k: _f(v) for k, v in r.items() if k != "SAUV_td32"}
+               for r in conn.execute(SQL_DNS_RANGE, {**params, "ips": list(settings.dns_reference_ips)}).mappings()}
+        rows = {}
+        for r in conn.execute(SQL_WHOLE_RANGE, params).mappings():
+            ts = str(r["SAUV_td32"])
+            rows[ts] = {k: _f(v) for k, v in r.items() if k != "SAUV_td32"}
+            rows[ts].update(dns.get(ts, {}))
+    return rows
 
 
 def collect_all(timestamps: list, alert_timestamps: list, monitor_roaming: bool = False) -> dict[str, DbSnapshot]:

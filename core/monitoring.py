@@ -18,9 +18,9 @@ import time
 from contextlib import suppress
 from datetime import datetime, timedelta
 
-from . import analytics, collector, constants, metrics, notify, orange, rules, tickets
-from .config import (fmt, load_config, local_to_utc_naive, now_local, parse, round5, settings,
-                     utc_naive_to_local_naive)
+from . import analytics, collector, constants, governance, history, metrics, notify, orange, rules, shadow, tickets
+from .config import (config_for, fmt, load_config, load_overrides, local_to_utc_naive, now_local, parse, round5,
+                     settings, utc_naive_to_local_naive)
 from .logger import get_logger
 
 logger = get_logger(__name__)
@@ -95,7 +95,14 @@ def build_series(snap: collector.DbSnapshot, alert_ts: list) -> tuple[list, list
     return stamps, traffic, loss
 
 
-def _alerts_enabled(db_key: str, cfg: dict) -> bool:
+def widest_drop_window(cfg: dict, overrides: dict) -> int:
+    """Plus grand « nombre de baisses consécutives » demandé (global ou surchargé) : la collecte doit couvrir le pire cas."""
+    wanted = [cfg["traffic_consecutive_drops_count"]]
+    wanted += [o["traffic_consecutive_drops_count"] for o in overrides.values() if "traffic_consecutive_drops_count" in o]
+    return max(wanted)
+
+
+def alerts_enabled(db_key: str, cfg: dict) -> bool:
     """Interrupteurs « alerts_enable_* » : créer (ou non) des tickets par catégorie de base (international, gi, roaming)."""
     if db_key in constants.LABELS.get("international", {}):
         return bool(cfg.get("alerts_enable_international", True))
@@ -118,11 +125,12 @@ def run_cycle() -> dict:
     stats: dict = {}
     try:
         cfg = load_config()                       # relue (cache par mtime) : les seuils modifiés sont pris en compte
+        overrides = load_overrides()              # seuils par base : lus UNE fois par cycle
         constants.reload_database_configurations()
         checkpoint = round5(now_local().replace(tzinfo=None))
         now_str = fmt(checkpoint)
         logger.info("Cycle de supervision — checkpoint %s", now_str)
-        all_ts, alert_ts, cps = build_windows(checkpoint, cfg)
+        all_ts, alert_ts, cps = build_windows(checkpoint, {**cfg, "traffic_consecutive_drops_count": widest_drop_window(cfg, overrides)})
 
         snaps = collector.collect_all(all_ts, alert_ts, monitor_roaming=bool(cfg.get("alerts_enable_roaming", False)))
         stats["sources_failed"] = [k for k, s in snaps.items() if not s.ok]
@@ -136,19 +144,18 @@ def run_cycle() -> dict:
             cps_dash = {i: {**c, "end": c["end"].replace(tzinfo=constants.CAMEROON_TZ),
                             "start": c["start"].replace(tzinfo=constants.CAMEROON_TZ)} for i, c in cps.items()}
             data = metrics.build_dashboard(dash, tdd, cps_dash, checkpoint.replace(tzinfo=constants.CAMEROON_TZ))
-            with constants.DASHBOARD_CACHE_LOCK:
-                constants.DASHBOARD_CACHE.clear()
-                constants.DASHBOARD_CACHE.update(data)
+            constants.set_dashboard(data)
         except Exception:
             logger.exception("Calcul du tableau de bord en échec (la supervision continue)")
 
         # --- détection + tickets
-        stats.update(_process_monitoring(snaps, alert_ts, now_str, cfg))
+        stats.update(_process_monitoring(snaps, alert_ts, now_str, cfg, overrides))
 
         state.cycles_ok += 1
         state.last_ok_at, state.last_ok_iso = time.monotonic(), fmt(now_local().replace(tzinfo=None))
         state.last_error, state.watchdog_notified = "", False
         logger.info("Cycle terminé en %.1fs : %s", time.monotonic() - t0, {k: v for k, v in stats.items() if k != "sources_failed"})
+        publish_threadsafe({"type": "data_version", "version": constants.DASHBOARD_VERSION})      # les navigateurs rechargent (avec gigue)
     except Exception as e:
         state.cycles_failed += 1
         state.last_error = f"{type(e).__name__}: {e}"
@@ -160,7 +167,11 @@ def run_cycle() -> dict:
     return stats
 
 
-def _process_monitoring(snaps: dict, alert_ts: list, now_str: str, cfg: dict) -> dict:
+def _process_monitoring(snaps: dict, alert_ts: list, now_str: str, cfg: dict, overrides: dict | None = None) -> dict:
+    overrides = overrides or {}
+    # maintenance + silences après rejet : lus UNE fois, à l'heure RÉELLE (le checkpoint est arrondi jusqu'à 5 min en arrière :
+    # une fenêtre ouverte « maintenant » ne s'appliquerait pas)
+    silenced = governance.silenced_databases()
     open_list = tickets.load_open()                              # UNE lecture par cycle
     index = {(t["database_name"], t["type"]): t for t in open_list}
     cs = tickets.ChangeSet()
@@ -168,6 +179,7 @@ def _process_monitoring(snaps: dict, alert_ts: list, now_str: str, cfg: dict) ->
     id_factory = tickets.next_id
     checkpoint = parse(now_str)
     n_db = 0
+    n_silenced = 0
     for db_key, snap in snaps.items():
         try:
             # M-05 : un incident de SUPERVISION (base injoignable) n'est pas un incident RÉSEAU → pas de ticket Orange
@@ -182,8 +194,12 @@ def _process_monitoring(snaps: dict, alert_ts: list, now_str: str, cfg: dict) ->
             if state.source_failures.pop(db_key, 0) and db_key in state.unreachable_notified:
                 state.unreachable_notified.discard(db_key)
                 logger.info("Source %s de nouveau joignable", db_key)
-            if not _alerts_enabled(db_key, cfg):
+            if not alerts_enabled(db_key, cfg):
                 continue
+            if governance.is_silenced(db_key, silenced):
+                n_silenced += 1                      # aucune création ni mise à jour de ticket pendant la maintenance
+                continue
+            db_cfg = config_for(db_key, cfg, overrides)      # seuils globaux + surcharges de CETTE base
             n_db += 1
             stamps, traffic, loss = build_series(snap, alert_ts)
             tv = [{"timestamp": s, "value": v} for s, v in zip(stamps, traffic, strict=True)]
@@ -191,31 +207,35 @@ def _process_monitoring(snaps: dict, alert_ts: list, now_str: str, cfg: dict) ->
             # (J-1 en tête de série ; la détection n'examine que les valeurs récentes)
             ctx = tickets.DbContext(
                 db_key=db_key, now=now_str, traffic_values=tv, loss_values=lv,
-                traffic=rules.detect_traffic(traffic[1:], cfg), pertes=rules.detect_pertes(loss[1:], cfg),
-                mode7d=snap.mode7d, cfg=cfg, orange_enabled=orange_on)
+                traffic=rules.detect_traffic(traffic[1:], db_cfg), pertes=rules.detect_pertes(loss[1:], db_cfg),
+                mode7d=snap.mode7d, cfg=db_cfg, orange_enabled=orange_on)
             tt, pt = index.get((db_key, "traffic")), index.get((db_key, "pertes"))
             actions = rules.plan_actions(ctx.traffic.alert, ctx.pertes.alert, tt is not None, pt is not None)
             tickets.apply_actions(ctx, actions, {"traffic": tt, "pertes": pt}, cs, id_factory)
 
             last_local = utc_naive_to_local_naive(snap.last_update) if snap.last_update else None
-            fresh, minutes = rules.db_freshness(last_local, checkpoint, cfg)
+            fresh, minutes = rules.db_freshness(last_local, checkpoint, db_cfg)
             if fresh == "unknown":
                 logger.warning("[%s] Aucune donnée dans la base — fraîcheur inconnue (pas de ticket)", db_key)
-            tickets.apply_db_down(db_key, fresh, minutes, fmt(last_local) if last_local else None, now_str, cfg,
+            tickets.apply_db_down(db_key, fresh, minutes, fmt(last_local) if last_local else None, now_str, db_cfg,
                                   index.get((db_key, "db_down")), cs, orange_on, id_factory)
         except Exception:
             logger.exception("Échec du traitement de %s (cycle poursuivi pour les autres bases)", db_key)
 
     conflicts = tickets.persist(cs)
-    created = [t for t in cs.inserts]
-    if created:
+    created = list(cs.inserts)
+    announced = tickets.visible_to_recipients(created)           # une création en attente de validation n'est PAS annoncée par e-mail
+    if announced:                                                # (l'e-mail part à l'approbation : voir routers/tickets.py)
         closed_ids = {tid for tid, f in cs.updates.items() if f.get("status") == "closed"}
-        still_open = [t for t in open_list if t["id"] not in closed_ids] + created
-        notify.notify_new_tickets(created, still_open)
+        still_open = tickets.visible_to_recipients([t for t in open_list if t["id"] not in closed_ids] + created)
+        notify.notify_new_tickets(announced, still_open)
+    # Historique local puis détecteurs « futurs » en mode ombre : aucun des deux ne peut faire échouer le cycle ni toucher un ticket
+    rows_recorded = history.record_snapshots(snaps)
+    shadow_verdicts = sum(shadow.run_shadow(snaps, created).values())
     kinds: dict[str, int] = {}
     for kind, *_ in cs.events:
         kinds[kind] = kinds.get(kind, 0) + 1
-    return {"bases_evaluees": n_db, "tickets_crees": len(created), "tickets_maj": len(cs.updates), "conflits": len(conflicts), **kinds}
+    return {"bases_evaluees": n_db, "bases_en_silence": n_silenced, "tickets_crees": len(created), "tickets_maj": len(cs.updates), "conflits": len(conflicts), "historique": rows_recorded, "ombre": shadow_verdicts, **kinds}
 
 
 # ============================================================================
@@ -232,8 +252,10 @@ def _safe(fn, name: str):
 
 
 def job_orange_sync() -> None:
+    """Outbox (création/restauration) puis notes de mise à jour des tickets déjà créés chez Orange."""
     orange.sync_outbox(get_orange(), on_failed=lambda t, err: notify.notify_internal(
         f"Orange : abandon du ticket {t['id']}", f"Le ticket AUTODO {t['id']} n'a pas pu être synchronisé avec Orange.\n{err}"))
+    orange.sync_notes(get_orange())
 
 
 def job_orange_reconcile() -> None:
@@ -265,6 +287,9 @@ def register_jobs(scheduler) -> None:
                       max_instances=1, coalesce=True)
     scheduler.add_job(_safe(analytics.purge, "purge"), CronTrigger(hour=3, minute=17, timezone=tz), id="purge",
                       max_instances=1, coalesce=True)
+    scheduler.add_job(_safe(job_viewer_peak, "viewer_peak"), "interval", minutes=1, id="viewer_peak", max_instances=1, coalesce=True)
+    scheduler.add_job(_safe(history.purge, "purge_history"), CronTrigger(hour=3, minute=27, timezone=tz), id="purge_history",
+                      max_instances=1, coalesce=True)
     scheduler.add_job(_safe(job_watchdog, "watchdog"), IntervalTrigger(minutes=5), id="watchdog",
                       max_instances=1, coalesce=True)
 
@@ -279,6 +304,41 @@ def status() -> dict:
 # ============================================================================
 # SSE (appelé depuis l'API ; les abonnés sont dans app.state)
 # ============================================================================
+class _Runtime:
+    """Boucle asyncio et application FastAPI, liées au démarrage : le cycle (thread APScheduler) s'en sert pour publier en SSE."""
+    loop: asyncio.AbstractEventLoop | None = None
+    app = None
+
+
+runtime = _Runtime()
+
+
+def bind_runtime(loop: asyncio.AbstractEventLoop, app) -> None:
+    runtime.loop, runtime.app = loop, app
+
+
+def publish_threadsafe(event: dict) -> None:
+    """Publie un évènement SSE depuis un AUTRE thread (cycle, tâches). Sans effet hors serveur ; ne lève jamais."""
+    loop, app = runtime.loop, runtime.app
+    if loop is None or app is None or loop.is_closed():
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(sse_publish({**event, "at": now_local().isoformat(timespec="seconds")}, app), loop)
+    except Exception:
+        logger.exception("Publication SSE impossible")
+
+
+def viewer_count() -> int:
+    """Nombre de flux SSE ouverts (= spectateurs connectés)."""
+    subscribers = getattr(getattr(runtime.app, "state", None), "sse_subscribers", None)
+    return len(subscribers) if subscribers is not None else 0
+
+
+def job_viewer_peak() -> None:
+    """Chaque minute : conserve le pic de spectateurs simultanés de la journée (T5)."""
+    analytics.record_viewer_peak(viewer_count())
+
+
 async def sse_publish(event: dict, app) -> None:
     subs = getattr(app.state, "sse_subscribers", None)
     if not subs:

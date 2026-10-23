@@ -1,26 +1,25 @@
-// AUTODO — Thème, filtres, sons d'alerte
+// AUTODO — Thème et filtres (le son est dans sound.js)
 // Script classique (partage la portée globale avec les autres fichiers de static/js/, chargés dans l'ordre de dashboard.html).
 
-// ====== THEME MANAGEMENT ======
+// ====== THEME (préférence du navigateur : voir prefs.js) ======
 function initTheme() {
-    document.documentElement.setAttribute('data-theme', STATE.theme);
     updateThemeButton();
 }
 
 function toggleTheme() {
-    STATE.theme = STATE.theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', STATE.theme);
-    localStorage.setItem('theme', STATE.theme);
-    updateThemeButton();
+    Prefs.set('theme', Prefs.get('theme') === 'dark' ? 'light' : 'dark');
 }
 
 function updateThemeButton() {
     const btn = document.getElementById('themeToggleBtn');
     if (btn) {
-        btn.textContent = STATE.theme === 'dark' ? '☀️' : '🌙';
-        btn.title = STATE.theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+        const dark = Prefs.get('theme') === 'dark';
+        btn.textContent = dark ? '☀️' : '🌙';
+        btn.title = dark ? t('theme.to_light') : t('theme.to_dark');
+        btn.setAttribute('aria-label', btn.title);
     }
 }
+document.addEventListener('prefs-changed', event => { if (['theme', 'lang'].includes(event.detail.key)) updateThemeButton(); });
 
 // Track filter state
 let filtersChanged = false;
@@ -122,90 +121,5 @@ function handleTypeFilterChange(input) {
         }
     } catch (error) {
         console.error('Error in handleTypeFilterChange:', error);
-    }
-}
-
-// Initialize Web Audio API context (called once at app start)
-function initAudioContext() {
-    if (STATE.audioContext) return;
-    try {
-        STATE.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        if (STATE.audioContext.state === 'suspended') {
-            STATE.audioContext.resume();
-        }
-    } catch (error) {
-        console.error('Audio context initialization failed:', error);
-    }
-}
-
-// Play alert sound with looping bell tones
-function playAlertSound() {
-    stopAlertSound(); // Stop any existing sound first
-    initAudioContext();
-    
-    if (!STATE.audioContext) return;
-    
-    try {
-        // Play first bell immediately
-        playBellTone();
-        
-        // Schedule repeats every 1 second
-        STATE.soundInterval = setInterval(playBellTone, 1000);
-    } catch (error) {
-        console.warn('Alert sound failed:', error);
-    }
-}
-
-// Stop all alert sounds
-function stopAlertSound() {
-    // Stop interval
-    if (STATE.soundInterval) {
-        clearInterval(STATE.soundInterval);
-        STATE.soundInterval = null;
-    }
-    
-    // Stop all active oscillators
-    STATE.soundOscillators.forEach(osc => {
-        try { osc.stop(); } catch (e) {}
-    });
-    STATE.soundOscillators = [];
-}
-
-// Generate and play a single bell tone (dual frequency for distinctiveness)
-function playBellTone() {
-    if (!STATE.audioContext) return;
-    
-    try {
-        const ctx = STATE.audioContext;
-        const now = ctx.currentTime;
-        const duration = 0.8;
-        
-        // Primary frequency (C5)
-        const osc1 = ctx.createOscillator();
-        const gain1 = ctx.createGain();
-        osc1.connect(gain1);
-        gain1.connect(ctx.destination);
-        osc1.frequency.value = 523;
-        osc1.type = 'sine';
-        gain1.gain.setValueAtTime(0.25, now);
-        gain1.gain.exponentialRampToValueAtTime(0.01, now + duration);
-        osc1.start(now);
-        osc1.stop(now + duration);
-        STATE.soundOscillators.push(osc1);
-        
-        // Secondary frequency (G5) for richer tone
-        const osc2 = ctx.createOscillator();
-        const gain2 = ctx.createGain();
-        osc2.connect(gain2);
-        gain2.connect(ctx.destination);
-        osc2.frequency.value = 784;
-        osc2.type = 'sine';
-        gain2.gain.setValueAtTime(0.15, now);
-        gain2.gain.exponentialRampToValueAtTime(0.01, now + duration);
-        osc2.start(now);
-        osc2.stop(now + duration);
-        STATE.soundOscillators.push(osc2);
-    } catch (error) {
-        console.error('Bell tone generation failed:', error);
     }
 }

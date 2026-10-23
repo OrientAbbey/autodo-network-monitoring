@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UniDiagnet</title>
     <link rel="stylesheet" type="text/css" href="/static/styles.css">
+    <link rel="stylesheet" type="text/css" href="/static/app-ui.css">
 </head>
 
 <body>
@@ -13,13 +14,13 @@
     <div id="alert-popup" class="alert-popup" role="alertdialog" aria-modal="true" aria-labelledby="alert-popup-title" aria-describedby="alert-popup-message">
         <div class="alert-popup-content">
             <div class="alert-popup-header">
-                <h3 id="alert-popup-title">🚨 Nouvelle Alerte</h3>
+                <h3 id="alert-popup-title" data-i18n="alert.new_title">🚨 Nouvelle Alerte</h3>
             </div>
             <div class="alert-popup-body">
                 <div id="alert-popup-message"></div>
             </div>
             <div class="alert-popup-footer">
-                <button class="btn-primary" data-action="acknowledgeAlert" aria-label="Acquitter l'alerte">Ok</button>
+                <button class="btn-primary" data-action="acknowledgeAlert" data-i18n="alert.ok" data-i18n-attr="aria-label:alert.ack_label">Ok</button>
             </div>
         </div>
     </div>
@@ -29,203 +30,41 @@
             <div class="header-content">
                 <div class="timestamp">
                     <div class="current-time">
-                        <span class="last-update">Last Update: </span>
+                        <span class="last-update" data-i18n="header.last_update">Last Update: </span>
                         <span class="last-update-value" role="status" aria-live="polite"></span>
-                        <span class="next-label" style="display:none;"> | Next in</span>
+                        <span class="next-label" style="display:none;"> | <span data-i18n="header.next_in">Next in</span></span>
                         <span class="countdown"></span>
                     </div>
                 </div>
                 <div class="controls">
+                    <span id="presence" class="presence" role="status">👥</span>
                     <button id="autoUpdateBtn" class="btn-secondary" data-action="toggleAutoUpdate" aria-pressed="true">
-                        Auto Update
+                        <span data-i18n="header.auto_update">Auto Update</span>
                     </button>
                     <button id="themeToggleBtn" class="btn-secondary" data-action="toggleTheme" aria-label="Basculer le thème clair/sombre">
                         🌙
                     </button>
-
-                    <!-- Filter Button -->
-                    <button id="filterBtn" class="btn-secondary" title="Filtres des alertes" aria-label="Filtrer les alertes">🔍 Filtres</button>
-                    <button id="openConfigBtn" class="btn-secondary" type="button"
-                        title="Ouvrir le Panneau de Configuration" aria-label="Ouvrir le panneau de configuration (administrateurs)">⚙️</button>
-                    <a href="/data-management" class="btn-secondary" title="Data Management"
-                        style="text-decoration: none; background: #667eea !important; color: white !important; border: 2px solid #667eea !important;">📁
-                        DM</a>
-                    <a href="/tickets" class="btn-danger" title="Afficher les tickets des incidents"
+                    <button id="filterBtn" class="btn-secondary" data-i18n-attr="title:header.filters_title;aria-label:header.filters_title"
+                        title="Filtres des alertes" aria-label="Filtrer les alertes">🔍 <span data-i18n="header.filters">Filtres</span></button>
+                    <button id="prefsBtn" class="btn-secondary" type="button" data-action="openPrefs"
+                        data-i18n-attr="title:prefs.title;aria-label:prefs.title" title="Préférences" aria-label="Préférences">🎛️</button>
+                    <a id="configLink" href="/supervision" class="btn-secondary" data-i18n-attr="title:header.supervision_title;aria-label:header.supervision_title"
+                        title="Supervision" aria-label="Supervision">⚙️</a>
+                    <a href="/tickets" class="btn-danger" data-i18n-attr="title:header.tickets_title" title="Afficher les tickets des incidents"
                         style="text-decoration: none; background: #dc3545 !important; color: white !important; border: 2px solid #dc3545 !important;">🎫
-                        Tickets</a>
+                        <span data-i18n="header.tickets">Tickets</span></a>
+                    <div id="account-widget" class="account-widget"></div>
                 </div>
             </div>
-
-            <!-- Panneau de configuration -->
-            <div class="drawer" id="config-drawer" style="display:none;">
-                <div class="drawer-header">
-                    <h2>🛠️ Paramètres d'alerte</h2>
-                    <button class="close-btn" id="close-drawer" type="button" aria-label="Fermer le panneau de configuration">×</button>
-                </div>
-                <div class="drawer-content">
-                    <form class="config-form" id="config-form" data-no-submit>
-
-                        <fieldset>
-                            <legend><strong>Paramètres de Trafic</strong></legend>
-                            <div class="row-block">
-                                <div class="row-title">Baisse Instantanée critique</div>
-                                <div class="form-row">
-                                    <div class="form-group" style="grid-column: 1 / span 2;">
-                                        <label for="alert_traffic_threshold_percent">Seuil (%)</label>
-                                        <input type="number" step="0.1" min="0" id="alert_traffic_threshold_percent"
-                                            name="alert_traffic_threshold_percent">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row-block">
-                                <div class="row-title">Baisses consécutives</div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="traffic_consecutive_drops_count">Nb de baisses</label>
-                                        <input type="number" step="1" min="1" id="traffic_consecutive_drops_count"
-                                            name="traffic_consecutive_drops_count">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="traffic_consecutive_drops_min_percent">Seuil (%)</label>
-                                        <input type="number" step="0.1" min="0"
-                                            id="traffic_consecutive_drops_min_percent"
-                                            name="traffic_consecutive_drops_min_percent">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row-block">
-                                <div class="row-title">Hausse importante</div>
-                                <div class="form-row">
-                                    <div class="form-group" style="grid-column: 1 / span 2;">
-                                        <label for="traffic_up_threshold_percent">Seuil (%)</label>
-                                        <input type="number" step="0.1" min="0" id="traffic_up_threshold_percent"
-                                            name="traffic_up_threshold_percent">
-                                    </div>
-                                </div>
-                            </div>
-                        </fieldset>
-                        <fieldset>
-                            <legend><strong>Paramètres de Pertes</strong></legend>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="alert_pertes_threshold">Seuil pertes</label>
-                                    <input type="number" step="0.01" min="0" id="alert_pertes_threshold"
-                                        name="alert_pertes_threshold">
-                                </div>
-                                <div class="form-group">
-                                    <label for="pertes_consecutive_count">Nb de perte</label>
-                                    <input type="number" step="1" min="1" id="pertes_consecutive_count"
-                                        name="pertes_consecutive_count">
-                                </div>
-                            </div>
-                        </fieldset>
-                        <fieldset>
-                            <legend><strong>Paramètres TCP Métriques</strong></legend>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="alert_tcp_no_response_threshold">Seuil TCP No Response (%)</label>
-                                    <input type="number" step="0.1" min="0" id="alert_tcp_no_response_threshold"
-                                        name="alert_tcp_no_response_threshold">
-                                </div>
-                                <div class="form-group">
-                                    <label for="alert_tcp_block_wp_up_threshold">Seuil TCP Block WP Up (%)</label>
-                                    <input type="number" step="0.1" min="0" id="alert_tcp_block_wp_up_threshold"
-                                        name="alert_tcp_block_wp_up_threshold">
-                                </div>
-                                <div class="form-group">
-                                    <label for="alert_latence_threshold_ms">Seuil Latence (ms)</label>
-                                    <input type="number" step="0.1" min="0" id="alert_latence_threshold_ms"
-                                        name="alert_latence_threshold_ms">
-                                </div>
-                            </div>
-                        </fieldset>
-                        <fieldset>
-                            <legend><strong>Paramètres Globaux</strong></legend>
-                            <div class="row-block">
-                                <div class="row-title">Persistance des alertes</div>
-                                <div class="form-row">
-                                    <div class="form-group" style="grid-column: 1 / span 2;">
-                                        <label for="alert_persistence_duration_minutes">Durée (minutes)</label>
-                                        <input type="number" step="1" min="0" id="alert_persistence_duration_minutes"
-                                            name="alert_persistence_duration_minutes">
-                                    </div>
-                                </div>
-                            </div>
-                        </fieldset>
-                        <fieldset>
-                            <legend><strong>Paramètres de Récupération</strong></legend>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="traffic_recovery_ratio">Seuil récupération Traffic</label>
-                                    <input type="number" step="0.01" min="0" max="1" id="traffic_recovery_ratio"
-                                        name="traffic_recovery_ratio">
-                                </div>
-                                <div class="form-group">
-                                    <label for="mode7days_recovery_ratio">Seuil Mode 7 jours</label>
-                                    <input type="number" step="0.01" min="0" max="1" id="mode7days_recovery_ratio"
-                                        name="mode7days_recovery_ratio">
-                                </div>
-                                <div class="form-group">
-                                    <label for="db_recovery_threshold_minutes">DB Down Minimum Temps (minutes)</label>
-                                    <input type="number" step="1" min="0" id="db_recovery_threshold_minutes"
-                                        name="db_recovery_threshold_minutes">
-                                </div>
-                            </div>
-                        </fieldset>
-                        <fieldset>
-                            <legend><strong>Sections et alertes actives</strong></legend>
-                            <p class="form-hint" style="margin:4px 0 8px;font-size:12px;opacity:.8">Sortie Internationale, Traffic Utilisateur et Roaming : masquent la section <u>et suspendent la création de tickets</u>. TCP Metrics et TDD : affichage seulement.</p>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="alerts_enable_international"><input type="checkbox"
-                                            id="alerts_enable_international" name="alerts_enable_international"
-                                            style="margin-right:8px;">Sortie Internationale</label>
-                                </div>
-                                <div class="form-group">
-                                    <label for="alerts_enable_gi"><input type="checkbox" id="alerts_enable_gi"
-                                            name="alerts_enable_gi" style="margin-right:8px;">Traffic
-                                        Utilisateur</label>
-                                </div>
-                                <div class="form-group">
-                                    <label for="alerts_enable_international_gi"><input type="checkbox"
-                                            id="alerts_enable_international_gi" name="alerts_enable_international_gi"
-                                            style="margin-right:8px;">International + GI (TCP Metrics)</label>
-                                </div>
-                                <div class="form-group">
-                                    <label for="alerts_enable_roaming"><input type="checkbox" id="alerts_enable_roaming"
-                                            name="alerts_enable_roaming" style="margin-right:8px;">Roaming
-                                        Utilisateur</label>
-                                </div>
-                                <div class="form-group">
-                                    <label for="alerts_enable_tdd"><input type="checkbox" id="alerts_enable_tdd"
-                                            name="alerts_enable_tdd" style="margin-right:8px;">TDD</label>
-                                </div>
-                            </div>
-                        </fieldset>
-
-                        <!-- Test Sound Alert Buttons -->
-                        <fieldset>
-                            <legend><strong>🔊 Test des Alertes Sonores</strong></legend>
-                            <div class="form-row" style="gap: 10px;">
-                                <button type="button" class="save-btn" data-action="playAlertSound" 
-                                    style="background: #28a745; flex: 1;">▶️ Démarrer l'alarme</button>
-                                <button type="button" class="save-btn" data-action="stopAlertSound" 
-                                    style="background: #dc3545; flex: 1;">⏹️ Arrêter l'alarme</button>
-                            </div>
-                        </fieldset>
-
-                        <button type="submit" class="save-btn">💾 Enregistrer</button>
-                        <button type="button" class="btn-secondary"
-                            data-action="clearDismissedAlerts">Afficher les alertes masquées</button>
-                    </form>
-                </div>
-            </div>
+            <div id="maintenance-banner" class="maintenance-banner" role="status" hidden></div>
         </header>
+
+        <!-- Cartes mobiles (< 640 px) : construites à partir des tableaux -->
+        <div id="mobile-cards" class="mobile-cards" hidden></div>
 
         <!-- Sections principales -->
         <div class="sections-grid" id="sections-grid">
-            {% for section_id, section_title in [('international', 'Sortie Internationale (CAMTEL)'), ('gi', 'Traffic
-            Utilisateur (Gi)'),
+            {% for section_id, section_title in [('international', 'Sortie Internationale (CAMTEL)'), ('gi', 'Traffic Utilisateur (Gi)'),
             ('international_gi', 'International + GI (TCP Metrics)'),
             ('roaming', 'Roaming Utilisateur'), ('tdd', 'TDD')] %}
 
@@ -241,7 +80,7 @@
                 {% endif %}
                 <h2 class="section-title" data-action="toggleSection">
                     <span class="toggle-icon">▼</span>
-                    {{ section_title }}
+                    <span data-i18n="sect.{{ section_id }}">{{ section_title }}</span>
                 </h2>
                 <div class="section-content">
                     {% if section_id == 'roaming' %}
@@ -268,7 +107,7 @@
                     <div class="data-section collapsible collapsed" id="section-alertes-{{ section_id }}">
                         <h2 class="section-title alertes-title" data-action="toggleSection">
                             <span class="toggle-icon">▶</span>
-                            Alertes {{ section_title }}
+                            <span data-i18n="alert.section_prefix">Alertes</span> <span data-i18n="sect.{{ section_id }}">{{ section_title }}</span>
                             <span id="alertes-count-{{ section_id }}"></span>
                         </h2>
                         <div class="section-content">
@@ -284,56 +123,52 @@
     <!-- Filter Sidebar -->
     <div id="filterSidebar" class="filter-sidebar">
         <div class="filter-sidebar-header">
-            <h3>Filtres des Alertes</h3>
-            <button class="close-sidebar-btn" title="Fermer">✕</button>
+            <h3 data-i18n="filter.title">Filtres des Alertes</h3>
+            <button class="close-sidebar-btn" data-i18n-attr="title:common.close;aria-label:common.close" title="Fermer" aria-label="Fermer">✕</button>
         </div>
         <div class="filter-sidebar-content">
             <div class="filter-group">
-                <h4>Statut</h4>
+                <h4 data-i18n="filter.status">Statut</h4>
                 <div class="filter-options">
-                    {% for value, label, checked in [('all', 'Toutes les alertes', ''), ('open', 'Ouvertes uniquement',
-                    'checked'), ('closed', 'Fermées uniquement', '')] %}
+                    {% for value, key, label, checked in [('all', 'filter.status_all', 'Toutes les alertes', ''), ('open', 'filter.status_open', 'Ouvertes uniquement', 'checked'), ('closed', 'filter.status_closed', 'Fermées uniquement', '')] %}
                     <label class="filter-option">
                         <input type="radio" name="statusFilter" value="{{ value }}" {{ checked }}>
-                        <span>{{ label }}</span>
+                        <span data-i18n="{{ key }}">{{ label }}</span>
                     </label>
                     {% endfor %}
                 </div>
             </div>
 
             <div class="filter-group">
-                <h4>Type d'alerte</h4>
+                <h4 data-i18n="filter.type">Type d'alerte</h4>
                 <div class="filter-options">
-                    {% for value, label, checked in [('all', 'Tous les types', 'checked'), ('traffic', 'Traffic', ''),
-                    ('pertes', 'Pertes', ''), ('db_down', 'DB_DOWN', '')] %}
+                    {% for value, key, label, checked in [('all', 'filter.type_all', 'Tous les types', 'checked'), ('traffic', 'filter.type_traffic', 'Traffic', ''), ('pertes', 'filter.type_losses', 'Pertes', ''), ('db_down', 'filter.type_db_down', 'DB_DOWN', '')] %}
                     <label class="filter-option">
                         <input type="checkbox" name="typeFilter" value="{{ value }}" {{ checked }}>
-                        <span>{{ label }}</span>
+                        <span data-i18n="{{ key }}">{{ label }}</span>
                     </label>
                     {% endfor %}
                 </div>
             </div>
 
             <div class="filter-group">
-                <h4>Période</h4>
+                <h4 data-i18n="filter.period">Période</h4>
                 <div class="filter-options">
-                    {% for value, label, checked in [('all', 'Toute période', ''), ('today', "Aujourd'hui", ''),
-                    ('week', 'Cette semaine', ''), ('month', 'Ce mois', 'checked')] %}
+                    {% for value, key, label, checked in [('all', 'filter.period_all', 'Toute période', ''), ('today', 'filter.period_today', "Aujourd'hui", ''), ('week', 'filter.period_week', 'Cette semaine', ''), ('month', 'filter.period_month', 'Ce mois', 'checked')] %}
                     <label class="filter-option">
                         <input type="radio" name="periodFilter" value="{{ value }}" {{ checked }}>
-                        <span>{{ label }}</span>
+                        <span data-i18n="{{ key }}">{{ label }}</span>
                     </label>
                     {% endfor %}
                 </div>
             </div>
 
             <div class="filter-actions">
-                <button class="btn-primary" id="applyFiltersBtn">Appliquer les filtres</button>
-                <button class="btn-secondary" id="resetFiltersBtn">Réinitialiser</button>
-                <button type="button" class="btn-secondary" data-action="clearDismissedAlerts">Afficher les
-                    alertes masquées</button>
+                <button class="btn-primary" id="applyFiltersBtn" data-i18n="filter.apply">Appliquer les filtres</button>
+                <button class="btn-secondary" id="resetFiltersBtn" data-i18n="filter.reset">Réinitialiser</button>
+                <button type="button" class="btn-secondary" data-action="clearDismissedAlerts" data-i18n="filter.show_hidden">Afficher les alertes masquées</button>
                 <div id="filterStatus" class="filter-status" style="display: none;">
-                    <small>⚠️ Filtres modifiés - cliquez "Appliquer" pour voir les changements</small>
+                    <small data-i18n="filter.changed">⚠️ Filtres modifiés - cliquez "Appliquer" pour voir les changements</small>
                 </div>
             </div>
         </div>
@@ -344,13 +179,22 @@
 
 
 
+    <script src="/static/js/common.js"></script>
+    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/prefs.js"></script>
+    <script src="/static/js/session.js"></script>
+    <script src="/static/js/sound.js"></script>
+    <script src="/static/js/a11y.js"></script>
+    <script src="/static/js/ui.js"></script>
     <script src="/static/js/state.js"></script>
-    <script src="/static/js/config-panel.js"></script>
     <script src="/static/js/alerts.js"></script>
     <script src="/static/js/live.js"></script>
     <script src="/static/js/sections.js"></script>
-    <script src="/static/js/theme-filters-audio.js"></script>
+    <script src="/static/js/theme-filters.js"></script>
     <script src="/static/js/render.js"></script>
+    <script src="/static/js/sparklines.js"></script>
+    <script src="/static/js/mobile-cards.js"></script>
+    <script src="/static/js/wall.js"></script>
     <script src="/static/js/main.js"></script>
 </body>
 

@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT))
 os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="autodo_test_"))
 os.environ.setdefault("LOG_FILE", str(Path(os.environ["DATA_DIR"]) / "test.log"))
 os.environ.update({
-    "CONFIG_PASSWORD": "cfgpass", "DATA_MANAGEMENT_PASSWORD": "dmpass",
+    "ADMIN_USERNAME": "admin", "ADMIN_PASSWORD": "Admin-Initial-1",
     "ORANGE_API_SERVER_INTRA": "http://orange.test", "ORANGE_API_TOKEN_ENDPOINT": "/oauth/v3/token",
     "ORANGE_API_BASE_ENDPOINT": "/tt/v3", "ORANGE_API_CLIENT_ID": "cid", "ORANGE_API_CLIENT_SECRET": "SuperSecretValue123456",
     "CLIENT_USER_ID": "TESTUSER", "ORANGE_API_RATE_PER_SECOND": "50", "ORANGE_API_BURST": "50",
@@ -44,3 +44,29 @@ def test_db():
     assert db.ensure_schema()
     yield db
     db.dispose_all()
+
+
+# Tables de la phase A : vidées avant chaque test qui en dépend (fixture réutilisable)
+PHASE_A_TABLES = ("users", "audit_log", "config_versions", "maintenance_windows", "alert_acks", "ticket_events", "ticket_feedback",
+                  "tickets_tb", "ticket_counters", "usage_peaks", "metrics_5min", "detector_settings", "detector_verdicts")
+
+
+@pytest.fixture
+def clean_state(test_db):
+    """Base locale vide + configuration par défaut + sessions et limiteur remis à zéro."""
+    from sqlalchemy import text
+    from core import auth, config, tickets
+    default = json.loads((ROOT / "config.default.json").read_text(encoding="utf-8"))
+
+    def wipe():
+        with test_db.local_tx() as c:
+            for table in PHASE_A_TABLES:
+                c.execute(text(f"DELETE FROM {table}"))
+        config.write_raw({**default, "overrides": {}})
+        auth.limiter.reset()
+        auth.sessions._by_digest.clear()
+        tickets.invalidate_alert_cache()
+
+    wipe()
+    yield test_db
+    wipe()

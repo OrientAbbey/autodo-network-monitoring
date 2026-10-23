@@ -238,10 +238,66 @@ def _m3_logs_datetime(c: Connection) -> None:
         c.execute(text("ALTER TABLE logs MODIFY access_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"))
 
 
+def _m4_comptes_gouvernance(c: Connection) -> None:
+    """Comptes nominatifs, audit, versions de configuration, maintenance, accusés, journal de ticket, pics d'usage."""
+    c.execute(text("""CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(64) NOT NULL, display_name VARCHAR(100) NOT NULL,
+        role VARCHAR(16) NOT NULL, password_hash VARCHAR(255) NOT NULL, active TINYINT(1) NOT NULL DEFAULT 1,
+        must_change_password TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL, last_login_at DATETIME NULL,
+        failed_logins INT NOT NULL DEFAULT 0, locked_until DATETIME NULL,
+        UNIQUE KEY uq_users_username (username)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS audit_log (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY, at DATETIME NOT NULL, actor VARCHAR(64) NOT NULL, ip VARCHAR(45) NOT NULL,
+        action VARCHAR(64) NOT NULL, target VARCHAR(128) NOT NULL DEFAULT '', details JSON NULL,
+        INDEX idx_audit_at (at), INDEX idx_audit_action (action)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS config_versions (
+        id INT AUTO_INCREMENT PRIMARY KEY, at DATETIME NOT NULL, actor VARCHAR(64) NOT NULL, comment VARCHAR(200) NOT NULL DEFAULT '',
+        config_json LONGTEXT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS maintenance_windows (
+        id INT AUTO_INCREMENT PRIMARY KEY, db_key VARCHAR(50) NOT NULL, starts_at DATETIME NOT NULL, ends_at DATETIME NOT NULL,
+        reason VARCHAR(200) NOT NULL DEFAULT '', created_by VARCHAR(64) NOT NULL, auto_silence TINYINT(1) NOT NULL DEFAULT 0,
+        INDEX idx_maintenance_db (db_key, ends_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS alert_acks (
+        ticket_id BIGINT NOT NULL PRIMARY KEY, acked_at DATETIME NOT NULL, acked_by VARCHAR(64) NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS ticket_events (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY, ticket_id BIGINT NOT NULL, at DATETIME NOT NULL, kind VARCHAR(32) NOT NULL,
+        message TEXT NOT NULL, actor VARCHAR(64) NOT NULL DEFAULT 'système', to_orange TINYINT(1) NOT NULL DEFAULT 0,
+        orange_sent TINYINT(1) NOT NULL DEFAULT 0, INDEX idx_events_ticket (ticket_id, at),
+        INDEX idx_events_orange (to_orange, orange_sent)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS usage_peaks (
+        `day` DATE NOT NULL PRIMARY KEY, peak_viewers INT NOT NULL, peak_at DATETIME NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS ticket_feedback (
+        ticket_id BIGINT NOT NULL PRIMARY KEY, label VARCHAR(8) NOT NULL, given_by VARCHAR(64) NOT NULL, given_at DATETIME NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    _add_col(c, "tickets_tb", "validation_state", "VARCHAR(16) NOT NULL DEFAULT 'auto'")
+    _add_col(c, "tickets_tb", "last_note_value", "DECIMAL(10,3) NULL")
+    _add_col(c, "tickets_tb", "last_note_at", "DATETIME NULL")
+    _add_idx(c, "tickets_tb", "idx_validation", "(validation_state, status)")
+
+
+def _m5_historique_detecteurs(c: Connection) -> None:
+    """Historique local des métriques (D2), état des détecteurs « futurs » et leurs verdicts en mode ombre."""
+    c.execute(text("""CREATE TABLE IF NOT EXISTS metrics_5min (
+        db_key VARCHAR(50) NOT NULL, ts DATETIME NOT NULL, traffic_gbps DOUBLE NULL, loss_pct DOUBLE NULL,
+        latency_ms DOUBLE NULL, tcp_no_response_pct DOUBLE NULL, tcp_block_wp_up_pct DOUBLE NULL, dns_malformed_pct DOUBLE NULL,
+        PRIMARY KEY (db_key, ts), INDEX idx_metrics_ts (ts)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS detector_settings (
+        detector VARCHAR(32) NOT NULL PRIMARY KEY, enabled TINYINT(1) NOT NULL DEFAULT 1, trained_at DATETIME NULL,
+        metrics_json TEXT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+    c.execute(text("""CREATE TABLE IF NOT EXISTS detector_verdicts (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY, detector VARCHAR(32) NOT NULL, db_key VARCHAR(50) NOT NULL, ts DATETIME NOT NULL,
+        score DOUBLE NULL, explanation TEXT NOT NULL, created_at DATETIME NOT NULL,
+        UNIQUE KEY uq_verdict (detector, db_key, ts), INDEX idx_verdict_ts (ts)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
+
+
 MIGRATIONS = [
     (1, "baseline", _m1_baseline),
     (2, "tickets: version + outbox Orange + index", _m2_tickets_outbox),
     (3, "logs.access_time en DATETIME", _m3_logs_datetime),
+    (4, "comptes, audit, versions, maintenance, accusés, journal de ticket", _m4_comptes_gouvernance),
+    (5, "historique 5 min, détecteurs et verdicts (mode ombre)", _m5_historique_detecteurs),
 ]
 
 # Schéma SQLite « final » (baseline + toutes les migrations fusionnées) : pas de ALTER/information_schema.
@@ -257,7 +313,8 @@ _SQLITE_TABLES = (
         last_values TEXT DEFAULT NULL, description TEXT NOT NULL, reason TEXT DEFAULT NULL,
         pertes_warnings TEXT DEFAULT NULL, version INTEGER NOT NULL DEFAULT 0,
         orange_sync_state TEXT NOT NULL DEFAULT 'pending', orange_attempts INTEGER NOT NULL DEFAULT 0,
-        orange_next_retry_at TEXT DEFAULT NULL, orange_last_error TEXT DEFAULT NULL)""",
+        orange_next_retry_at TEXT DEFAULT NULL, orange_last_error TEXT DEFAULT NULL,
+        validation_state TEXT NOT NULL DEFAULT 'auto', last_note_value NUMERIC DEFAULT NULL, last_note_at TEXT DEFAULT NULL)""",
     """CREATE TABLE IF NOT EXISTS daily_users (
         `date` TEXT NOT NULL, client_id TEXT NOT NULL, last_seen TEXT NOT NULL,
         visits_count INTEGER NOT NULL DEFAULT 0, last_ip TEXT, user_agent TEXT,
@@ -268,6 +325,38 @@ _SQLITE_TABLES = (
     "CREATE TABLE IF NOT EXISTS ticket_counters (day TEXT PRIMARY KEY, n INTEGER NOT NULL)",
     """CREATE TABLE IF NOT EXISTS notification_state (
         recipient TEXT NOT NULL PRIMARY KEY, ticket_ids TEXT, sent_at TEXT NOT NULL)""",
+    """CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL,
+        role TEXT NOT NULL, password_hash TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1,
+        must_change_password INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, last_login_at TEXT,
+        failed_logins INTEGER NOT NULL DEFAULT 0, locked_until TEXT)""",
+    """CREATE TABLE IF NOT EXISTS audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, actor TEXT NOT NULL, ip TEXT NOT NULL,
+        action TEXT NOT NULL, target TEXT NOT NULL DEFAULT '', details TEXT)""",
+    """CREATE TABLE IF NOT EXISTS config_versions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, actor TEXT NOT NULL,
+        comment TEXT NOT NULL DEFAULT '', config_json TEXT NOT NULL)""",
+    """CREATE TABLE IF NOT EXISTS maintenance_windows (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, db_key TEXT NOT NULL, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL,
+        reason TEXT NOT NULL DEFAULT '', created_by TEXT NOT NULL, auto_silence INTEGER NOT NULL DEFAULT 0)""",
+    """CREATE TABLE IF NOT EXISTS alert_acks (
+        ticket_id INTEGER NOT NULL PRIMARY KEY, acked_at TEXT NOT NULL, acked_by TEXT NOT NULL)""",
+    """CREATE TABLE IF NOT EXISTS ticket_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER NOT NULL, at TEXT NOT NULL,
+        kind TEXT NOT NULL, message TEXT NOT NULL, actor TEXT NOT NULL DEFAULT 'système',
+        to_orange INTEGER NOT NULL DEFAULT 0, orange_sent INTEGER NOT NULL DEFAULT 0)""",
+    """CREATE TABLE IF NOT EXISTS usage_peaks (
+        day TEXT NOT NULL PRIMARY KEY, peak_viewers INTEGER NOT NULL, peak_at TEXT NOT NULL)""",
+    """CREATE TABLE IF NOT EXISTS ticket_feedback (
+        ticket_id INTEGER NOT NULL PRIMARY KEY, label TEXT NOT NULL, given_by TEXT NOT NULL, given_at TEXT NOT NULL)""",
+    """CREATE TABLE IF NOT EXISTS metrics_5min (
+        db_key TEXT NOT NULL, ts TEXT NOT NULL, traffic_gbps REAL, loss_pct REAL, latency_ms REAL,
+        tcp_no_response_pct REAL, tcp_block_wp_up_pct REAL, dns_malformed_pct REAL, PRIMARY KEY (db_key, ts))""",
+    """CREATE TABLE IF NOT EXISTS detector_settings (
+        detector TEXT NOT NULL PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, trained_at TEXT, metrics_json TEXT)""",
+    """CREATE TABLE IF NOT EXISTS detector_verdicts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, detector TEXT NOT NULL, db_key TEXT NOT NULL, ts TEXT NOT NULL,
+        score REAL, explanation TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE (detector, db_key, ts))""",
     """CREATE TABLE IF NOT EXISTS schema_version (
         version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)""",
 )
@@ -280,6 +369,14 @@ _SQLITE_INDEXES = (
     "CREATE INDEX IF NOT EXISTS idx_ip_time ON logs (ip_address, access_time)",
     "CREATE INDEX IF NOT EXISTS idx_access_time ON logs (access_time)",
     "CREATE INDEX IF NOT EXISTS idx_action ON logs (action)",
+    "CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log (at)",
+    "CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log (action)",
+    "CREATE INDEX IF NOT EXISTS idx_maintenance_db ON maintenance_windows (db_key, ends_at)",
+    "CREATE INDEX IF NOT EXISTS idx_events_ticket ON ticket_events (ticket_id, at)",
+    "CREATE INDEX IF NOT EXISTS idx_events_orange ON ticket_events (to_orange, orange_sent)",
+    "CREATE INDEX IF NOT EXISTS idx_metrics_ts ON metrics_5min (ts)",
+    "CREATE INDEX IF NOT EXISTS idx_verdict_ts ON detector_verdicts (ts)",
+    "CREATE INDEX IF NOT EXISTS idx_validation ON tickets_tb (validation_state, status)",
 )
 
 
