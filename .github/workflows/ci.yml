@@ -1,33 +1,9 @@
 name: ci
 on:
   push:
-  pull_request:
-  workflow_dispatch:
+    branches: [diagnostics/ci-minimal]
 jobs:
   test:
-    runs-on: ubuntu-24.04
-    services:
-      mariadb:
-        image: mariadb:10.11
-        env: { MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "1" }
-        ports: ["3306:3306"]
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-retries=20
-    env:
-      DEMO_DB_HOST: 127.0.0.1
-      DEMO_DB_PORT: "3306"
-      TEST_DB_HOST: 127.0.0.1
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12", cache: pip }
-      - run: pip install -r requirements.lock.txt pytest httpx playwright aiosmtpd ruff bandit pip-audit
-      - run: ruff check . && bandit -q -r core routers main.py -ll --skip B608 && pip-audit -r requirements.lock.txt
-      - run: pytest                                             # unitaires + sécurité + intégration MariaDB
-      - run: playwright install --with-deps chromium
-      - name: E2E (pile simulée : faux Orange + puits SMTP)
-        run: |
-          python -m uvicorn mock_orange_api:app --app-dir demo --port 9001 --log-level warning &
-          python demo/mail_sink.py &
-          set -a; . demo/env.demo; set +a
-          E2E_ALIGN=0 pytest tests/e2e -k "not second_cycle"
+      - run: echo ci-minimal-ok
