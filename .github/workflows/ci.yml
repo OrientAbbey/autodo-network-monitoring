@@ -2,6 +2,10 @@ name: ci
 on:
   push:
     branches: [diagnostics/ci-minimal]
+env:
+  DEMO_DB_HOST: 127.0.0.1
+  DEMO_DB_PORT: "3306"
+  TEST_DB_HOST: 127.0.0.1
 jobs:
   test:
     runs-on: ubuntu-24.04
