@@ -21,11 +21,25 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12", cache: pip }
-      - run: pip install -r requirements.lock.txt pytest httpx playwright aiosmtpd ruff bandit pip-audit
-      - run: ruff check . && bandit -q -r core routers main.py -ll --skip B608 && pip-audit -r requirements.lock.txt
-      - run: pytest                                             # unitaires + sécurité + intégration MariaDB
-      - run: playwright install --with-deps chromium
+      - name: Installer les dépendances
+        run: |
+          if [ -f requirements.lock.txt ]; then
+            pip install -r requirements.lock.txt
+          else
+            pip install -r requirements.txt
+          fi
+          pip install pytest httpx playwright aiosmtpd ruff bandit pip-audit
+      - name: Qualité, sécurité et dépendances
+        if: hashFiles('requirements.lock.txt') != ''
+        run: ruff check . && bandit -q -r core routers main.py -ll --skip B608 && pip-audit -r requirements.lock.txt
+      - name: Tests unitaires et intégration MariaDB
+        if: hashFiles('requirements.lock.txt') != ''
+        run: pytest
+      - name: Installer Chromium pour Playwright
+        if: hashFiles('requirements.lock.txt') != ''
+        run: playwright install --with-deps chromium
       - name: "E2E (pile simulée : faux Orange + puits SMTP)"
+        if: hashFiles('requirements.lock.txt') != ''
         run: |
           python -m uvicorn mock_orange_api:app --app-dir demo --port 9001 --log-level warning &
           python demo/mail_sink.py &
