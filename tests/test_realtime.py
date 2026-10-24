@@ -60,6 +60,31 @@ def test_acknowledging_changes_the_etag_so_every_browser_refreshes(client):
     assert client.get("/api/dashboard_data", headers={"If-None-Match": before}).status_code == 200
 
 
+def test_gzip_response_is_one_gzip_member_identical_in_content_and_shared_between_viewers(client):
+    """Réponse complète mémorisée par (ETag, gzip) : compressée UNE fois pour tous les spectateurs aux mêmes filtres."""
+    import gzip as gz
+    dashboard._BODY_CACHE.clear()
+    tickets.persist(tickets.ChangeSet(inserts=[mk(1)]))
+    publish_cycle()
+    plain = client.get("/api/dashboard_data", headers={"Accept-Encoding": "identity"})
+    zipped = client.get("/api/dashboard_data", headers={"Accept-Encoding": "gzip"})
+    assert zipped.headers["content-encoding"] == "gzip" and zipped.headers["vary"] == "Accept-Encoding" and "content-encoding" not in plain.headers
+    assert plain.headers["etag"] == zipped.headers["etag"] and zipped.json() == plain.json()           # httpx décode : un seul membre gzip
+    assert zipped.json()["alertes"]["traffic"][0]["id"] == 1
+    for _ in range(5):
+        client.get("/api/dashboard_data", headers={"Accept-Encoding": "gzip"})
+    assert len(dashboard._BODY_CACHE) == 2                                                             # 1 variante brute + 1 gzip, quel que soit le nombre de spectateurs
+    assert gz.decompress(dashboard._BODY_CACHE[(zipped.headers["etag"], True)]) == plain.content
+
+
+def test_a_new_cycle_never_serves_a_stale_cached_body(client):
+    dashboard._BODY_CACHE.clear()
+    publish_cycle()
+    first = client.get("/api/dashboard_data").json()
+    constants.set_dashboard({"recap": {"kribi": {"v": 2}}})
+    assert client.get("/api/dashboard_data").json()["recap"] == {"kribi": {"v": 2}} != first["recap"]
+
+
 def test_etag_comparison_handles_lists_and_weak_prefix():
     assert dashboard._etag_matches('"a", W/"b"', 'W/"b"') and dashboard._etag_matches("*", 'W/"x"')
     assert not dashboard._etag_matches('"a"', 'W/"b"') and not dashboard._etag_matches(None, 'W/"b"')

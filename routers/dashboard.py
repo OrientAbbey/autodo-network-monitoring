@@ -4,6 +4,7 @@ Règle : aucun accès base de données dans la boucle d'événements. Les endpoi
 (exécutés dans le pool de threads, borné à 20) ou passent par ``asyncio.to_thread``.
 """
 import asyncio
+import gzip
 import zlib
 from urllib.parse import quote
 
@@ -87,7 +88,32 @@ async def api_dashboard_data(request: Request, response: Response, status: str |
     headers = {**dict(response.headers), "ETag": etag, "Cache-Control": "no-cache"}
     if _etag_matches(request.headers.get("if-none-match"), etag):
         return Response(status_code=304, headers=headers)
-    return Response(cached_json + b',"alertes":' + alerts_json + b"}", media_type="application/json", headers=headers)
+    use_gzip = "gzip" in request.headers.get("accept-encoding", "").lower()
+    body = await asyncio.to_thread(_response_body, etag, use_gzip, cached_json, alerts_json)
+    if use_gzip:
+        headers.update({"Content-Encoding": "gzip", "Vary": "Accept-Encoding"})        # déjà compressé : le middleware ne le refait pas
+    return Response(body, media_type="application/json", headers=headers)
+
+
+_BODY_CACHE: dict[tuple[str, bool], bytes] = {}
+_BODY_CACHE_MAX = 32
+
+
+def _response_body(etag: str, use_gzip: bool, cached_json: bytes, alerts_json: bytes) -> bytes:
+    """Réponse complète, mémorisée par (ETag, gzip) : les spectateurs aux mêmes filtres partagent UNE réponse, compressée une seule fois.
+
+    L'ETag contient la version du cycle et l'empreinte des alertes : une entrée périmée n'est donc jamais resservie.
+    Un seul membre gzip : les clients courants (httpx, etc.) ne décodent pas les flux à plusieurs membres.
+    """
+    key = (etag, use_gzip)
+    body = _BODY_CACHE.get(key)
+    if body is None:
+        raw = cached_json + b',"alertes":' + alerts_json + b"}"
+        body = gzip.compress(raw, compresslevel=5, mtime=0) if use_gzip else raw
+        if len(_BODY_CACHE) >= _BODY_CACHE_MAX:
+            _BODY_CACHE.clear()
+        _BODY_CACHE[key] = body
+    return body
 
 
 def format_sse(event: dict) -> str:
