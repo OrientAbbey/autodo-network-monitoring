@@ -221,7 +221,7 @@ def cmd_seed(a):
     app_user = os.getenv("DEMO_APP_DB_USER", "u"), os.getenv("DEMO_APP_DB_PASS", "p")
     diag_user = os.getenv("DEMO_DIAG_USER", "diag"), os.getenv("DEMO_DIAG_PASS", "diagpass")
     cur.execute("CREATE DATABASE IF NOT EXISTS tickets_db")
-    for host in ("127.0.0.1", "localhost"):
+    for host in ("127.0.0.1", "localhost", "%"):
         cur.execute(f"CREATE USER IF NOT EXISTS '{app_user[0]}'@'{host}' IDENTIFIED BY '{app_user[1]}'")
         cur.execute(f"GRANT ALL ON tickets_db.* TO '{app_user[0]}'@'{host}'")
         cur.execute(f"CREATE USER IF NOT EXISTS '{diag_user[0]}'@'{host}' IDENTIFIED BY '{diag_user[1]}'")
@@ -233,7 +233,7 @@ def cmd_seed(a):
     t0 = time.time()
     for cat, key, *_ in CATALOG:
         create_schema(cur, key, cat)
-        for host in ("127.0.0.1", "localhost"):
+        for host in ("127.0.0.1", "localhost", "%"):
             cur.execute(f"GRANT SELECT ON `{db_name(key)}`.* TO '{diag_user[0]}'@'{host}'")
         if a.reset:
             cur.execute(f"USE `{db_name(key)}`")
