@@ -289,7 +289,8 @@ def fake_diagnet(test_db):
     collector.reset_cache()
     from seed_demo_data import admin_conn      # compte DIAGNET avec droits d'ÉCRITURE : le garde-fou READ ONLY doit les neutraliser
     adm = admin_conn(); cur = adm.cursor()
-    for host in ("127.0.0.1", "localhost"):
+    # The CI runner connects to the MariaDB service through its bridge IP.
+    for host in ("127.0.0.1", "localhost", "%"):
         cur.execute(f"CREATE USER IF NOT EXISTS 'diag'@'{host}' IDENTIFIED BY 'diagpass'")
         cur.execute(f"GRANT ALL ON autodo_test.* TO 'diag'@'{host}'")
     adm.commit(); adm.close()
