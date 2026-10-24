@@ -122,17 +122,6 @@ def viewer_peaks(period: str = "7days") -> list[dict]:
     return [{"day": str(r["day"]), "peak_viewers": int(r["peak_viewers"]), "peak_at": fmt(r["peak_at"])} for r in rows]
 
 
-def log_action(ip: str, action: str) -> bool:
-    try:
-        with local_tx() as c:
-            c.execute(text("INSERT INTO logs (ip_address, access_time, action) VALUES (:ip, :t, :a)"),
-                      {"ip": ip[:45], "t": fmt(now_local().replace(tzinfo=None)), "a": action[:100]})
-        return True
-    except Exception:
-        logger.exception("Journalisation de l'action impossible")
-        return False
-
-
 def access_logs(period: str = "7days") -> dict:
     """Journaux d'accès + statistiques, en UNE requête (le reste est dérivé en Python)."""
     cutoff = period_to_cutoff(period).strftime("%Y-%m-%d")
@@ -154,34 +143,23 @@ def access_logs(period: str = "7days") -> dict:
         "today_unique_count": daily.get(today, 0)}}
 
 
-def config_changes(period: str = "7days") -> list:
-    cutoff = fmt(period_to_cutoff(period))
-    with local_conn() as c:
-        rows = fetch_all(c, "SELECT access_time AS timestamp, action AS parameter, ip_address AS modified_by "
-                            "FROM logs WHERE access_time >= :c ORDER BY access_time DESC LIMIT 1000", c=cutoff)
-    return rows
-
-
 def purge(retention_days: int | None = None, batch: int = 5000) -> dict:
-    """Supprime les données plus vieilles que la rétention, par lots."""
+    """Supprime les visites plus vieilles que la rétention, par lots. (Le journal d'audit n'est PAS purgé : c'est une trace de responsabilité.)"""
     days = retention_days or settings.retention_days
     limit_day = (now_local().replace(tzinfo=None) - timedelta(days=days)).strftime("%Y-%m-%d")
-    limit_ts = limit_day + " 00:00:00"
-    out = {}
-    for table, where, p in (("daily_users", "`date` < :v", limit_day), ("logs", "access_time < :v", limit_ts)):
-        total = 0
-        while True:
-            with local_tx() as c:
-                if settings.db_backend == "sqlite":     # SQLite n'accepte pas DELETE ... LIMIT : borne par rowid
-                    sql = (f"DELETE FROM {table} WHERE rowid IN "
-                           f"(SELECT rowid FROM {table} WHERE {where} LIMIT {batch})")
-                else:
-                    sql = f"DELETE FROM {table} WHERE {where} LIMIT {batch}"
-                n = c.execute(text(sql), {"v": p}).rowcount
-            total += n
-            if n < batch:
-                break
-        out[table] = total
-    if any(out.values()):
+    total = 0
+    while True:
+        with local_tx() as c:
+            if settings.db_backend == "sqlite":     # SQLite n'accepte pas DELETE ... LIMIT : borne par rowid
+                sql = (f"DELETE FROM daily_users WHERE rowid IN "
+                       f"(SELECT rowid FROM daily_users WHERE `date` < :v LIMIT {batch})")
+            else:
+                sql = f"DELETE FROM daily_users WHERE `date` < :v LIMIT {batch}"
+            n = c.execute(text(sql), {"v": limit_day}).rowcount
+        total += n
+        if n < batch:
+            break
+    out = {"daily_users": total}
+    if total:
         logger.info("Purge de rétention (%s j) : %s", days, out)
     return out

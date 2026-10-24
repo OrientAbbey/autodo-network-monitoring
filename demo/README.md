@@ -40,7 +40,10 @@ cd <repo> && python main.py                                     # http://127.0.0
 python demo/seed_demo_data.py scenario instant_drop kribi
 python demo/seed_demo_data.py scenario clear kribi
 ```
-Mots de passe de démo : configuration `cfgpass`, data-management `dmpass`.
+Compte de démo : administrateur initial `admin` / `Admin-Initial-1` (voir `env.demo`) ; **le mot de passe doit être changé à la première connexion**.
+Une fois changé, l'application ne relit plus `ADMIN_PASSWORD`. Les tests E2E repartent d'une base de comptes vide à chaque exécution.
+
+Captures d'écran : `screenshots/avant_*.png` (version d'origine, commit `9ffea7c`) et `screenshots/apres_*.png` / `C*.png` (nouvelle interface).
 
 ## Démo sans base de données (SQLite + sources simulées)
 

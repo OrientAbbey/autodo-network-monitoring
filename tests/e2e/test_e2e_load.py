@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
-from conftest import BASE, db
+from conftest import BASE, NEW_PASSWORD, db
 
 VIEWERS = 50
 ROUNDS = 12
@@ -20,7 +20,7 @@ def _viewer(i, latencies, errors):
     for _ in range(ROUNDS):
         t = time.perf_counter()
         try:
-            r = s.post(BASE + "/api/dashboard_data", json={}, headers={"X-Client-Id": cid}, timeout=15)
+            r = s.get(BASE + "/api/dashboard_data", headers={"X-Client-Id": cid}, timeout=15)
             if r.status_code != 200:
                 errors.append(r.status_code)
         except requests.RequestException as e:
@@ -64,17 +64,25 @@ def test_fifty_permanent_viewers_stay_fast_and_error_free(stack):
     assert requests.get(BASE + "/health", timeout=5).status_code == 200
 
 
-def test_admin_endpoint_stays_responsive_under_viewer_load(stack):
+def test_login_stays_responsive_under_viewer_load(stack, admin_api):
     stop = threading.Event()
     def noise():
         s = requests.Session()
         while not stop.is_set():
-            s.post(BASE + "/api/dashboard_data", json={}, timeout=15)
+            s.get(BASE + "/api/dashboard_data", timeout=15)
     ts = [threading.Thread(target=noise, daemon=True) for _ in range(30)]
     [t.start() for t in ts]
     time.sleep(1)
     t0 = time.perf_counter()
-    r = requests.post(BASE + "/api/auth", json={"password": "cfgpass"}, timeout=10)
+    r = requests.post(BASE + "/api/login", json={"username": "admin", "password": NEW_PASSWORD}, timeout=10)     # scrypt : le plus coûteux
     dt = (time.perf_counter() - t0) * 1000
     stop.set()
-    assert r.status_code == 200 and dt < 1500, f"/api/auth {dt:.0f} ms sous charge"
+    assert r.status_code == 200 and dt < 1500, f"/api/login {dt:.0f} ms sous charge"
+
+
+def test_etag_makes_unchanged_polls_cheap(stack):
+    """Sans changement, la revalidation répond 304 sans corps : c'est ce qui rend 50 navigateurs supportables."""
+    first = requests.get(BASE + "/api/dashboard_data", timeout=10)
+    assert first.status_code == 200 and first.headers["etag"]
+    again = requests.get(BASE + "/api/dashboard_data", headers={"If-None-Match": first.headers["etag"]}, timeout=10)
+    assert again.status_code == 304 and again.content == b""

@@ -16,7 +16,7 @@ NOW = fmt(now_local().replace(tzinfo=None))
 @pytest.fixture(autouse=True)
 def clean(test_db):
     with test_db.local_tx() as c:
-        for t in ("tickets_tb", "ticket_counters", "daily_users", "logs", "notification_state"):
+        for t in ("tickets_tb", "ticket_counters", "daily_users", "notification_state"):
             c.execute(text(f"DELETE FROM {t}"))
     tickets.invalidate_alert_cache()
     yield
@@ -50,10 +50,10 @@ def test_writes_are_committed_and_visible_from_a_new_connection():           # r
 def test_exception_inside_local_tx_rolls_back(test_db):
     with pytest.raises(RuntimeError):
         with test_db.local_tx() as c:
-            c.execute(text("INSERT INTO logs (ip_address, action) VALUES ('1.1.1.1', 'x')"))
+            c.execute(text("INSERT INTO audit_log (at, actor, ip, action) VALUES (NOW(), 'x', '1.1.1.1', 'rollback_test')"))
             raise RuntimeError("boom")
     with test_db.local_conn() as c:
-        assert c.execute(text("SELECT COUNT(*) FROM logs")).scalar() == 0
+        assert c.execute(text("SELECT COUNT(*) FROM audit_log WHERE action = 'rollback_test'")).scalar() == 0
 
 
 def test_next_id_is_atomic_under_concurrency_and_well_formed():
@@ -343,3 +343,17 @@ def test_series_builder_and_detection_see_the_loss_counters(fake_diagnet):
     stamps, traffic, loss = monitoring.build_series(snap, ts[-6:])
     assert loss[-1] == pytest.approx(9.0) and traffic[-1] == pytest.approx(100.0)
     assert rules.detect_pertes(loss, CFG).alert
+
+
+def test_old_logs_table_is_archived_not_destroyed(test_db):
+    """Migration 6 : `logs` est renommée (données conservées), jamais supprimée ; elle est rejouable sans effet."""
+    with test_db.local_tx() as c:
+        for table in ("logs", "logs_archived"):
+            c.execute(text(f"DROP TABLE IF EXISTS {table}"))
+        c.execute(text("CREATE TABLE logs (ip_address VARCHAR(45), action VARCHAR(100))"))
+        c.execute(text("INSERT INTO logs VALUES ('1.1.1.1', 'update_config')"))
+        test_db._m6_archive_logs(c)
+        test_db._m6_archive_logs(c)                                                   # idempotente
+        names = {r[0] for r in c.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()"))}
+        assert "logs" not in names and c.execute(text("SELECT COUNT(*) FROM logs_archived")).scalar() == 1
+        c.execute(text("DROP TABLE logs_archived"))

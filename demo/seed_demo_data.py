@@ -244,7 +244,7 @@ def cmd_seed(a):
         conn.commit()
     if a.reset:
         cur.execute("USE tickets_db")
-        for t in ("tickets_tb", "daily_users", "logs", "ticket_counters", "notification_state", "schema_version"):
+        for t in ("tickets_tb", "daily_users", "logs", "logs_archived", "ticket_counters", "notification_state", "schema_version"):
             cur.execute(f"DROP TABLE IF EXISTS {t}")
     cur.execute("FLUSH PRIVILEGES")
     conn.commit()

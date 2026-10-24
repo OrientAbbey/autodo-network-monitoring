@@ -136,3 +136,116 @@ def page(browser_ctx):
     pg.on("dialog", lambda d: d.dismiss())
     yield pg
     ctx.close()
+
+
+# ====================================================================== aides communes aux fichiers E2E (comptes, navigateur)
+NEW_PASSWORD = "Admin-Final-2x"
+SUP_PASSWORD = "Super-Visor-1x"
+XSS = "<img src=x onerror=window.__xss=1>"
+
+
+# ---------------------------------------------------------------- aides
+def watch(page) -> list[str]:
+    """Collecte erreurs console (dont violations de CSP), exceptions JS et requêtes échouées."""
+    problems: list[str] = []
+    page.on("console", lambda m: problems.append(f"console: {m.text}") if m.type == "error" else None)
+    page.on("pageerror", lambda e: problems.append(f"pageerror: {e}"))
+    page.on("requestfailed", lambda r: problems.append(f"requestfailed: {r.url}") if not r.url.endswith("/events") else None)   # SSE coupé à la navigation
+    return problems
+
+
+def real_problems(problems):
+    """Écarte les 4xx VOLONTAIRES des tests (« Failed to load resource » : la réponse d'erreur est le comportement attendu)."""
+    return [p for p in problems if "status of 4" not in p]
+
+
+class Api:
+    """Client HTTP d'un compte (cookie de session)."""
+
+    def __init__(self, username, password):
+        self.s = requests.Session()
+        r = self.s.post(f"{BASE}/api/login", json={"username": username, "password": password}, timeout=10)
+        assert r.status_code == 200, r.text
+        self.user = r.json()["user"]
+
+    def get(self, path, **kw):
+        return self.s.get(BASE + path, timeout=30, **kw)
+
+    def post(self, path, body=None):
+        return self.s.post(BASE + path, json=body if body is not None else {}, timeout=60)
+
+    def put(self, path, body):
+        return self.s.put(BASE + path, json=body, timeout=30)
+
+    def delete(self, path):
+        return self.s.delete(BASE + path, timeout=30)
+
+
+@pytest.fixture(scope="session")
+def admin_api(stack):
+    """Admin initial : changement de mot de passe obligatoire fait ici (une fois pour toute la session)."""
+    first = requests.Session()
+    assert first.post(f"{BASE}/api/login", json={"username": ADMIN_USER, "password": ADMIN_INITIAL_PASSWORD}, timeout=10).json()["user"]["must_change_password"] is True
+    assert first.post(f"{BASE}/api/me/password", json={"current_password": ADMIN_INITIAL_PASSWORD, "new_password": NEW_PASSWORD}, timeout=10).status_code == 200
+    return Api(ADMIN_USER, NEW_PASSWORD)
+
+
+@pytest.fixture(scope="session")
+def supervisor(admin_api):
+    """Compte superviseur au mot de passe DÉFINITIF (le changement forcé est testé séparément)."""
+    created = admin_api.post("/api/admin/users", {"username": "sup1", "display_name": "Sophie Sup", "role": "supervision", "password": "Temp-Passw0rd"})
+    assert created.status_code == 201, created.text
+    first = requests.Session()
+    first.post(f"{BASE}/api/login", json={"username": "sup1", "password": "Temp-Passw0rd"}, timeout=10)
+    assert first.post(f"{BASE}/api/me/password", json={"current_password": "Temp-Passw0rd", "new_password": SUP_PASSWORD}, timeout=10).status_code == 200
+    return Api("sup1", SUP_PASSWORD)
+
+
+def ui_login(page, username, password):
+    page.goto(BASE + "/")
+    page.click("#loginBtn")
+    page.fill("#login-username", username)
+    page.fill("#login-password", password)
+    page.click("#login-dialog-form button[type=submit]")
+    page.wait_for_selector("#account-name", timeout=10000)
+
+
+def api_login(page, username, password):
+    """Connexion rapide : la requête partage les cookies du contexte navigateur."""
+    r = page.context.request.post(f"{BASE}/api/login", data={"username": username, "password": password})
+    assert r.ok, r.text()
+
+
+def wait_js(page, expression, timeout=10000):
+    """Attend qu'une expression JavaScript devienne vraie. (`wait_for_function` de Playwright utilise eval : la CSP de l'application l'interdit.)"""
+    deadline = time.time() + timeout / 1000
+    while time.time() < deadline:
+        if page.evaluate(f"() => !!({expression})"):
+            return
+        page.wait_for_timeout(150)
+    state = page.evaluate("() => JSON.stringify({url: location.href, popup: document.getElementById('alert-popup')?.style.display, "
+                          "current: typeof STATE === 'undefined' ? null : STATE.currentAlertes.length, shown: typeof STATE === 'undefined' ? null : STATE.shownIds.size})")
+    raise AssertionError(f"condition jamais vraie : {expression} — état de la page : {state} — accusés en base : {db('SELECT ticket_id, acked_by, acked_at FROM alert_acks')}")
+
+
+def clear_acks():
+    """Remet tous les accusés à zéro. Le serveur garde la liste d'alertes en cache 3 s : on attend son expiration."""
+    db("DELETE FROM alert_acks")
+    time.sleep(3.3)
+
+
+def wait_acked(timeout=8):
+    """Attend qu'un accusé (envoyé en arrière-plan par le navigateur) soit enregistré : évite de le supprimer trop tôt."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if db("SELECT COUNT(*) AS n FROM alert_acks")[0]["n"] > 0:
+            return
+        time.sleep(0.2)
+    raise AssertionError("aucun accusé enregistré")
+
+
+def ack_all():
+    """Acquitte toutes les alertes ouvertes PAR L'API (elle invalide le cache serveur ; un INSERT direct laisserait la pop-up s'afficher)."""
+    ids = [row["id"] for row in db("SELECT id FROM tickets_tb WHERE status = 'open'")]
+    if ids:
+        requests.post(f"{BASE}/api/ack", json={"ticket_ids": ids[:200]}, timeout=10)

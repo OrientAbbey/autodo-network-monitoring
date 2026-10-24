@@ -292,12 +292,24 @@ def _m5_historique_detecteurs(c: Connection) -> None:
         UNIQUE KEY uq_verdict (detector, db_key, ts), INDEX idx_verdict_ts (ts)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
 
 
+def _m6_archive_logs(c: Connection) -> None:
+    """L'ancienne table ``logs`` (actions de configuration par IP) est remplacée par ``audit_log`` (qui, quoi, depuis où, avec le détail).
+
+    On la RENOMME en ``logs_archived`` au lieu de la supprimer : aucune donnée n'est détruite par une migration automatique.
+    Un administrateur peut la supprimer à la main (``DROP TABLE logs_archived``) après vérification.
+    """
+    names = {r[0] for r in c.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()"))}
+    if "logs" in names and "logs_archived" not in names:
+        c.execute(text("RENAME TABLE logs TO logs_archived"))
+
+
 MIGRATIONS = [
     (1, "baseline", _m1_baseline),
     (2, "tickets: version + outbox Orange + index", _m2_tickets_outbox),
     (3, "logs.access_time en DATETIME", _m3_logs_datetime),
     (4, "comptes, audit, versions, maintenance, accusés, journal de ticket", _m4_comptes_gouvernance),
     (5, "historique 5 min, détecteurs et verdicts (mode ombre)", _m5_historique_detecteurs),
+    (6, "logs → logs_archived (remplacée par audit_log)", _m6_archive_logs),
 ]
 
 # Schéma SQLite « final » (baseline + toutes les migrations fusionnées) : pas de ALTER/information_schema.
@@ -319,7 +331,7 @@ _SQLITE_TABLES = (
         `date` TEXT NOT NULL, client_id TEXT NOT NULL, last_seen TEXT NOT NULL,
         visits_count INTEGER NOT NULL DEFAULT 0, last_ip TEXT, user_agent TEXT,
         PRIMARY KEY (`date`, client_id))""",
-    """CREATE TABLE IF NOT EXISTS logs (
+    """CREATE TABLE IF NOT EXISTS logs_archived (
         id INTEGER PRIMARY KEY AUTOINCREMENT, ip_address TEXT NOT NULL,
         access_time TEXT DEFAULT CURRENT_TIMESTAMP, action TEXT NOT NULL DEFAULT 'criteria_access')""",
     "CREATE TABLE IF NOT EXISTS ticket_counters (day TEXT PRIMARY KEY, n INTEGER NOT NULL)",
@@ -366,9 +378,9 @@ _SQLITE_INDEXES = (
     "CREATE INDEX IF NOT EXISTS idx_status_ts ON tickets_tb (status, timestamp)",
     "CREATE INDEX IF NOT EXISTS idx_orange_sync ON tickets_tb (orange_sync_state, orange_next_retry_at)",
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_external_ticket ON tickets_tb (external_api_ticket_id)",
-    "CREATE INDEX IF NOT EXISTS idx_ip_time ON logs (ip_address, access_time)",
-    "CREATE INDEX IF NOT EXISTS idx_access_time ON logs (access_time)",
-    "CREATE INDEX IF NOT EXISTS idx_action ON logs (action)",
+    "CREATE INDEX IF NOT EXISTS idx_ip_time ON logs_archived (ip_address, access_time)",
+    "CREATE INDEX IF NOT EXISTS idx_access_time ON logs_archived (access_time)",
+    "CREATE INDEX IF NOT EXISTS idx_action ON logs_archived (action)",
     "CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log (at)",
     "CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log (action)",
     "CREATE INDEX IF NOT EXISTS idx_maintenance_db ON maintenance_windows (db_key, ends_at)",

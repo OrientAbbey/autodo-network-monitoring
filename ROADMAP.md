@@ -5,6 +5,41 @@ Les chiffres de charge viennent de mesures réelles sur la pile de démonstratio
 les résultats de détection viennent d'un prototype sur **données simulées** (`demo/anomaly_prototype.py`) — à rejouer sur
 l'historique réel avant toute décision. Les estimations d'effort (S ≤ 3 j, M ≤ 2 sem., L > 2 sem.) sont indicatives.
 
+## 0. État d'avancement (mis à jour après les phases A à D)
+
+Légende : ✅ réalisé et testé · 🟡 partiel (précisé) · ⬜ non réalisé. Les sections 1 à 9 ci-dessous gardent leur texte d'origine (raisonnement,
+estimations) ; c'est ce tableau qui fait foi pour l'état du code.
+
+| Réf. | État | Précision |
+|---|---|---|
+| A1 rôles et comptes | ✅ | comptes nominatifs ; hachage **scrypt** (bibliothèque standard) et non argon2 ; rôles `supervision` / `admin` ; pas de rôle « opérateur » distinct (le visiteur acquitte) |
+| A2 audit · A3 versions de configuration | ✅ | audit consultable + export CSV ; versions avec diff et restauration ; **pas** d'approbation à deux personnes |
+| A4 simulation « et si ? » | ✅ | réservée à l'admin ; trafic et pertes uniquement (pas DB_DOWN) ; indicative |
+| A5 maintenance · A6/D8 seuils par base | ✅ | silence automatique après rejet en plus |
+| A7 santé · A8 sessions | 🟡 | santé complète sauf **taille des tables** ; sessions listées et révocables |
+| A9 qualité des alertes | 🟡 | retours « réel / faux positif » + rapport du mode ombre ; **pas** de tableau MTTD / TTR médian |
+| D1, D5 | ✅ | mode ombre + rapport vs tickets ; D1 ignore jours fériés et distinction ouvré/week-end |
+| D2 historique local | ✅ | `metrics_5min`, import DIAGNET, rétention 400 j ; **pas** d'agrégats 1 h / 1 j matérialisés |
+| D3 prévision et capacité | 🟡 | Holt-Winters 24 h et jours avant saturation, **à la demande** (page Admin) ; la bande « attendu » des courbes vient de D1, pas de D3 |
+| D4 Isolation Forest · D7 qualité | 🟡 | entraînement, score en mode ombre ; **pas** de prédiction du TTR, de file « à confirmer », de réentraînement planifié ni de suivi de dérive ; **aucune** donnée réelle évaluée |
+| D6 corrélation entre bases | ⬜ | nécessite la topologie (décision 3) |
+| T1, T2, T4, T5 | ✅ | `data_version` SSE avec gigue, ETag/304, mur d'écran, présence et pics |
+| T3 mises à jour différentielles · T7 multi-workers | ⬜ | |
+| T6 préférences par spectateur | 🟡 | langue, thème, palette, son, voix, notifications + lien partageable ; **sections repliées non mémorisées** |
+| U1 · U3 · U6 · U10 | ✅ | cartes mobiles (pas de navigation basse) ; mini-courbes ; chronologie ; FR/EN (hors aide longue et textes serveur) |
+| U5 prise en charge | 🟡 | commentaires datés et accusé partagé ; **pas** de « je m'en occupe » |
+| U7 accessibilité | 🟡 | `aria-live`, focus de la pop-up, clavier sur les sections, palette daltonisme ; **contrastes AA non mesurés**, navigation clavier des tableaux non faite |
+| U2 feux tricolores · U4 centre d'alertes · U8 raccourcis · U9 export CSV/PDF des tickets | ⬜ | seul l'export CSV de l'audit existe |
+| S1, S3, S5, S6 | ✅ | son désactivé par défaut ; accusé partagé ; voix ; bandeau d'autoplay, notifications système, titre clignotant |
+| S2 sons distincts · S4 escalade · S7 équivalents non sonores | ⬜ | (le clignotement du titre est un début de S7) |
+| S8 heures calmes | 🟡 | une base en maintenance ne produit ni ticket ni alerte donc pas de sonnerie ; pas de réglage horaire |
+| §8 Orange : notes de mise à jour | ✅ | **format de la note à confirmer** avec l'API réelle |
+| §8 autres (Teams/SMS, Prometheus, HA, rotation des secrets) | ⬜ | |
+
+**Décisions de la section 10** : (1) *comptes nominatifs locaux dès maintenant* → retenu et réalisé ; (4) le son est **par poste** (préférence du
+navigateur) ou `?wall=1&sound=1` ; (5) rétention de l'historique : 400 jours par défaut, réglable (`HISTORY_RETENTION_DAYS`).
+Restent ouvertes : (2) nombre de tickets historiques étiquetables, (3) topologie câble → sites.
+
 ## 1. Contraintes qui structurent les choix
 
 | Contrainte | Conséquence |
