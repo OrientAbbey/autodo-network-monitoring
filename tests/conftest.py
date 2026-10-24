@@ -34,7 +34,8 @@ def test_db():
         cur = c.cursor()
         cur.execute("DROP DATABASE IF EXISTS autodo_test")
         cur.execute("CREATE DATABASE autodo_test")
-        for host in ("127.0.0.1", "localhost"):
+        # GitHub Actions reaches the MariaDB service through the runner's bridge IP.
+        for host in ("127.0.0.1", "localhost", "%"):
             cur.execute(f"CREATE USER IF NOT EXISTS 'u'@'{host}' IDENTIFIED BY 'p'")
             cur.execute(f"GRANT ALL ON autodo_test.* TO 'u'@'{host}'")
         c.commit()
