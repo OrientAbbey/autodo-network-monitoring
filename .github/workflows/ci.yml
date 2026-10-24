@@ -25,7 +25,7 @@ jobs:
       - run: ruff check . && bandit -q -r core routers main.py -ll --skip B608 && pip-audit -r requirements.lock.txt
       - run: pytest                                             # unitaires + sécurité + intégration MariaDB
       - run: playwright install --with-deps chromium
-      - name: E2E (pile simulée : faux Orange + puits SMTP)
+      - name: "E2E (pile simulée : faux Orange + puits SMTP)"
         run: |
           python -m uvicorn mock_orange_api:app --app-dir demo --port 9001 --log-level warning &
           python demo/mail_sink.py &
