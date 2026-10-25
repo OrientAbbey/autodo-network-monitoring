@@ -4,7 +4,8 @@ Chaque test exprime le comportement ATTENDU. Les écrans de l'interface (supervi
 import time
 import pytest
 import requests
-from conftest import ADMIN_USER, BASE, NEW_PASSWORD, SHOTS, XSS_IP, api_login, clear_acks, db, log_text, wait_cycles
+from conftest import (ADMIN_USER, BASE, CYCLE_PERIOD_S, NEW_PASSWORD, SHOTS, XSS_IP, api_login, clear_acks, db, log_text,
+                      wait_cycles)
 
 EXPECTED = {  # base -> (type, catégorie)
     "douala_camtel": ("traffic", 1),    # trafic nul
@@ -91,7 +92,8 @@ def test_notification_email_sent(stack):
 
 
 def test_second_cycle_is_stable_no_duplicates(stack):
-    assert wait_cycles(stack["c0"] + 1, timeout=240), "2e cycle de monitoring non observé"
+    # le cycle est planifié toutes les 5 min : attendre au moins un cycle complet, quel que soit le moment du 1er
+    assert wait_cycles(stack["c0"] + 1, timeout=CYCLE_PERIOD_S + 120), "2e cycle de monitoring non observé"
     time.sleep(3)
     errs = [ln for ln in log_text().splitlines() if "Cycle de supervision en échec" in ln or "Traceback" in ln]
     assert not errs, errs[:3]

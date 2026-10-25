@@ -64,6 +64,36 @@ def wait_cycles(n: int, timeout: int = 60):
     return False
 
 
+SCENARIOS = (  # (mode, base, minutes-ago éventuel) : 5 incidents attendus, un par scénario
+    ("zero", "douala_camtel", "--minutes-ago", "5"),
+    ("instant_drop", "kribi"),
+    ("gradual", "oci_sat3", "--minutes-ago", "25"),
+    ("loss", "wacs_ic", "--minutes-ago", "30"),
+    ("stale", "garoua_camtel", "--minutes-ago", "90"),
+)
+EXPECTED_TICKETS = len(SCENARIOS)
+CYCLE_PERIOD_S = 300          # cron du cycle de supervision : :01, :06, :11… (voir monitoring.start_scheduler)
+
+
+def wait_for_expected_tickets(timeout: int = CYCLE_PERIOD_S + 120) -> tuple[int, int]:
+    """Attend que les 5 tickets locaux ET Orange existent (un cycle peut être décalé : trou de 5 min, outbox 10 s).
+
+    L'attente couvre un cycle complet : si le premier cycle tombe sur un créneau que ``follow`` n'a pas encore
+    inséré (donnée manquante → détection reportée), le cycle suivant crée le ticket ~5 min plus tard.
+    """
+    deadline = time.time() + timeout
+    local = orange_n = 0
+    while time.time() < deadline:
+        local = len(db("SELECT id FROM tickets_tb"))
+        orange_n = len(requests.get("http://127.0.0.1:9001/_debug/tickets", timeout=5).json()["tickets"])
+        if local >= EXPECTED_TICKETS and orange_n >= EXPECTED_TICKETS:
+            return local, orange_n
+        time.sleep(2)
+    names = [r["database_name"] for r in db("SELECT database_name FROM tickets_tb")]
+    pytest.fail(f"{EXPECTED_TICKETS} tickets attendus, obtenus : local={local} {names}, orange={orange_n} "
+                f"(après {timeout}s)\n--- journal de l'application ---\n" + log_text()[-4000:])
+
+
 @pytest.fixture(scope="session")
 def stack():
     # 1. aligner sur :03 / :08 ... pour que le 2e cycle (cron :06/:11) arrive ~2,5 min après le 1er
@@ -73,10 +103,10 @@ def stack():
             wait = ((3 - now.minute) % 5) * 60 - now.second
             print(f"[e2e] alignement sur la fenêtre de 5 min : attente {wait}s"); time.sleep(max(wait, 0))
     # 2. scénarios + données
-    for args in (("clear",), ("zero", "douala_camtel", "--minutes-ago", "5"), ("instant_drop", "kribi"), ("gradual", "oci_sat3", "--minutes-ago", "25"),
-                 ("loss", "wacs_ic", "--minutes-ago", "30"), ("stale", "garoua_camtel", "--minutes-ago", "90")):
+    for args in (("clear",), *SCENARIOS):
         sh("scenario", *args)
     sh("seed", "--reset")
+    sh("follow", "--once")        # le créneau courant doit exister AVANT le 1er cycle (sinon donnée manquante)
     # 3. application
     data_dir = tempfile.mkdtemp(prefix="autodo_e2e_")
     for table in ("users", "audit_log", "config_versions", "maintenance_windows", "alert_acks", "ticket_events", "ticket_feedback",
@@ -88,6 +118,7 @@ def stack():
     (REPO / "db_config.json").write_text((DEMO / "db_config.json").read_text())
     requests.post("http://127.0.0.1:9001/_debug/reset", timeout=5)
     follow = subprocess.Popen([sys.executable, str(DEMO / "seed_demo_data.py"), "follow", "--interval", "10"], cwd=DEMO)
+    time.sleep(2)                                     # le flux « live » a inséré le créneau courant avant le 1er cycle
     app = subprocess.Popen([sys.executable, "main.py"], cwd=REPO, stdout=APP_LOG.open("w"), stderr=subprocess.STDOUT,
                            env={**json.loads(os.environ.get("AUTODO_ORIG_ENV", "{}") or json.dumps(dict(os.environ)), ),
                                 "DATA_DIR": data_dir, "LOG_FILE": str(Path(data_dir) / "app.log"),
@@ -100,10 +131,9 @@ def stack():
             time.sleep(1)
         else:
             pytest.fail("l'application ne démarre pas:\n" + log_text()[-2000:])
-        wait_cycles(1, 90)
-        end = time.time() + 90                       # laisse l'outbox Orange (toutes les 10 s en démo) vider ses tickets
-        while time.time() < end and len(requests.get("http://127.0.0.1:9001/_debug/tickets", timeout=5).json()["tickets"]) < 5:
-            time.sleep(2)
+        if not wait_cycles(1, 120):
+            pytest.fail("le premier cycle de supervision n'a pas abouti :\n" + log_text()[-4000:])
+        wait_for_expected_tickets()                  # 5 tickets locaux + 5 chez Orange (peut couvrir un cycle de retard)
         time.sleep(2)
         snap = {"c0": cycles_done(), "local": len(db("SELECT id FROM tickets_tb")), "orange": len(requests.get(
             "http://127.0.0.1:9001/_debug/tickets", timeout=5).json()["tickets"])}
