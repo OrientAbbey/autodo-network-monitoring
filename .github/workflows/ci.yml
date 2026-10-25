@@ -44,4 +44,4 @@ jobs:
           python -m uvicorn mock_orange_api:app --app-dir demo --port 9001 --log-level warning &
           python demo/mail_sink.py &
           set -a; . demo/env.demo; set +a
-          E2E_ALIGN=0 pytest tests/e2e/test_e2e_ui.py
+          E2E_ALIGN=0 pytest tests/e2e/
