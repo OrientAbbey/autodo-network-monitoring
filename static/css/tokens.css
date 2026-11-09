@@ -1,0 +1,126 @@
+/* AUTODO — Jetons de design (source UNIQUE des couleurs, tailles et espacements ; CHANTIER_UI.md §4).
+   Chargé EN PREMIER sur toutes les pages. Les contrastes de ces couleurs sont vérifiés par un test (tests/test_frontend_static.py). */
+
+:root {
+  color-scheme: dark;
+
+  /* Couleurs — thème sombre (défaut) */
+  --bg: #161616;
+  --surface: #202020;
+  --surface-2: #2a2a2a;
+  --border: #3a3a3a;
+  --text: #f3f3f3;
+  --text-muted: #b0b0b0;
+  --accent: #ff6600;          /* marque : texte, liens, filets */
+  --accent-hover: #ff8533;
+  --accent-fill: #ff6600;     /* fond d'un bouton principal */
+  --on-accent: #161616;       /* texte sur --accent-fill (le blanc sur orange vif ne fait que 2,9:1) */
+  --ok: #3ddc84;
+  --bad: #ff6b6b;
+  --warn: #ffb020;
+  --info: #6cb6ff;
+
+  --role-supervision: #1d4ed8;   /* rôles (badge) : texte blanc, ≥ 5,9:1 */
+  --role-admin: #6d28d9;
+  --on-role: #ffffff;
+
+  /* Typographie : 5 tailles seulement */
+  --fs-xs: 0.75rem;   /* 12 px : métadonnées, en-têtes de colonnes */
+  --fs-sm: 0.875rem;  /* 14 px : texte courant, libellés, deltas */
+  --fs-md: 1rem;      /* 16 px : valeurs, titres de carte */
+  --fs-lg: 1.25rem;   /* 20 px : titres de section et de page */
+  --fs-xl: 1.75rem;   /* 28 px : mur d'écran */
+  --fw-regular: 400;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* Espacement (pas de 4 px), rayons, ombre, hauteur des commandes */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --control-h: 36px;
+  --row-h: 44px;
+  --transition: 0.15s ease;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #eceff2;
+  --border: #cfd5db;
+  --text: #1b1f23;
+  --text-muted: #4a5560;
+  --accent: #b53d0a;
+  --accent-hover: #8f2f08;
+  --accent-fill: #b53d0a;
+  --on-accent: #ffffff;
+  --ok: #0a7437;
+  --bad: #c0121f;
+  --warn: #8a5a00;
+  --info: #0b57d0;
+  --shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+/* Palette adaptée au daltonisme (Okabe-Ito) : bleu / orangé à la place de vert / rouge. Les états portent AUSSI une icône ou un signe. */
+:root[data-palette="colorblind"] {
+  --ok: #56b4e9;
+  --bad: #f0a04b;
+}
+
+:root[data-theme="light"][data-palette="colorblind"] {
+  --ok: #00629b;
+  --bad: #a64400;
+}
+
+/* Cibles tactiles : 44 px minimum quand le pointeur est un doigt */
+@media (pointer: coarse) {
+  :root {
+    --control-h: 44px;
+    --row-h: 48px;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   ALIAS DE TRANSITION : les anciens noms de variables restent valides et suivent les jetons (dans les DEUX thèmes).
+   À retirer quand plus aucune règle ne les utilise (CHANTIER_UI.md, lot U7).
+   --------------------------------------------------------------------------------------------- */
+:root {
+  --orange-primary: var(--accent);
+  --orange-light: var(--accent-hover);
+  --orange-dark: var(--accent-hover);
+  --dark-primary: var(--bg);
+  --dark-secondary: var(--surface);
+  --dark-light: var(--surface-2);
+  --white: var(--text);
+  --white-soft: var(--text);
+  --gray-light: var(--text-muted);
+  --gray-medium: var(--text-muted);
+  --success: var(--ok);
+  --danger: var(--bad);
+  --border-radius: var(--radius-md);
+  --shadow-hover: var(--shadow);
+  /* page des tickets */
+  --dark-orange: var(--accent);
+  --light-orange: var(--accent-hover);
+  --dark-bg: var(--bg);
+  --card-bg: var(--surface);
+  --text-color: var(--text);
+  /* app-ui.css (pages supervision / admin) */
+  --ui-surface: var(--surface);
+  --ui-surface-2: var(--surface-2);
+  --ui-text: var(--text);
+  --ui-muted: var(--text-muted);
+  --ui-border: var(--border);
+  --ui-accent: var(--accent);
+  --ui-ok: var(--ok);
+  --ui-danger: var(--bad);
+  --ui-warn: var(--warn);
+  --ui-focus: var(--info);
+}

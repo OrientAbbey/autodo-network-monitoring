@@ -116,8 +116,8 @@ La règle historique `html { font-size: 90 % }` est **supprimée** (elle ramenai
 Légende : ☐ à faire · ◐ en cours · ☑ fait. Un lot = un commit **et un bundle** ; chaque lot se termine par l'audit (§8) et les tests.
 
 - ☑ **U0 Outillage** — `demo/ui_audit.py` (mesures + captures reproductibles) ; base §2 figée.
-- ☐ **U1 Jetons** — `tokens.css` ; anciens noms (`--dark-*`, `--white`, `--orange-*`, `--gray-*`) rebranchés sur les jetons ; fin de l'inversion du thème clair ; suppression du bleu ; `tickets.html` et `app-ui.css` consomment les jetons.
-- ☐ **U2 Composants** — boutons, pastilles, liens, panneaux en une seule définition ; suppression des doublons ; page tickets sur jetons (`tickets.css`).
+- ☑ **U1 Jetons** — `tokens.css` ; anciens noms (`--dark-*`, `--white`, `--orange-*`, `--gray-*`) rebranchés sur les jetons ; fin de l'inversion du thème clair ; suppression du bleu ; `tickets.html` et `app-ui.css` consomment les jetons.
+- ☑ **U2 Composants** — boutons, pastilles, liens, panneaux en une seule définition ; suppression des doublons ; page tickets sur jetons (`tickets.css`).
 - ☐ **U3 En-tête et état global** — barre d'application, bande d'état (résumé serveur), menus, légende en dialogue.
 - ☐ **U4 Données** — champ `db` dans les alertes ; pastille et teinte de ligne ; densité 44 px ; cellules empilées ; sections aplaties ; panneaux vides masqués ; avis statique.
 - ☐ **U5 Responsive** — première colonne figée et indice de défilement ; barre mobile ; cartes avec état ; cibles 44 px.
@@ -146,4 +146,6 @@ Légende : ☐ à faire · ◐ en cours · ☑ fait. Un lot = un commit **et un 
 |---|---|---|
 | 2026-10-26 | — | Audit mesuré (pile simulée) ; diagnostic ; document créé. |
 | 2026-10-26 | U0 | `demo/ui_audit.py` ajouté ; mesures de départ figées (§2, §6) ; branche `feat/ui-refonte`. |
+| 2026-10-28 | U1 | `static/css/tokens.css` (sombre, clair, daltonisme, alias de transition) ; `styles.css`/`app-ui.css`/tickets n'ont plus de palette propre ; ~20 rustines du thème clair supprimées. Un test calcule les contrastes des jetons et a fait corriger 3 couleurs limites. |
+| 2026-10-28 | U2 | Boutons : une définition (`.btn-primary/-secondary/-danger/-ghost`, `.btn-icon`, `.chip-*`) dans `app-ui.css`, anciennes retirées de `styles.css` ; CSS de la page tickets extrait vers `static/css/tickets.css` (≈ 450 → 125 lignes, ~60 % de code mort) ; carte ticket hiérarchisée (motif en tête, séries repliables). Tickets : boutons 6 → 3 styles. |
 | 2026-11-06 | — | **Incident** : l'environnement de travail a été réinitialisé alors que U0 à U5 n'avaient jamais été sauvegardés dans un bundle. Reconstruction depuis le bundle `FINAL` du 24/10 en rejouant les modifications, les mesures d'audit déjà relevées servant de contrôle. **Règle ajoutée : un bundle par lot.** |

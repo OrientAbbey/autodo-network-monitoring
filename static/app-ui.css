@@ -1,40 +1,35 @@
 /* AUTODO — Composants communs (comptes, dialogues, onglets, tableaux, mini-courbes, cartes mobiles, mur d'écran, accessibilité).
    Variables propres (--ui-*) : la page des tickets et le tableau de bord n'ont pas les mêmes thèmes. */
 
-:root {
-  --ui-surface: #2d2d2d;
-  --ui-surface-2: #3a3a3a;
-  --ui-text: #f5f5f5;
-  --ui-muted: #b5b5b5;
-  --ui-border: #555;
-  --ui-accent: #ff6600;
-  --ui-ok: #00cc66;
-  --ui-danger: #ff3333;
-  --ui-warn: #ffb020;
-  --ui-focus: #66b3ff;
-}
+/* Couleurs : jetons de static/css/tokens.css (les noms --ui-* y sont des alias). */
 
-:root[data-theme="light"] {
-  --ui-surface: #ffffff;
-  --ui-surface-2: #eef0f2;
-  --ui-text: #212529;
-  --ui-muted: #555d66;
-  --ui-border: #b9bfc5;
-  --ui-accent: #c2410c;
-  --ui-ok: #0a7d3e;
-  --ui-danger: #c0121f;
-  --ui-warn: #8a5a00;
-  --ui-focus: #0b57d0;
+/* ---------- boutons : UNE définition pour les 4 pages (CHANTIER_UI.md §4.2) ---------- */
+.btn, .btn-primary, .btn-secondary, .btn-danger, .btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  min-height: var(--control-h); padding: 0 var(--sp-4); border: 1px solid transparent; border-radius: var(--radius-sm);
+  font-family: inherit; font-size: var(--fs-sm); font-weight: var(--fw-semibold); line-height: 1.2; text-decoration: none; white-space: nowrap;
+  cursor: pointer; transition: background var(--transition), border-color var(--transition), color var(--transition);
 }
+.btn-primary { background: var(--accent-fill); color: var(--on-accent); }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn, .btn-secondary { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+.btn:hover, .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+.btn-danger { background: var(--bad); color: var(--on-accent); }
+.btn-danger:hover { filter: brightness(1.1); }
+.btn-ghost { background: transparent; color: var(--text-muted); }
+.btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+.btn-icon { width: var(--control-h); padding: 0; font-size: var(--fs-md); }
+.btn[aria-pressed="true"], .btn-secondary[aria-pressed="true"] { border-color: var(--ok); color: var(--ok); }
+.btn:disabled, .btn-primary:disabled, .btn-secondary:disabled, .btn-danger:disabled, .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
+a.btn-primary:hover, a.btn-secondary:hover { text-decoration: none; }
 
-/* U7 — palette adaptée au daltonisme (Okabe-Ito : bleu / orange au lieu de vert / rouge) */
-:root[data-palette="colorblind"] {
-  --success: #0072b2;
-  --danger: #d55e00;
-  --ui-ok: #0072b2;
-  --ui-danger: #d55e00;
-  --ui-warn: #e69f00;
-}
+/* ---------- pastilles d'état : toujours icône + texte, jamais la couleur seule ---------- */
+.chip { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 2px var(--sp-2); border-radius: 999px; border: 1px solid currentColor;
+  font-size: var(--fs-xs); font-weight: var(--fw-bold); line-height: 1.4; white-space: nowrap; }
+.chip-ok { color: var(--ok); }
+.chip-bad { color: var(--bad); }
+.chip-warn { color: var(--warn); }
+.chip-muted { color: var(--text-muted); }
 
 /* ---------- accessibilité ---------- */
 .sr-only {
@@ -105,7 +100,7 @@
 
 /* ---------- alertes : états de validation et d'accusé ---------- */
 .badge-pending, .badge-acked { margin-left: 8px; padding: 2px 8px; border-radius: 8px; font-size: 0.85em; font-weight: 700; vertical-align: middle; }
-.badge-pending { background: var(--ui-warn); color: #1a1a1a; }
+.badge-pending { background: var(--warn); color: var(--on-accent); }
 .badge-acked { background: transparent; border: 1px solid var(--ui-ok); color: var(--ui-ok); }
 .popup-alerts { margin: 0; padding-left: 20px; text-align: left; }
 .popup-alerts li { margin: 4px 0; }
@@ -153,8 +148,6 @@
 .timeline-item.kind-rejected, .timeline-item.kind-deleted, .timeline-item.kind-orange_failed { border-left-color: var(--ui-danger); }
 .timeline-item time { color: var(--ui-muted); font-size: 0.85em; }
 .timeline-message { margin-top: 2px; white-space: pre-wrap; word-break: break-word; }
-.ticket-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(128, 128, 128, 0.3); }
-.ticket-actions .btn { font-size: 0.8em; padding: 5px 10px; }
 
 /* ---------- U3 — mini-courbes 24 h ---------- */
 .sparkline { display: block; margin-top: 3px; width: 96px; height: 22px; }

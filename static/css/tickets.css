@@ -1,0 +1,98 @@
+/* AUTODO — Page des tickets. Couleurs/tailles : static/css/tokens.css ; boutons, pastilles, dialogues : static/app-ui.css. */
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  margin: 0;
+  padding: var(--sp-5);
+  font-size: var(--fs-sm);
+}
+
+.container { max-width: 1400px; margin: 0 auto; }
+
+.header { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-4); flex-wrap: wrap; margin-bottom: var(--sp-5); }
+h1 { margin: 0; flex: 1; font-size: var(--fs-lg); font-weight: var(--fw-bold); color: var(--text); }
+h1::before { content: ""; display: inline-block; width: 4px; height: 1em; margin-right: var(--sp-2); vertical-align: -0.12em; background: var(--accent); border-radius: 2px; }
+.header-tools { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; }
+
+/* Filtres */
+.filters-toggle-container { position: relative; }
+.filters-container {
+  position: absolute; top: calc(var(--control-h) + var(--sp-2)); right: 0; min-width: 320px; z-index: 1000; padding: var(--sp-4);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow);
+  opacity: 0; visibility: hidden; transform: translateY(-8px); transition: opacity var(--transition), transform var(--transition), visibility var(--transition);
+}
+.filters-container.show { opacity: 1; visibility: visible; transform: none; }
+.filter-group { margin-bottom: var(--sp-3); }
+.filter-label { display: block; margin-bottom: var(--sp-1); font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.filter-input, .filter-select {
+  width: 100%; min-height: var(--control-h); padding: 0 var(--sp-3); font: inherit; font-size: var(--fs-sm);
+  background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.filter-input:focus, .filter-select:focus { outline: none; border-color: var(--accent); }
+
+.results-info {
+  display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-4);
+  padding: var(--sp-2) var(--sp-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
+}
+.button-group { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.results-filters { color: var(--text-muted); margin-bottom: var(--sp-3); }
+
+/* Cartes */
+.tickets-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--sp-4); }
+.ticket-card {
+  display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4);
+  background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: var(--radius-md);
+}
+.ticket-card.is-open { border-left-color: var(--bad); }
+.ticket-card.is-closed { border-left-color: var(--ok); }
+.ticket-header { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-2); }
+.ticket-type { font-weight: var(--fw-bold); font-size: var(--fs-md); text-transform: uppercase; color: var(--text); }
+.ticket-id { margin-left: var(--sp-1); font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.ticket-status {
+  display: inline-flex; align-items: center; gap: var(--sp-1); padding: 2px var(--sp-2); border-radius: 999px; border: 1px solid currentColor;
+  font-size: var(--fs-xs); font-weight: var(--fw-bold); text-transform: uppercase;
+}
+.status-open { color: var(--bad); }
+.status-open::before { content: "●"; }
+.status-closed { color: var(--ok); }
+.status-closed::before { content: "✓"; }
+.status-deleted { color: var(--text-muted); }
+.pertes-indicator { margin-left: var(--sp-2); padding: 1px var(--sp-2); border: 1px solid var(--bad); border-radius: 999px; font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--bad); }
+
+.ticket-reason { margin: 0; font-size: var(--fs-md); line-height: 1.4; color: var(--text); }
+.ticket-info { display: flex; flex-direction: column; gap: 2px; }
+.info-row { display: flex; justify-content: space-between; gap: var(--sp-3); padding: 2px 0; }
+.info-label { color: var(--text-muted); font-size: var(--fs-xs); font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: 0.03em; align-self: center; }
+.info-row .is-accent { color: var(--accent); font-weight: var(--fw-bold); }
+.info-row .is-ok { color: var(--ok); font-weight: var(--fw-bold); }
+.info-row .is-bad { color: var(--bad); font-weight: var(--fw-bold); }
+.info-row > span:last-child { font-variant-numeric: tabular-nums; text-align: right; }
+
+/* Séries de valeurs : repliées par défaut */
+.intervals { border-top: 1px solid var(--border); padding-top: var(--sp-2); }
+.intervals summary { cursor: pointer; color: var(--text-muted); font-size: var(--fs-xs); font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: 0.03em; padding: var(--sp-1) 0; }
+.intervals summary:hover { color: var(--text); }
+.interval-item { padding: 2px var(--sp-2); margin-top: 2px; background: var(--surface-2); border-radius: var(--radius-sm); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.interval-item.is-bad { color: var(--bad); }
+.interval-item.is-ok { color: var(--ok); }
+
+.pertes-warnings { padding: var(--sp-2) var(--sp-3); border: 1px solid var(--bad); border-left-width: 4px; border-radius: var(--radius-sm); max-height: 12em; overflow-y: auto; }
+.pertes-warnings .info-label { color: var(--bad); }
+.pertes-warning-item { margin-top: var(--sp-1); font-size: var(--fs-xs); color: var(--bad); font-variant-numeric: tabular-nums; }
+
+.ticket-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-top: auto; padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+.ticket-actions .btn, .ticket-actions .btn-primary, .ticket-actions .btn-secondary { min-height: 32px; padding: 0 var(--sp-3); font-size: var(--fs-xs); }
+.empty-state { grid-column: 1 / -1; padding: var(--sp-6); text-align: center; color: var(--text-muted); font-size: var(--fs-md); }
+
+@media (pointer: coarse) {
+  .ticket-actions .btn, .ticket-actions .btn-primary, .ticket-actions .btn-secondary { min-height: var(--control-h); }
+}
+
+@media (max-width: 768px) {
+  body { padding: var(--sp-3); }
+  .filters-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); min-width: 90vw; max-height: 80vh; overflow-y: auto; }
+  .filters-container.show { transform: translate(-50%, -50%); }
+}

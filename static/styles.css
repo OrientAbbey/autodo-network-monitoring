@@ -1,113 +1,6 @@
-/* ===== VARIABLES CSS ===== */
-:root {
-  --orange-primary: #ff6600;
-  --orange-light: #ff8533;
-  --orange-dark: #e55a00;
-  --dark-primary: #1a1a1a;
-  --dark-secondary: #2d2d2d;
-  --dark-light: #404040;
-  --white: #ffffff;
-  --white-soft: #f5f5f5;
-  --gray-light: #cccccc;
-  --gray-medium: #999999;
-  --success: #00cc66;
-  --danger: #ff3333;
-  --border-radius: 8px;
-  --transition: all 0.3s ease;
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  --shadow-hover: 0 8px 25px rgba(0, 0, 0, 0.25);
-}
+/* Variables, thèmes sombre/clair et palettes : voir static/css/tokens.css (source unique). */
 
-/* Light theme variables */
-:root[data-theme="light"] {
-  --dark-primary: #d1d1d1;
-  --dark-secondary: #e7e9eb;
-  --dark-light: #e9ecef;
-  --white: #212529;
-  --white-soft: #343a40;
-  --gray-light: #6c757d;
-  --gray-medium: #495057;
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  --shadow-hover: 0 8px 25px rgba(0, 0, 0, 0.15);
-}
 
-/* Light theme specific styles */
-:root[data-theme="light"] .section-title {
-  background: hsl(232, 100%, 49%);
-  /* Updated blue background */
-  color: #ffffff;
-  /* White text */
-}
-
-:root[data-theme="light"] .section-title.alertes-title {
-  background: #495057;
-  /* More gray background for alertes sections */
-  color: #ffffff;
-  /* White text */
-}
-
-:root[data-theme="light"] .data-table {
-  border: 2px solid #dee2e6;
-  /* Light border for main table */
-}
-
-:root[data-theme="light"] .data-table th,
-:root[data-theme="light"] .data-table td {
-  border: 1px solid #dee2e6;
-  /* Thin dark lines for cell borders */
-}
-
-:root[data-theme="light"] .data-table th {
-  background: var(--dark-secondary);
-  color: hsl(232, 100%, 49%);
-  /* Updated blue for column headers */
-  border: 1px solid #dee2e6;
-}
-
-:root[data-theme="light"] .detail-table {
-  border: 1px solid #dee2e6;
-}
-
-:root[data-theme="light"] .detail-table th,
-:root[data-theme="light"] .detail-table td {
-  border: 1px solid #dee2e6;
-  /* Thin dark lines for detail table cells */
-}
-
-:root[data-theme="light"] .detail-table th {
-  color: hsl(232, 100%, 49%);
-  /* Updated blue for detail table headers */
-}
-
-:root[data-theme="light"] .location-cell {
-  color: hsl(232, 100%, 49%);
-  /* Updated blue for city/database names */
-  font-weight: 600;
-}
-
-:root[data-theme="light"] .data-table tbody tr:hover {
-  background: #f8f9fa;
-}
-
-/* Fix alerts visibility in light mode */
-:root[data-theme="light"] .alertes-list {
-  background: #ffffff;
-  color: #212529;
-}
-
-:root[data-theme="light"] .alert {
-  background: #f8f9fa;
-  color: #212529;
-  border: 2px solid #dee2e6;
-}
-
-:root[data-theme="light"] .alert h3 {
-  color: #212529;
-}
-
-:root[data-theme="light"] .alert ul {
-  color: #212529;
-}
 
 /* Filter Sidebar */
 .filter-sidebar {
@@ -153,7 +46,7 @@
   justify-content: space-between;
   align-items: center;
   background: var(--orange-primary);
-  color: white;
+  color: var(--on-accent);
 }
 
 .filter-sidebar-header h3 {
@@ -240,32 +133,6 @@
 .filter-actions .btn-primary,
 .filter-actions .btn-secondary {
   width: 100%;
-  padding: 12px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.95em;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.filter-actions .btn-primary {
-  background: var(--orange-primary);
-  color: white;
-}
-
-.filter-actions .btn-primary:hover {
-  background: var(--orange-dark);
-}
-
-.filter-actions .btn-secondary {
-  background: var(--dark-light);
-  color: var(--white);
-  border: 1px solid var(--gray-light);
-}
-
-.filter-actions .btn-secondary:hover {
-  background: var(--gray-light);
 }
 
 .filter-status {
@@ -318,52 +185,12 @@
   color: #ffc107;
 }
 
-/* Light theme adjustments for sidebar */
-:root[data-theme="light"] .filter-sidebar {
-  background: #ffffff;
-  border-left-color: #dee2e6;
-}
-
-:root[data-theme="light"] .filter-option:hover {
-  background: #f8f9fa;
-}
-
-:root[data-theme="light"] .filter-group h4 {
-  color: #212529;
-  border-bottom-color: #dee2e6;
-}
-
-:root[data-theme="light"] .filter-option span {
-  color: #212529;
-}
-
-:root[data-theme="light"] .filter-actions .btn-secondary {
-  background: #ffffff;
-  color: #212529;
-  border-color: #dee2e6;
-}
-
-:root[data-theme="light"] .filter-actions .btn-secondary:hover {
-  background: #f8f9fa;
-}
-
 /* Mobile responsiveness */
 @media (max-width: 768px) {
   .filter-sidebar {
     width: 100vw;
     right: -100vw;
   }
-}
-
-/* Remove hover effect from alertes bar in light mode and add spacing */
-:root[data-theme="light"] .collapsible .section-title.alertes-title:hover {
-  background: #495057;
-  /* Keep same gray color, no hover effect */
-}
-
-:root[data-theme="light"] .data-section.collapsible {
-  margin-top: 15px;
-  /* Add space between table total row and alertes bar */
 }
 
 /* ===== RESET & BASE ===== */
@@ -642,99 +469,7 @@ body {
   border-color: var(--orange-primary);
 }
 
-.save-btn {
-  width: 100%;
-  padding: 12px 16px;
-  background: var(--orange-primary);
-  color: var(--white);
-  border: 2px solid var(--orange-primary);
-  border-radius: 8px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.save-btn:hover {
-  background: var(--orange-dark);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-hover);
-}
-
-/* ===== BOUTONS ===== */
-.btn-primary,
-.btn-secondary {
-  padding: 8px 12px;
-  /* réduit */
-  border: none;
-  border-radius: var(--border-radius);
-  font-weight: 600;
-  cursor: pointer;
-  transition: var(--transition);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-  /* réduit */
-}
-
-.btn-primary {
-  background: var(--orange-primary);
-  color: var(--white);
-  border: 2px solid var(--orange-primary);
-}
-
-.btn-primary:hover {
-  background: var(--orange-dark);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-hover);
-}
-
-.btn-secondary {
-  background: var(--dark-light);
-  color: var(--white);
-  border: 2px solid var(--dark-light);
-}
-
-/* Bouton paramètres en orange clair */
-#openConfigBtn.btn-secondary {
-  background: rgba(255, 165, 0, 0.15);
-  color: var(--orange-light);
-  border-color: var(--orange-light);
-}
-
-#openConfigBtn.btn-secondary:hover {
-  background: rgba(255, 165, 0, 0.25);
-  color: var(--orange-primary);
-  border-color: var(--orange-primary);
-}
-
-.btn-secondary:hover {
-  background: var(--orange-primary);
-  border-color: var(--orange-primary);
-  transform: translateY(-2px);
-}
-
-.btn-danger {
-  background: #dc3545;
-  color: var(--white);
-  border: 2px solid #dc3545;
-  padding: 8px 12px;
-  border-radius: var(--border-radius);
-  font-weight: 600;
-  cursor: pointer;
-  transition: var(--transition);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-}
-
-.btn-danger:hover {
-  background: #c82333;
-  border-color: #c82333;
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-hover);
-}
+/* ===== BOUTONS : voir static/app-ui.css (définition unique) ===== */
 
 .refresh-icon {
   width: 16px;
@@ -813,7 +548,7 @@ body {
 
 .section-title {
   background: var(--orange-primary);
-  color: var(--white);
+  color: var(--on-accent);
   padding: 15px 20px;
   margin: 0;
   font-size: 1.4rem;
@@ -1090,7 +825,7 @@ body {
 
 .section-header {
   background: var(--orange-primary);
-  color: var(--white);
+  color: var(--on-accent);
   padding: 10px 15px;
   display: flex;
   justify-content: space-between;
@@ -1196,12 +931,6 @@ body {
   .data-table td {
     padding: 6px 8px;
     font-size: 0.8rem;
-  }
-
-  .btn-primary,
-  .btn-secondary {
-    padding: 10px 15px;
-    font-size: 0.9rem;
   }
 
   .metric {

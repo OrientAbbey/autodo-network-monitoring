@@ -111,9 +111,12 @@
             createTicketCard: (ticket) => {
                 const hasPertes = ticket.type === 'traffic' && ticket.pertes_warnings?.length > 0;
                 const slicedValues = ticket.last_values?.slice(1) || [];
+                const unit = ticket.type === 'pertes' ? ' %' : ticket.type === 'traffic' ? ' Gb/s' : ticket.type === 'db_down' ? ' min' : '';
+                const row = (label, value, cls = '') => `<div class="info-row"><span class="info-label">${esc(label)}</span><span${cls ? ` class="${cls}"` : ''}>${value}</span></div>`;
+                const isOpen = ticket.status === 'open';
 
                 return `
-                    <div class="ticket-card">
+                    <article class="ticket-card is-${esc(ticket.status)}">
                         <div class="ticket-header">
                             <div>
                                 <span class="ticket-type">${esc(ticket.type)}</span>
@@ -122,41 +125,39 @@
                             </div>
                             <span class="ticket-status status-${esc(ticket.status)}">${esc(ticket.status)}${ticket.validation_state === 'pending' ? ` <span class="badge-pending">${esc(t('alert.pending'))}</span>` : ''}</span>
                         </div>
+                        ${ticket.reason ? `<p class="ticket-reason">${esc(ticket.reason)}</p>` : ''}
                         <div class="ticket-info">
-                            <div class="info-row"><span class="info-label">Agent:</span><span>${esc(ticket.agent || '-')}</span></div>
-                            <div class="info-row"><span class="info-label">Severity:</span><span>${esc(ticket.severity || '-')}</span></div>
-                            <div class="info-row"><span class="info-label">Orange Ticket:</span><span style="color: var(--light-orange); font-weight: bold;">${esc(ticket.orange_ticket_id || ticket.external_api_ticket_id || 'N/A')}</span></div>
-                            <div class="info-row"><span class="info-label">Site:</span><span>${esc(ticket.site || '-')}</span></div>
-                            <div class="info-row"><span class="info-label">Database:</span><span>${esc(ticket.database_name || '-')}</span></div>
-                            <div class="info-row"><span class="info-label">Timestamp:</span><span>${ticket.timestamp ? Utils.formatDate(ticket.timestamp) : '-'}</span></div>
-                            <div class="info-row"><span class="info-label">Value:</span><span>${ticket.value !== undefined ? `${ticket.value}${ticket.type === 'pertes' ? ' %' : ticket.type === 'traffic' ? ' Gb/s' : ticket.type === 'db_down' ? ' min' : ''}` : '-'}</span></div>
-                            ${ticket.type === 'traffic' ? `<div class="info-row"><span class="info-label">Pertes:</span><span style="color: ${ticket.pertes === 'Yes' ? '#ff4444' : '#4CAF50'}; font-weight: bold;">${esc(ticket.pertes || 'No')}</span></div>` : ''}
-                            <div class="info-row"><span>${esc(ticket.reason || '-')}</span></div>
-                            ${ticket.status === 'closed' && ticket.closure_timestamp ? `
-                                <div class="info-row"><span class="info-label">Closed At:</span><span>${Utils.formatDate(ticket.closure_timestamp)}</span></div>
-                                ${ticket.human_readable ? `<div class="info-row"><span class="info-label">TTR:</span><span style="color: var(--light-orange); font-weight: bold;">${esc(ticket.human_readable)}</span></div>` : ''}
-                            ` : ''}
-                            ${slicedValues.length > 0 && ticket.type === 'traffic' ? `
-                                <div class="intervals">
-                                    <div class="info-label">Traffic Values:</div>
-                                    ${slicedValues.map(v => `<div class="interval-item">${esc(v.timestamp.slice(0, 16))} | ${esc(v.value)} Gb/s</div>`).join('')}
-                                </div>
-                            ` : ''}
-                            ${ticket.type === 'pertes' && slicedValues.length > 0 ? `
-                                <div class="intervals">
-                                    <div class="info-label">Previous Pertes Values:</div>
-                                    ${slicedValues.map(v => `<div class="interval-item" style="color: ${Number(v.value) > State.currentCriteria.alert_pertes_threshold ? '#ff6b6b' : '#4CAF50'}">${esc(v.timestamp.slice(0, 16))} | ${esc(v.value)}%</div>`).join('')}
-                                </div>
-                            ` : ''}
-                            ${hasPertes ? `
-                                <div class="pertes-warnings">
-                                    <div class="info-label" style="color: #ff6b6b; font-weight: bold;">⚠️ High Packet Loss Detected:</div>
-                                    ${ticket.pertes_warnings.map(w => `<div class="pertes-warning-item"><span style="color: #ff6b6b; font-size: 0.9em;">${w.timestamp} - ${w.loss_percentage}% packet loss</span></div>`).join('')}
-                                </div>
-                            ` : ''}
+                            ${row('Site', esc(ticket.site || '-'))}
+                            ${row('Database', esc(ticket.database_name || '-'))}
+                            ${row('Value', ticket.value !== undefined ? esc(`${ticket.value}${unit}`) : '-')}
+                            ${row('Severity', esc(ticket.severity || '-'))}
+                            ${ticket.type === 'traffic' ? row('Pertes', esc(ticket.pertes || 'No'), ticket.pertes === 'Yes' ? 'is-bad' : 'is-ok') : ''}
+                            ${row('Orange', esc(ticket.orange_ticket_id || ticket.external_api_ticket_id || 'N/A'), 'is-accent')}
+                            ${row('Agent', esc(ticket.agent || '-'))}
+                            ${row('Timestamp', ticket.timestamp ? esc(Utils.formatDate(ticket.timestamp)) : '-')}
+                            ${!isOpen && ticket.closure_timestamp ? row('Closed At', esc(Utils.formatDate(ticket.closure_timestamp))) : ''}
+                            ${!isOpen && ticket.closure_timestamp && ticket.human_readable ? row('TTR', esc(ticket.human_readable), 'is-accent') : ''}
                         </div>
+                        ${slicedValues.length > 0 && ticket.type === 'traffic' ? `
+                            <details class="intervals">
+                                <summary>Traffic Values (${slicedValues.length})</summary>
+                                ${slicedValues.map(v => `<div class="interval-item">${esc(v.timestamp.slice(0, 16))} | ${esc(v.value)} Gb/s</div>`).join('')}
+                            </details>
+                        ` : ''}
+                        ${ticket.type === 'pertes' && slicedValues.length > 0 ? `
+                            <details class="intervals">
+                                <summary>Previous Pertes Values (${slicedValues.length})</summary>
+                                ${slicedValues.map(v => `<div class="interval-item ${Number(v.value) > State.currentCriteria.alert_pertes_threshold ? 'is-bad' : 'is-ok'}">${esc(v.timestamp.slice(0, 16))} | ${esc(v.value)}%</div>`).join('')}
+                            </details>
+                        ` : ''}
+                        ${hasPertes ? `
+                            <div class="pertes-warnings">
+                                <div class="info-label">⚠️ High Packet Loss Detected</div>
+                                ${ticket.pertes_warnings.map(w => `<div class="pertes-warning-item">${esc(w.timestamp)} - ${esc(w.loss_percentage)}% packet loss</div>`).join('')}
+                            </div>
+                        ` : ''}
                         <div class="ticket-actions">${TicketActions.buttons(ticket)}</div>
-                    </div>
+                    </article>
                 `;
             },
 
@@ -171,7 +172,7 @@
                 document.getElementById('resultsCount').textContent = `Showing ${sorted.length} of ${State.allTickets.length} tickets`;
 
                 if (sorted.length === 0) {
-                    container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--light-orange); font-size: 1.2em; padding: 40px;">No tickets found</div>';
+                    container.innerHTML = '<div class="empty-state">No tickets found</div>';
                 } else {
                     container.innerHTML = sorted.map(t => UI.createTicketCard(t)).join('');
                 }

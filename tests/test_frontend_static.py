@@ -162,3 +162,67 @@ def test_public_maintenance_endpoint_exposes_only_what_a_viewer_needs(client):
     governance.add_window("kribi", now - timedelta(minutes=1), now + timedelta(hours=1), "câblage", "secret-user")
     windows = client.get("/api/maintenance/active").json()["windows"]
     assert [(w["db_key"], w["reason"]) for w in windows] == [("kribi", "câblage")] and "created_by" not in windows[0]
+
+
+# ---------------------------------------------------------------------------- jetons de design (CHANTIER_UI.md §4)
+TOKENS = ROOT / "static" / "css" / "tokens.css"
+
+
+def theme_tokens(selector: str) -> dict[str, str]:
+    """Couleurs hexadécimales d'un bloc de thème de tokens.css (le défaut `:root {` inclut le sombre)."""
+    css = TOKENS.read_text(encoding="utf-8")
+    block = css[css.index(selector):]
+    block = block[:block.index("\n}")]
+    return dict(re.findall(r"(--[a-z0-9-]+):\s*(#[0-9a-fA-F]{6})", block))
+
+
+def luminance(hex_color: str) -> float:
+    channels = [int(hex_color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def contrast(first: str, second: str) -> float:
+    high, low = sorted((luminance(first), luminance(second)), reverse=True)
+    return (high + 0.05) / (low + 0.05)
+
+
+@pytest.mark.parametrize("theme", ["dark", "light"])
+def test_token_colors_meet_wcag_aa_on_every_surface(theme):
+    """Toute couleur de texte des jetons doit atteindre 4,5:1 sur les fonds où elle est utilisée, dans CHAQUE thème."""
+    colors = {**theme_tokens(":root {"), **(theme_tokens(':root[data-theme="light"] {') if theme == "light" else {})}
+    for text_role in ("--text", "--text-muted", "--accent", "--ok", "--bad", "--warn"):
+        for surface in ("--bg", "--surface", "--surface-2"):
+            ratio = contrast(colors[text_role], colors[surface])
+            assert ratio >= 4.5, f"{theme}: {text_role} sur {surface} = {ratio:.2f}:1"
+    assert contrast(colors["--on-accent"], colors["--accent-fill"]) >= 4.5, f"{theme}: texte de bouton principal"
+
+
+@pytest.mark.parametrize("palette_selector, theme", [(':root[data-palette="colorblind"] {', "dark"), (':root[data-theme="light"][data-palette="colorblind"] {', "light")])
+def test_colorblind_palette_keeps_ok_and_bad_readable(palette_selector, theme):
+    base = {**theme_tokens(":root {"), **(theme_tokens(':root[data-theme="light"] {') if theme == "light" else {})}
+    base.update(theme_tokens(palette_selector))
+    for role in ("--ok", "--bad"):
+        for surface in ("--surface", "--surface-2"):
+            assert contrast(base[role], base[surface]) >= 4.5, f"{theme}/daltonisme: {role} sur {surface}"
+
+
+def test_tokens_define_the_same_roles_in_both_themes():
+    dark, light = theme_tokens(":root {"), theme_tokens(':root[data-theme="light"] {')
+    colour_roles = {"--bg", "--surface", "--surface-2", "--border", "--text", "--text-muted", "--accent", "--accent-hover", "--accent-fill", "--on-accent", "--ok", "--bad", "--warn", "--info"}
+    assert colour_roles <= set(dark) and colour_roles - {"--accent-fill"} <= set(light) | {"--accent-fill"}
+
+
+@pytest.mark.parametrize("template", ["dashboard.html", "base_app.html", "tickets.html"])
+def test_tokens_are_loaded_first_on_every_page(template):
+    html = (TEMPLATES / template).read_text(encoding="utf-8")
+    styles = re.findall(r'<link rel="stylesheet"[^>]*href="(/static/[^"]+)"', html)
+    assert styles[0] == "/static/css/tokens.css", styles
+    assert not re.search(r"<style[^>]*>\s*:root\s*\{[^}]*--(dark|card|text)-", html), "variables redéclarées en ligne : elles écrasent les jetons"
+
+
+def test_light_theme_is_no_longer_built_by_inverting_variables():
+    """L'ancienne méthode (en clair, --white devenait gris foncé) est supprimée : le thème clair vient uniquement des jetons."""
+    css = (ROOT / "static" / "styles.css").read_text(encoding="utf-8")
+    assert 'data-theme="light"' not in css and "hsl(232" not in css
+    assert not re.search(r"^\s*--[a-z-]+\s*:", css, re.M), "styles.css ne doit plus DÉFINIR de variables (tokens.css est la source unique)"

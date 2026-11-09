@@ -71,11 +71,11 @@ const TicketActions = {
     /** Boutons d'une carte ticket (chaîne HTML : seules des valeurs échappées et des clés de traduction y figurent). */
     buttons(ticket) {
         const id = esc(ticket.id);
-        const button = (action, label, cls = 'btn-secondary') => `<button type="button" class="btn ${cls}" data-action="${action}" data-id="${id}">${esc(label)}</button>`;
+        const button = (action, label, cls = 'btn-secondary') => `<button type="button" class="${cls}" data-action="${action}" data-id="${id}">${esc(label)}</button>`;
         const parts = [button('ticketTimeline', `🕒 ${t('tickets.timeline')}`)];
         if (Session.can('supervision')) {
             if (ticket.validation_state === 'pending' && ticket.status === 'open') {
-                parts.push(button('ticketApprove', `✔ ${t('validation.approve')}`, 'btn-orange'), button('ticketReject', `✖ ${t('validation.reject')}`));
+                parts.push(button('ticketApprove', `✔ ${t('validation.approve')}`, 'btn-primary'), button('ticketReject', `✖ ${t('validation.reject')}`));
             } else if (ticket.status !== 'deleted') {
                 parts.push(button('ticketDelete', `🗑 ${t('common.delete')}`));
             }
