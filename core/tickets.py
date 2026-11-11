@@ -119,6 +119,29 @@ def invalidate_alert_cache() -> None:
         _alerts_cache.clear()
 
 
+def alerts_summary() -> dict:
+    """Résumé des alertes OUVERTES et actionnables, **indépendant des filtres d'affichage** (alimente la bande d'état et le repérage des lignes).
+
+    Sont exclus : tickets fermés, supprimés/rejetés et ceux en attente de validation (pas encore un ticket officiel).
+    """
+    now = time.monotonic()
+    with _alerts_lock:
+        hit = _alerts_cache.get("__summary__")
+        if hit and now - hit[0] < ALERTS_TTL:
+            return hit[1]
+    with local_conn() as c:
+        rows = fetch_all(c, "SELECT type, database_name FROM tickets_tb WHERE status = 'open' AND validation_state <> 'pending'")
+    by_db: dict[str, set[str]] = {}
+    by_type = {"traffic": 0, "pertes": 0, "db_down": 0}
+    for row in rows:
+        by_type[row["type"]] = by_type.get(row["type"], 0) + 1
+        by_db.setdefault(row["database_name"], set()).add(row["type"])
+    summary = {"open": len(rows), "by_type": by_type, "bases": sorted(by_db), "by_db": {k: sorted(v) for k, v in sorted(by_db.items())}}
+    with _alerts_lock:
+        _alerts_cache["__summary__"] = (now, summary)
+    return summary
+
+
 def dashboard_alerts(filters: dict | None = None) -> dict:
     """Alertes du tableau de bord (format historique : {"traffic": [...], "pertes": [...]})."""
     filters = filters or {}
@@ -161,7 +184,7 @@ def dashboard_alerts(filters: dict | None = None) -> dict:
         loc = constants.LOCATION_MAPPING.get(a["database_name"], a["database_name"])
         ts = a["timestamp"]                          # datetime (MySQL) ou str (SQLite) : on normalise
         ts_str = ts.strftime("%Y-%m-%d %H:%M") if isinstance(ts, datetime) else str(ts)[:16]
-        item = {"id": a["id"], "type": a["type"].upper(), "location": loc, "title": f"Alerte {a['type'].upper()} - {loc}",
+        item = {"id": a["id"], "type": a["type"].upper(), "db": a["database_name"], "location": loc, "title": f"Alerte {a['type'].upper()} - {loc}",
                 "message": a["reason"], "valeurs": vals, "status": a["status"],
                 "date": ts_str, "creation_time": ts_str,
                 "external_id": a.get("external_api_ticket_id"), "autin_id": a.get("autin_id"),

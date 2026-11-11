@@ -326,51 +326,11 @@ body {
   font-weight: bold;
 }
 
-/* ===== HEADER ===== */
-.header {
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  background: var(--dark-secondary);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow);
-  margin-bottom: 15px;
-  border: 2px solid var(--orange-primary);
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.current-time {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--orange-primary);
-}
-
-.last-update-value,
-.countdown {
-  color: var(--white-soft);
-}
-
 .comparison-time {
   font-size: 0.9rem;
   color: var(--gray-light);
   margin-top: 5px;
 }
-
-.controls {
-  display: flex;
-  gap: 8px;
-  /* réduit */
-  align-items: center;
-}
-
 
 /* ===== CONFIG DRAWER ===== */
 .drawer {
@@ -882,15 +842,6 @@ body {
     padding: 10px;
   }
 
-  .header-content {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .controls {
-    justify-content: center;
-  }
-
   .data-table {
     font-size: 0.85rem;
   }
@@ -947,69 +898,6 @@ body {
     font-size: 1rem;
     padding: 20px 15px;
   }
-}
-
-/* ===== BADGE ALERTES ===== */
-.alertes-badge {
-  position: fixed;
-  top: 20px;
-  right: 30px;
-  background: var(--danger);
-  color: white;
-  font-weight: bold;
-  border-radius: 20px;
-  padding: 10px 22px;
-  font-size: 1.1rem;
-  z-index: 10000;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  cursor: pointer;
-  transition: opacity 0.2s;
-  user-select: none;
-}
-
-.alertes-badge-open {
-  position: fixed;
-  top: 20px;
-  right: 30px;
-  background: var(--danger);
-  color: white;
-  font-weight: bold;
-  border-radius: 20px;
-  padding: 8px 18px;
-  font-size: 1.2rem;
-  z-index: 10001;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
-  display: none;
-  align-items: center;
-  cursor: pointer;
-  user-select: none;
-}
-
-.alertes-badge-close {
-  background: transparent;
-  border: none;
-  color: white;
-  font-size: 1.3em;
-  margin-left: 10px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.badge-count {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: var(--danger);
-  color: white;
-  font-weight: bold;
-  border-radius: 50%;
-  padding: 2px 7px;
-  font-size: 0.9em;
-  z-index: 10002;
-  display: none;
 }
 
 /* ===== TOAST NOTIFICATIONS ===== */
@@ -1097,47 +985,10 @@ html {
   }
 }
 
-/* ===== ALERTES BADGE EN HEADER ===== */
-.header .alertes-badge,
-.header .alertes-badge-open {
-  position: static;
-  /* plus de position fixed quand inséré dans le header */
-  top: auto;
-  right: auto;
-  margin-left: 8px;
-}
-
-/* Ajustement spécifique pour le badge affiché (ouvert) dans le header */
-.header .alertes-badge {
-  padding: 6px 14px;
-  font-size: 0.95rem;
-  gap: 8px;
-}
-
-/* La cloche réduite dans le header */
-.header .alertes-badge-open {
-  padding: 4px 10px;
-  font-size: 1rem;
-}
-
-/* ===== AUTOUPDATE BUTTON SCALE ===== */
-#autoUpdateBtn {
-  transform: scale(0.9);
-  /* réduit uniformément sans changer le ratio */
-  transform-origin: center center;
-}
-
-/* compenser l'espace occupé pour éviter des chevauchements dans .controls */
-.controls #autoUpdateBtn {
-  margin-right: -4px;
-  /* léger ajustement visuel */
-}
 /* ===== MOBILE : rien ne doit déborder de l'écran (barre de boutons, pop-up, tableaux défilent dans leur conteneur) ===== */
 @media (max-width: 768px) {
   html, body { max-width: 100%; overflow-x: hidden; }
-  .controls { flex-wrap: wrap; justify-content: center; }
-  .controls > * { flex: 0 1 auto; }
   .alert-popup-content { width: calc(100% - 24px); max-width: 500px; }
-  .main-container, .header, .header-content { min-width: 0; max-width: 100%; box-sizing: border-box; }
+  .main-container { min-width: 0; max-width: 100%; box-sizing: border-box; }
   [id^="table-wrapper"], .table-wrapper { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }

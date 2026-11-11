@@ -114,3 +114,58 @@ const Toasts = {
         setTimeout(() => toast.remove(), 300);
     }
 };
+
+
+// ====== MENUS (déroulants d'actions) — contrat HTML :
+//   <div class="menu"><button data-menu-toggle aria-haspopup="menu" aria-expanded="false" aria-controls="ID">…</button>
+//   <div class="menu-list" id="ID" role="menu" hidden><button class="menu-item" role="menuitem">…</button> …</div></div>
+// Clavier : Entrée/Espace/↓ ouvre, ↑↓ Début Fin naviguent, Échap ferme et rend le focus au bouton, Tab ferme.
+const Menus = {
+    items(list) { return Array.from(list.querySelectorAll('[role="menuitem"]:not([disabled])')).filter(i => !i.hidden); },
+    close(menu, restoreFocus = false) {
+        const toggle = menu.querySelector('[data-menu-toggle]');
+        const list = menu.querySelector('.menu-list');
+        if (!list || list.hidden) return;
+        list.hidden = true;
+        toggle.setAttribute('aria-expanded', 'false');
+        if (restoreFocus) toggle.focus();
+    },
+    closeAll(except = null) {
+        document.querySelectorAll('.menu').forEach(m => { if (m !== except) this.close(m); });
+    },
+    open(menu, focusIndex = 0) {
+        this.closeAll(menu);
+        const list = menu.querySelector('.menu-list');
+        menu.querySelector('[data-menu-toggle]').setAttribute('aria-expanded', 'true');
+        list.hidden = false;
+        const items = this.items(list);
+        if (items.length) items[Math.max(0, Math.min(focusIndex, items.length - 1))].focus();
+    }
+};
+
+document.addEventListener('click', event => {
+    const toggle = event.target.closest('[data-menu-toggle]');
+    if (toggle) {
+        const menu = toggle.closest('.menu');
+        if (menu.querySelector('.menu-list').hidden) Menus.open(menu); else Menus.close(menu, true);
+        return;
+    }
+    const item = event.target.closest('.menu-item');
+    if (item) { Menus.close(item.closest('.menu')); return; }          // l'action de l'élément s'exécute (son propre gestionnaire) puis le menu se ferme
+    Menus.closeAll();                                                  // clic ailleurs
+});
+
+document.addEventListener('keydown', event => {
+    const menu = event.target.closest?.('.menu');
+    if (!menu) return;
+    const list = menu.querySelector('.menu-list');
+    const isToggle = event.target.matches('[data-menu-toggle]');
+    if (isToggle && ['ArrowDown', 'ArrowUp'].includes(event.key)) { event.preventDefault(); Menus.open(menu, event.key === 'ArrowDown' ? 0 : 99); return; }
+    if (list.hidden) return;
+    const items = Menus.items(list);
+    const at = items.indexOf(document.activeElement);
+    const move = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: items.length - 1 }[event.key];
+    if (move !== undefined) { event.preventDefault(); items[(move + items.length) % items.length]?.focus(); }
+    else if (event.key === 'Escape') { event.preventDefault(); Menus.close(menu, true); }
+    else if (event.key === 'Tab') Menus.close(menu);
+});

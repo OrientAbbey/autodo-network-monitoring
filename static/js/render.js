@@ -434,6 +434,7 @@ function updateDashboardDOM(data) {
 
     // Store dashboard data globally for filter functionality
     window.lastDashboardData = data;
+    STATE.alertSummary = data.resume || null;          // résumé serveur des alertes ouvertes (indépendant des filtres)
 
     // Récupérer les alertes ignorées via AlertesManager
     const dismissedAlertes = AlertManager.getDismissedAlertes();

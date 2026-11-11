@@ -118,9 +118,9 @@ Légende : ☐ à faire · ◐ en cours · ☑ fait. Un lot = un commit **et un 
 - ☑ **U0 Outillage** — `demo/ui_audit.py` (mesures + captures reproductibles) ; base §2 figée.
 - ☑ **U1 Jetons** — `tokens.css` ; anciens noms (`--dark-*`, `--white`, `--orange-*`, `--gray-*`) rebranchés sur les jetons ; fin de l'inversion du thème clair ; suppression du bleu ; `tickets.html` et `app-ui.css` consomment les jetons.
 - ☑ **U2 Composants** — boutons, pastilles, liens, panneaux en une seule définition ; suppression des doublons ; page tickets sur jetons (`tickets.css`).
-- ☐ **U3 En-tête et état global** — barre d'application, bande d'état (résumé serveur), menus, légende en dialogue.
-- ☐ **U4 Données** — champ `db` dans les alertes ; pastille et teinte de ligne ; densité 44 px ; cellules empilées ; sections aplaties ; panneaux vides masqués ; avis statique.
-- ☐ **U5 Responsive** — première colonne figée et indice de défilement ; barre mobile ; cartes avec état ; cibles 44 px.
+- ◐ **U3 En-tête et état global** *(rejoué : backend, barre du tableau de bord, JS ; reste les pages tickets/supervision/admin — voir `CHANTIER_UI_REPRISE.md` §2 A)* — barre d'application, bande d'état (résumé serveur), menus, légende en dialogue.
+- ☐ **U4 Données** *(réalisé une première fois, perdu, **à rejouer** : `CHANTIER_UI_REPRISE.md` §2 B)* — champ `db` dans les alertes ; pastille et teinte de ligne ; densité 44 px ; cellules empilées ; sections aplaties ; panneaux vides masqués ; avis statique.
+- ☐ **U5 Responsive** *(idem : `CHANTIER_UI_REPRISE.md` §2 C)* — première colonne figée et indice de défilement ; barre mobile ; cartes avec état ; cibles 44 px.
 - ☐ **U6 Autres pages** — supervision/admin : `kit-table`, largeurs, format des dates, `aria-current`.
 - ☐ **U7 Clôture** — AA dans les deux thèmes, mouvements réduits, mise à jour des E2E, captures avant/après, README/REVUE, bundle.
 
@@ -149,3 +149,4 @@ Légende : ☐ à faire · ◐ en cours · ☑ fait. Un lot = un commit **et un 
 | 2026-10-28 | U1 | `static/css/tokens.css` (sombre, clair, daltonisme, alias de transition) ; `styles.css`/`app-ui.css`/tickets n'ont plus de palette propre ; ~20 rustines du thème clair supprimées. Un test calcule les contrastes des jetons et a fait corriger 3 couleurs limites. |
 | 2026-10-28 | U2 | Boutons : une définition (`.btn-primary/-secondary/-danger/-ghost`, `.btn-icon`, `.chip-*`) dans `app-ui.css`, anciennes retirées de `styles.css` ; CSS de la page tickets extrait vers `static/css/tickets.css` (≈ 450 → 125 lignes, ~60 % de code mort) ; carte ticket hiérarchisée (motif en tête, séries repliables). Tickets : boutons 6 → 3 styles. |
 | 2026-11-06 | — | **Incident** : l'environnement de travail a été réinitialisé alors que U0 à U5 n'avaient jamais été sauvegardés dans un bundle. Reconstruction depuis le bundle `FINAL` du 24/10 en rejouant les modifications, les mesures d'audit déjà relevées servant de contrôle. **Règle ajoutée : un bundle par lot.** |
+| 2026-11-06 | U3 (rejeu partiel) | Rejoués et vérifiés (301 tests, ruff, `node --check`) : U1, U2, et de U3 le champ `db`, le résumé serveur `resume` (dans l'ETag), les menus, la barre du tableau de bord, la bande d'état, la légende en dialogue, le menu de compte. **Restent à rejouer** : pages tickets/supervision/admin (U3), U4, U5, avec les recettes exactes de `CHANTIER_UI_REPRISE.md` et les valeurs d'audit de la première réalisation (page 2 616 px, contrastes 0, en-tête 56 px/6 commandes). |

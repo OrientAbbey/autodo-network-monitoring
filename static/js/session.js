@@ -29,14 +29,22 @@ const Session = (() => {
         if (!host) return;
         clear(host);
         if (!current) {
-            host.appendChild(el('button', { type: 'button', class: 'btn-secondary', id: 'loginBtn', dataset: { action: 'openLogin' }, text: t('auth.login') }));
+            host.appendChild(el('button', { type: 'button', class: 'btn-ghost', id: 'loginBtn', dataset: { action: 'openLogin' }, text: t('auth.login') }));
             return;
         }
-        host.appendChild(el('span', { class: 'account-name', id: 'account-name', text: current.display_name || current.username }));
-        host.appendChild(el('span', { class: `role-badge role-${current.role}`, id: 'role-badge', text: t(`role.${current.role}`) }));
-        if (can('supervision')) host.appendChild(el('a', { class: 'btn-secondary', href: '/supervision', id: 'nav-supervision', text: t('nav.supervision') }));
-        if (can('admin')) host.appendChild(el('a', { class: 'btn-secondary', href: '/admin', id: 'nav-admin', text: t('nav.admin') }));
-        host.appendChild(el('button', { type: 'button', class: 'btn-secondary', id: 'logoutBtn', dataset: { action: 'logout' }, text: t('auth.logout') }));
+        const item = (id, href, icon, label, action) => el(href ? 'a' : 'button', { class: 'menu-item', role: 'menuitem', id, href, type: href ? null : 'button', dataset: action ? { action } : null },
+            el('span', { class: 'menu-icon', 'aria-hidden': 'true', text: icon }), el('span', { text: label }));
+        const pageHasNav = !!document.querySelector('.app-nav');
+        host.appendChild(el('div', { class: 'menu' },
+            el('button', { type: 'button', class: 'btn-ghost', id: 'accountBtn', 'data-menu-toggle': true, 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'accountMenu' },
+                el('span', { id: 'account-name', text: current.display_name || current.username }),
+                el('span', { class: `role-badge role-${current.role}`, id: 'role-badge', text: t(`role.${current.role}`) }), el('span', { 'aria-hidden': 'true', text: '▾' })),
+            el('div', { class: 'menu-list', id: 'accountMenu', role: 'menu', hidden: true },
+                can('supervision') && !pageHasNav ? item('nav-supervision', '/supervision', '⚙️', t('nav.supervision')) : null,
+                can('admin') && !pageHasNav ? item('nav-admin', '/admin', '🛡️', t('nav.admin')) : null,
+                el('div', { class: 'menu-separator', role: 'separator' }),
+                item('changePasswordBtn', null, '🔑', t('auth.change_password'), 'changePassword'),
+                item('logoutBtn', null, '⎋', t('auth.logout'), 'logout'))));
     }
 
     // ---------------------------------------------------------------- connexion

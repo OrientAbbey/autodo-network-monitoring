@@ -64,85 +64,25 @@ const UIUtils = {
         return Math.max(1, Math.ceil((next.getTime() - now.getTime()) / 1000));
     },
 
-    insertHelpIcon() {
-        const controls = DOM.controls;
-        if (!controls || DOM.helpIcon) return;
-
-        const helpIcon = document.createElement('span');
-        helpIcon.id = 'helpIcon';
-        helpIcon.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;font-size:1.1em;cursor:pointer;margin-right:8px;';
-        helpIcon.innerHTML = `
-          <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--dark-light);border:2px solid var(--orange-primary);color:var(--orange-primary);font-weight:bold;font-size:1.2em;box-shadow:0 2px 8px rgba(0,0,0,0.10);user-select:none;">?</span>
-        `;
-
-        let tooltipTimeout;
-
-        helpIcon.addEventListener('mouseenter', (e) => {
-            clearTimeout(tooltipTimeout);
-            this.hideHelpTooltip();
-            this.showHelpTooltip(e);
-        });
-
-        helpIcon.addEventListener('mouseleave', () => {
-            tooltipTimeout = setTimeout(() => this.hideHelpTooltip(), 300);
-        });
-
-        document.addEventListener('mouseover', (e) => {
-            const isTooltip = e.target.closest('#help-tooltip');
-            const isHelpIcon = e.target.closest('#helpIcon');
-
-            if (isTooltip) {
-                clearTimeout(tooltipTimeout);
-            } else if (!isHelpIcon) {
-                this.hideHelpTooltip();
-            }
-        });
-
-        const refreshBtn = DOM.refreshBtn;
-        const autoUpdateBtn = DOM.autoUpdateBtn;
-        if (refreshBtn) controls.insertBefore(helpIcon, refreshBtn);
-        else if (autoUpdateBtn) controls.insertBefore(helpIcon, autoUpdateBtn);
-        else controls.appendChild(helpIcon);
-    },
-
-    showHelpTooltip(e) {
-        const helpText = `
-            <div style="max-width:420px;padding:18px 12px 12px 12px;line-height:1.6;">
-                <h3 style="margin-top:0;">Aide : Signification des flèches et couleurs</h3>
-                <ul style="margin-left:18px;">
-                    <li><b>Flèche ↑</b> : Augmentation de la valeur</li>
-                    <li><b>Flèche ↓</b> : Diminution de la valeur</li>
-                    <li><b>Flèche ↔</b> : Valeur stable</li>
-                </ul>
-                <b>Pour le <span style='color:var(--orange-primary)'>traffic</span> :</b>
-                <ul style="margin-left:18px;">
-                    <li><span style='color:var(--danger)'>Rouge</span> : Baisse ≥ <code>alert_traffic_threshold_percent</code> 
-                        <u>ou</u> ≥ <code>traffic_consecutive_drops_count</code> baisses consécutives 
-                        d'au moins <code>traffic_consecutive_drops_min_percent</code></li>
-                    <li><span style='color:var(--success)'>Vert</span> : Hausse ≥ <code>traffic_up_threshold_percent</code></li>
-                    <li><span style='color:var(--gray-light)'>Gris</span> : Autres cas</li>
-                </ul>
-                <b>Pour les <span style='color:var(--orange-primary)'>pertes</span> :</b>
-                <ul style="margin-left:18px;">
-                    <li><span style='color:var(--danger)'>Rouge</span> : Valeur courante &gt; <code>alert_pertes_threshold</code></li>
-                    <li><span style='color:var(--success)'>Vert</span> : Valeur courante &lt; seuil <u>et</u> en diminution</li>
-                    <li><span style='color:var(--gray-light)'>Gris</span> : Autres cas</li>
-                </ul>
-            </div>`;
-
-        this.hideHelpTooltip();
-
-        const tooltip = document.createElement('div');
-        tooltip.id = 'help-tooltip';
-        tooltip.style.cssText = `position:fixed;top:${e.clientY + 18}px;left:${e.clientX + 18}px;z-index:10010;background:var(--dark-secondary);border:2px solid var(--orange-primary);border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.25);color:var(--white);`;
-        tooltip.innerHTML = helpText;
-        tooltip.addEventListener('mouseleave', () => this.hideHelpTooltip());
-
-        document.body.appendChild(tooltip);
-    },
-
-    hideHelpTooltip() {
-        document.querySelectorAll('#help-tooltip').forEach(tooltip => tooltip.remove());
+    /** Légende : un vrai dialogue (clavier, lecteur d'écran), plus un simple survol à la souris. Les seuils cités sont ceux de la configuration en vigueur. */
+    async openHelp() {
+        let cfg = {};
+        try { cfg = await api('/api/config'); } catch (e) { /* légende sans chiffres */ }
+        const line = (key, params) => el('li', { text: t(key, params) });
+        const dialog = el('dialog', { class: 'app-dialog wide', id: 'help-dialog', 'aria-labelledby': 'help-title' },
+            el('div', { class: 'dialog-form' },
+                el('h3', { id: 'help-title', text: t('help.title') }),
+                el('h4', { text: t('help.arrows') }), el('ul', {}, line('help.arrow_up'), line('help.arrow_down'), line('help.arrow_flat')),
+                el('h4', { text: t('help.traffic') }),
+                el('ul', {}, line('help.traffic_red', { instant: cfg.alert_traffic_threshold_percent ?? '…', count: cfg.traffic_consecutive_drops_count ?? '…', first: cfg.traffic_consecutive_drops_min_percent ?? '…' }),
+                    line('help.traffic_green', { up: cfg.traffic_up_threshold_percent ?? '…' }), line('help.other_grey')),
+                el('h4', { text: t('help.loss') }),
+                el('ul', {}, line('help.loss_red', { threshold: cfg.alert_pertes_threshold ?? '…' }), line('help.loss_green'), line('help.other_grey')),
+                el('h4', { text: t('help.rows') }), el('ul', {}, line('help.row_alert'), line('help.spark')),
+                el('div', { class: 'dialog-actions' }, el('button', { type: 'button', class: 'btn-primary', dataset: { action: 'closeDialog' }, text: t('common.close') }))));
+        dialog.addEventListener('close', () => dialog.remove());
+        document.body.appendChild(dialog);
+        dialog.showModal();
     }
 };
 

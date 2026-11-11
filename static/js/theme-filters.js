@@ -12,12 +12,10 @@ function toggleTheme() {
 
 function updateThemeButton() {
     const btn = document.getElementById('themeToggleBtn');
-    if (btn) {
-        const dark = Prefs.get('theme') === 'dark';
-        btn.textContent = dark ? '☀️' : '🌙';
-        btn.title = dark ? t('theme.to_light') : t('theme.to_dark');
-        btn.setAttribute('aria-label', btn.title);
-    }
+    if (!btn) return;
+    const dark = Prefs.get('theme') === 'dark';
+    btn.querySelector('.menu-icon').textContent = dark ? '☀️' : '🌙';
+    btn.querySelector('.menu-label').textContent = dark ? t('theme.to_light') : t('theme.to_dark');
 }
 document.addEventListener('prefs-changed', event => { if (['theme', 'lang'].includes(event.detail.key)) updateThemeButton(); });
 

@@ -104,7 +104,7 @@ def test_the_dashboard_is_serialised_once_per_cycle_not_once_per_request(client,
     monkeypatch.setattr(dashboard.orjson, "dumps", lambda *a, **k: calls.append(a[0]) or real(*a, **k))
     for _ in range(5):
         client.get("/api/dashboard_data")
-    assert all(set(c) <= {"traffic", "pertes"} for c in calls if isinstance(c, dict))        # seules les alertes sont sérialisées par requête
+    assert all(set(c) <= {"alertes", "resume"} for c in calls if isinstance(c, dict))        # seules les alertes et leur résumé sont sérialisés par requête
 
 
 def test_set_dashboard_increments_the_version_and_keeps_the_dict_cache():
@@ -175,3 +175,26 @@ def test_the_peak_job_records_the_current_viewer_count(clean_state):
     finally:
         monitoring.runtime.app = None
     assert analytics.peak_today() == 4
+
+
+def test_alert_summary_ignores_display_filters_and_non_actionable_tickets(client):
+    """La bande d'état dit la VÉRITÉ quel que soit le filtre choisi (sinon « Fermées uniquement » afficherait « réseau nominal »)."""
+    tickets.persist(tickets.ChangeSet(inserts=[
+        mk(1, database_name="kribi"), mk(2, type="pertes", database_name="kribi"), mk(3, type="db_down", database_name="garoua"),
+        mk(4, database_name="ferme", status="closed"), mk(5, database_name="attente", validation_state="pending", orange_sync_state="held"),
+        mk(6, database_name="supprime", status="deleted")]))
+    publish_cycle()
+    for query in ("", "?status=closed", "?status=open&type=pertes", "?period=today"):
+        resume = client.get("/api/dashboard_data" + query).json()["resume"]
+        assert resume == {"open": 3, "by_type": {"traffic": 1, "pertes": 1, "db_down": 1}, "bases": ["garoua", "kribi"],
+                          "by_db": {"garoua": ["db_down"], "kribi": ["pertes", "traffic"]}}, query
+
+
+def test_summary_is_part_of_the_etag(client):
+    publish_cycle()
+    first = client.get("/api/dashboard_data").headers["etag"]
+    tickets.persist(tickets.ChangeSet(inserts=[mk(1, database_name="kribi", status="closed")]))
+    assert client.get("/api/dashboard_data", headers={"If-None-Match": first}).status_code in (200, 304)
+    tickets.update_fields(1, {"status": "open"})
+    tickets.invalidate_alert_cache()
+    assert client.get("/api/dashboard_data", headers={"If-None-Match": first}).status_code == 200      # un ticket ouvre : le résumé change, donc l'ETag

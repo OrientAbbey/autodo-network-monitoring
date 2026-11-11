@@ -83,13 +83,14 @@ async def api_dashboard_data(request: Request, response: Response, status: str |
     if not cached_json:
         raise HTTPException(503, "Données en cours de préparation", headers={"Retry-After": "10"})
     filters = {key: value for key, value in (("status", status), ("type", type), ("period", period)) if value}
-    alerts_json = orjson.dumps(await asyncio.to_thread(tickets.dashboard_alerts, filters), default=str)
-    etag = f'W/"{version}-{zlib.crc32(alerts_json):08x}"'
+    alerts, summary = await asyncio.gather(asyncio.to_thread(tickets.dashboard_alerts, filters), asyncio.to_thread(tickets.alerts_summary))
+    payload = orjson.dumps({"alertes": alerts, "resume": summary}, default=str)[1:-1]        # sans accolades : se greffe au JSON du cycle
+    etag = f'W/"{version}-{zlib.crc32(payload):08x}"'
     headers = {**dict(response.headers), "ETag": etag, "Cache-Control": "no-cache"}
     if _etag_matches(request.headers.get("if-none-match"), etag):
         return Response(status_code=304, headers=headers)
     use_gzip = "gzip" in request.headers.get("accept-encoding", "").lower()
-    body = await asyncio.to_thread(_response_body, etag, use_gzip, cached_json, alerts_json)
+    body = await asyncio.to_thread(_response_body, etag, use_gzip, cached_json, payload)
     if use_gzip:
         headers.update({"Content-Encoding": "gzip", "Vary": "Accept-Encoding"})        # déjà compressé : le middleware ne le refait pas
     return Response(body, media_type="application/json", headers=headers)
@@ -99,7 +100,7 @@ _BODY_CACHE: dict[tuple[str, bool], bytes] = {}
 _BODY_CACHE_MAX = 32
 
 
-def _response_body(etag: str, use_gzip: bool, cached_json: bytes, alerts_json: bytes) -> bytes:
+def _response_body(etag: str, use_gzip: bool, cached_json: bytes, payload: bytes) -> bytes:
     """Réponse complète, mémorisée par (ETag, gzip) : les spectateurs aux mêmes filtres partagent UNE réponse, compressée une seule fois.
 
     L'ETag contient la version du cycle et l'empreinte des alertes : une entrée périmée n'est donc jamais resservie.
@@ -108,7 +109,7 @@ def _response_body(etag: str, use_gzip: bool, cached_json: bytes, alerts_json: b
     key = (etag, use_gzip)
     body = _BODY_CACHE.get(key)
     if body is None:
-        raw = cached_json + b',"alertes":' + alerts_json + b"}"
+        raw = cached_json + b"," + payload + b"}"
         body = gzip.compress(raw, compresslevel=5, mtime=0) if use_gzip else raw
         if len(_BODY_CACHE) >= _BODY_CACHE_MAX:
             _BODY_CACHE.clear()

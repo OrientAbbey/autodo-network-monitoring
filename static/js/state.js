@@ -13,7 +13,8 @@ const STATE = {
     refreshInProgress: false,
     isFirstLoad: true,
     shownIds: new Set(),        // alertes déjà présentées dans la pop-up pendant cette session de page
-    popupIds: []                // alertes actuellement listées dans la pop-up
+    popupIds: [],               // alertes actuellement listées dans la pop-up
+    alertSummary: null          // résumé serveur des alertes ouvertes : { open, by_type, bases, by_db }
 };
 
 // ====== ACCÈS DOM ======
@@ -22,7 +23,6 @@ const DOM = {
     get alertesBadgeOpen() { return document.getElementById('alertes-badge-open'); },
     get alertPopup() { return document.getElementById('alert-popup'); },
     get alertPopupMessage() { return document.getElementById('alert-popup-message'); },
-    get controls() { return document.querySelector('.controls'); },
     get refreshBtn() { return document.getElementById('refreshBtn'); },
     get autoStatus() { return document.getElementById('autoStatus'); },
     get autoUpdateBtn() { return document.getElementById('autoUpdateBtn'); },

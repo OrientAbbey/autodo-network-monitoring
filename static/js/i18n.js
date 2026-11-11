@@ -5,6 +5,14 @@
 
 const I18N = {
     fr: {
+        'notice.gi': '[Attention] Les données des sorties GI Diagnet ne sont pas fiables en Busy Hour à cause de la saturation des sondes.',
+        'status.nominal': 'Réseau nominal', 'status.alerts': '{count} alerte(s)', 'status.bases': '{bases} base(s)', 'table.scroll_hint': '↔ Faire défiler pour voir toutes les colonnes',
+        'status.jump': 'Aller à la première base en alerte', 'status.loading': 'Chargement…',
+        'status.row_alert': 'Alerte ouverte : {types}', 'header.menu': 'Menu', 'header.more': 'Plus d\'actions', 'header.help': 'Légende',
+        'help.title': 'Légende', 'help.arrows': 'Flèches (écart avec la valeur de référence : 5 min, 1 jour, 1 semaine)', 'help.arrow_up': '↑ hausse', 'help.arrow_down': '↓ baisse', 'help.arrow_flat': '↔ stable',
+        'help.traffic': 'Trafic', 'help.traffic_red': 'Rouge : baisse ≥ {instant} % entre deux relevés, ou {count} baisses consécutives dont la première ≥ {first} %.',
+        'help.traffic_green': 'Vert : hausse ≥ {up} %.', 'help.other_grey': 'Gris : autres cas.', 'help.loss': 'Pertes', 'help.loss_red': 'Rouge : pertes supérieures à {threshold} %.', 'help.loss_green': 'Vert : sous le seuil et en baisse.',
+        'help.rows': 'Lignes et courbes', 'help.row_alert': 'Ligne teintée avec une pastille : une alerte est ouverte sur cette base.', 'help.spark': 'Mini-courbe : trafic des dernières 24 h ; la bande est la valeur attendue (± 15 %) pour ce créneau.',
         'common.cancel': 'Annuler', 'common.close': 'Fermer', 'common.confirm': 'Confirmer', 'common.date': 'Date', 'common.delete': 'Supprimer',
         'common.no': 'non', 'common.none': 'Aucun élément', 'common.yes': 'oui',
         'nav.admin': 'Admin', 'nav.dashboard': 'Tableau de bord', 'nav.supervision': 'Supervision',
@@ -36,7 +44,6 @@ const I18N = {
         'alert.closed_n': 'fermées', 'alert.open_n': 'ouvertes', 'alert.none_filtered': 'Aucune alerte trouvée pour les filtres sélectionnés',
         'alert.none_open': 'Aucune alerte ouverte.', 'alert.use_filters': 'Utilisez les filtres pour voir les alertes fermées', 'alert.none_section': 'Aucune alerte détectée pour cette section',
         'alert.section_prefix': 'Alertes',
-        'badge.traffic': 'traffic', 'badge.losses': 'pertes', 'badge.show': 'Afficher le badge des alertes',
         'filter.title': 'Filtres des alertes', 'filter.status': 'Statut', 'filter.type': 'Type d\'alerte', 'filter.period': 'Période',
         'filter.status_all': 'Toutes les alertes', 'filter.status_open': 'Ouvertes uniquement', 'filter.status_closed': 'Fermées uniquement',
         'filter.type_all': 'Tous les types', 'filter.type_traffic': 'Traffic', 'filter.type_losses': 'Pertes', 'filter.type_db_down': 'DB_DOWN',
@@ -104,6 +111,14 @@ const I18N = {
         'simulation.had_ticket': 'ticket réel', 'simulation.no_ticket': 'pas de ticket'
     },
     en: {
+        'notice.gi': '[Warning] GI Diagnet exit data is unreliable during the Busy Hour because the probes are saturated.',
+        'status.nominal': 'Network nominal', 'status.alerts': '{count} alert(s)', 'status.bases': '{bases} database(s)', 'table.scroll_hint': '↔ Scroll to see all columns',
+        'status.jump': 'Jump to the first database in alert', 'status.loading': 'Loading…',
+        'status.row_alert': 'Open alert: {types}', 'header.menu': 'Menu', 'header.more': 'More actions', 'header.help': 'Legend',
+        'help.title': 'Legend', 'help.arrows': 'Arrows (difference with the reference value: 5 min, 1 day, 1 week)', 'help.arrow_up': '↑ increase', 'help.arrow_down': '↓ decrease', 'help.arrow_flat': '↔ stable',
+        'help.traffic': 'Traffic', 'help.traffic_red': 'Red: drop ≥ {instant}% between two samples, or {count} consecutive drops whose first is ≥ {first}%.',
+        'help.traffic_green': 'Green: increase ≥ {up}%.', 'help.other_grey': 'Grey: other cases.', 'help.loss': 'Losses', 'help.loss_red': 'Red: losses above {threshold}%.', 'help.loss_green': 'Green: below the threshold and decreasing.',
+        'help.rows': 'Rows and curves', 'help.row_alert': 'Tinted row with a badge: an alert is open on this database.', 'help.spark': 'Mini-curve: traffic over the last 24 h; the band is the expected value (± 15%) for that time slot.',
         'common.cancel': 'Cancel', 'common.close': 'Close', 'common.confirm': 'Confirm', 'common.date': 'Date', 'common.delete': 'Delete',
         'common.no': 'no', 'common.none': 'Nothing to show', 'common.yes': 'yes',
         'nav.admin': 'Admin', 'nav.dashboard': 'Dashboard', 'nav.supervision': 'Supervision',
@@ -135,7 +150,6 @@ const I18N = {
         'alert.closed_n': 'closed', 'alert.open_n': 'open', 'alert.none_filtered': 'No alert found for the selected filters',
         'alert.none_open': 'No open alert.', 'alert.use_filters': 'Use the filters to see closed alerts', 'alert.none_section': 'No alert detected for this section',
         'alert.section_prefix': 'Alerts',
-        'badge.traffic': 'traffic', 'badge.losses': 'losses', 'badge.show': 'Show the alerts badge',
         'filter.title': 'Alert filters', 'filter.status': 'Status', 'filter.type': 'Alert type', 'filter.period': 'Period',
         'filter.status_all': 'All alerts', 'filter.status_open': 'Open only', 'filter.status_closed': 'Closed only',
         'filter.type_all': 'All types', 'filter.type_traffic': 'Traffic', 'filter.type_losses': 'Losses', 'filter.type_db_down': 'DB_DOWN',

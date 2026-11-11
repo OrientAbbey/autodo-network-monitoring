@@ -404,3 +404,12 @@ def test_a_rejected_ticket_never_triggers_an_email(supervisor, monkeypatch, sent
     monitoring._process_monitoring({"kribi": crash_snapshot()}, alert_ts, fmt(checkpoint), cfg, {})
     supervisor.post(f"/tickets/api/{tickets.load_open()[0]['id']}/reject", json={"reason": "test"})
     assert sent_emails == []
+
+
+def test_alerts_carry_the_database_key_so_the_ui_can_flag_the_right_row(clean_state):
+    """La ligne du tableau est repérée par la CLÉ de base (`tr[data-db]`), pas par le nom d'affichage de l'alerte."""
+    tickets.persist(tickets.ChangeSet(inserts=[mk(1, database_name="kribi"), mk(2, type="pertes", database_name="wacs_ic")]))
+    alerts = tickets.dashboard_alerts({})
+    assert [(a["db"], a["type"]) for a in alerts["traffic"]] == [("kribi", "TRAFFIC")]
+    assert [(a["db"], a["type"]) for a in alerts["pertes"]] == [("wacs_ic", "PERTES")]
+    assert alerts["traffic"][0]["title"].endswith(alerts["traffic"][0]["location"])                  # le nom d'affichage reste disponible

@@ -4,11 +4,11 @@
 // ====== INITIALISATION ======
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
+    document.querySelectorAll('.notice[data-notice-key]').forEach(n => { try { if (localStorage.getItem(n.dataset.noticeKey)) n.remove(); } catch (e) { /* ignoré */ } });
 
     requestAnimationFrame(() => {
         TabManager.initializeTabs();
         AutoUpdateManager.initializeAutoUpdate();
-        UIUtils.insertHelpIcon();
         GridManager.init();
 
         // Initialize filter sidebar event listeners
@@ -110,6 +110,18 @@ const ACTIONS = {
     toggleSection: (el) => toggleSection(el),
     showTab: (el, e) => showTab(el.dataset.tab, el.dataset.interval, e),
     dismissAlerte: (el) => AlertManager.dismissAlerte(el.dataset.id),
+    jumpToAlert: () => AlertManager.jumpToFirst(),
+    dismissNotice: (button) => {
+        const notice = button.closest('.notice');
+        try { localStorage.setItem(notice.dataset.noticeKey, '1'); } catch (e) { /* stockage indisponible : fermé pour cette page */ }
+        notice.remove();
+    },
+    openHelp: () => UIUtils.openHelp(),
+    toggleAppBar: (button) => {
+        const bar = document.getElementById('appBar');
+        const open = bar.classList.toggle('is-open');
+        button.setAttribute('aria-expanded', String(open));
+    },
 };
 document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-action]');

@@ -8,31 +8,59 @@ const AlertManager = {
         return alerte.status === 'open' && alerte.validation_state !== 'pending';
     },
 
+    /** Résumé affiché : celui du SERVEUR (indépendant des filtres d'affichage) ; à défaut, calculé depuis les alertes reçues. */
+    summary(allAlertes) {
+        if (STATE.alertSummary) return STATE.alertSummary;
+        const open = (allAlertes || []).filter(a => this.isActionable(a));
+        const byDb = {};
+        open.forEach(a => { if (a.db) (byDb[a.db] = byDb[a.db] || new Set()).add(a.type.toLowerCase()); });
+        return { open: open.length, bases: Object.keys(byDb), by_db: Object.fromEntries(Object.entries(byDb).map(([k, v]) => [k, [...v].sort()])),
+            by_type: { traffic: open.filter(a => a.type === 'TRAFFIC').length, pertes: open.filter(a => a.type === 'PERTES').length, db_down: 0 } };
+    },
+
+    typeLabel(type) {
+        return t({ traffic: 'filter.type_traffic', pertes: 'filter.type_losses', db_down: 'filter.type_db_down' }[type] || 'filter.type_traffic');
+    },
+
+    /** Bande d'état de la barre d'application : « Réseau nominal » ou « n alertes · m bases » (icône + texte, jamais la couleur seule). */
     updateBadge(allAlertes) {
-        document.querySelectorAll('#alertes-badge-open, #alertes-badge').forEach(e => e.remove());
+        const strip = document.getElementById('statusStrip');
+        if (!strip) return;
+        const summary = this.summary(allAlertes);
+        const nominal = summary.open === 0;
+        strip.className = `status-strip ${nominal ? 'is-ok' : 'is-bad'}`;
+        strip.querySelector('.status-strip__icon').textContent = nominal ? '✔' : '●';
+        strip.querySelector('.status-strip__text').textContent = nominal ? t('status.nominal') : t('status.alerts', { count: summary.open });
+        strip.querySelector('.status-strip__detail').textContent = nominal ? '' : ` · ${t('status.bases', { bases: summary.bases.length })}`;
+        strip.title = nominal ? '' : [['traffic', summary.by_type.traffic], ['pertes', summary.by_type.pertes], ['db_down', summary.by_type.db_down]]
+            .filter(([, n]) => n > 0).map(([type, n]) => `${this.typeLabel(type)} ${n}`).join(' · ') + ' — ' + t('status.jump');
+        strip.setAttribute('aria-disabled', String(nominal));
+        this.flagRows();
+    },
 
-        const openAlertes = allAlertes.filter(a => this.isActionable(a));
-        const totalOpenAlertes = openAlertes.length;
-        const badgeColor = totalOpenAlertes > 0 ? 'var(--danger)' : 'var(--success)';
+    /** Repère dans le tableau chaque base ayant une alerte ouverte : pastille, teinte de ligne et libellé pour lecteur d'écran. */
+    flagRows() {
+        const byDb = STATE.alertSummary?.by_db || {};
+        document.querySelectorAll('tr[data-db]').forEach(row => {
+            row.querySelectorAll('.alert-flag').forEach(node => node.remove());
+            const types = byDb[row.dataset.db];
+            row.dataset.alert = types?.length ? types.join(' ') : 'none';
+            const cell = row.querySelector('.location-cell');
+            if (!types?.length || !cell) return;
+            const names = types.map(type => this.typeLabel(type)).join(', ');
+            cell.appendChild(el('span', { class: 'alert-flag', title: t('status.row_alert', { types: names }) },
+                el('span', { 'aria-hidden': 'true', text: '●' }), el('span', { class: 'sr-only', text: t('status.row_alert', { types: names }) })));
+        });
+    },
 
-        const badge = el('div', { id: 'alertes-badge', class: 'alertes-badge', style: `background:${badgeColor};display:none` },
-            el('span', { text: `🚨 ${openAlertes.filter(a => a.type === 'TRAFFIC').length} ${t('badge.traffic')}` }),
-            el('span', { style: 'margin-left:10px;', text: `⚠️ ${openAlertes.filter(a => a.type === 'PERTES').length} ${t('badge.losses')}` }));
-        const openBtn = el('div', { id: 'alertes-badge-open', class: 'alertes-badge-open', title: t('badge.show'), role: 'button', tabindex: '0',
-            'aria-label': t('badge.show'), style: `background:${badgeColor};display:flex` }, '🔔',
-            el('span', { class: 'badge-count', style: `background:${badgeColor};display:${totalOpenAlertes > 0 ? 'block' : 'none'}`, text: totalOpenAlertes }));
-
-        const closeBtn = DOM.createCloseBtn();
-        closeBtn.setAttribute('aria-label', t('common.close'));
-        closeBtn.addEventListener('click', e => { badge.style.display = 'none'; openBtn.style.display = 'flex'; e.stopPropagation(); });
-        badge.appendChild(closeBtn);
-        const reveal = () => { badge.style.display = 'flex'; openBtn.style.display = 'none'; };
-        openBtn.addEventListener('click', reveal);
-        openBtn.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); reveal(); } });
-
-        const host = DOM.controls || document.body;
-        host.appendChild(badge);
-        host.appendChild(openBtn);
+    /** Clic sur la bande d'état : va à la première base en alerte (déplie sa section si besoin). */
+    jumpToFirst() {
+        const row = document.querySelector('tr[data-alert]:not([data-alert="none"])');
+        if (!row) return;
+        row.closest('.collapsed')?.classList.remove('collapsed');
+        row.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+        row.setAttribute('tabindex', '-1');
+        row.focus({ preventScroll: true });
     },
 
     /**
@@ -132,6 +160,9 @@ const AlertManager = {
                         return false;
                 }
             });
+
+            const panel = document.getElementById(`section-alertes-${section}`);
+            if (panel) panel.hidden = sectionAlertes.length === 0;      // rien à montrer : le panneau ne prend aucune place
 
             const openAlertes = sectionAlertes.filter(a => a.status === 'open');
             const closedAlertes = sectionAlertes.filter(a => a.status === 'closed');
@@ -317,3 +348,5 @@ const AlertManager = {
         this.updateSectionAlertes(alertesData);
     }
 };
+
+document.addEventListener('dashboard-updated', () => AlertManager.flagRows());
