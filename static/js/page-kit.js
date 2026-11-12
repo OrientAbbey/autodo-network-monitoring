@@ -2,6 +2,9 @@
 // Tout le DOM est construit avec el() (jamais innerHTML). Dépend de : common.js, i18n.js.
 
 const PageKit = {
+    /** Date/heure uniforme « AAAA-MM-JJ HH:MM:SS » (les API renvoient tantôt « T », tantôt des fractions ou un fuseau). */
+    dateTime(value) { return value ? String(value).replace('T', ' ').replace(/(\.\d+)?(Z|[+-]\d\d:?\d\d)?$/, '') : ''; },
+
     /** Exécute `fn` en affichant l'erreur dans un toast ; retourne undefined si elle échoue. */
     async guard(fn) {
         try {

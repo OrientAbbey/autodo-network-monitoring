@@ -53,7 +53,9 @@ PAGE_METRICS = """(minTap) => {
   if (header) {
     const bar = header.querySelector('.app-bar__actions, .controls, .header-tools') || header;
     const kids = [...bar.children].filter(vis);
-    out.header = {height: Math.round(header.getBoundingClientRect().height), controls: kids.length, controlHeights: [...new Set(kids.map(k => Math.round(k.getBoundingClientRect().height)))]};
+    const hb = header.getBoundingClientRect(), vk = [...header.querySelectorAll('.app-bar__brand, .app-bar__center, .app-bar__toggle, .app-bar__actions, .app-nav')].filter(vis).map(k => k.getBoundingClientRect());
+    const overlap = vk.some((a, i) => vk.some((b, j) => j > i && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1));
+    out.header = {height: Math.round(hb.height), overflow: overlap || header.scrollWidth > header.clientWidth + 1, controls: kids.length, controlHeights: [...new Set(kids.map(k => Math.round(k.getBoundingClientRect().height)))]};
   }
   const dataRows = [...document.querySelectorAll('tr[data-db]')].filter(vis);
   if (dataRows.length) {
@@ -183,6 +185,7 @@ def main():
             visit("dashboard_1440_dark", "/", 1440, 900, "tr[data-db]", full=True)
             visit("dashboard_1440_light", "/", 1440, 900, "tr[data-db]", theme="light")
             visit("dashboard_768_dark", "/", 768, 1024, "tr[data-db]")
+            visit("dashboard_1024_dark", "/", 1024, 768, "tr[data-db]")
             visit("dashboard_390_dark", "/", 390, 844, "tr[data-db]", mobile=True)
             visit("tickets_1440_dark", "/tickets/", 1440, 900, ".ticket-card", login=True)
             visit("tickets_1440_light", "/tickets/", 1440, 900, ".ticket-card", theme="light", login=True)
@@ -198,6 +201,7 @@ def main():
     summary = {
         "C1_fonts_dashboard": len(d["fonts"]), "C2_button_styles_dashboard": len(d["buttons"]), "C2_buttons_off_system_dashboard": sorted(set(d["offSystem"])), "C2_button_styles_tickets": len(report["pages"]["tickets_1440_dark"]["buttons"]),
         "C3_header_controls": d["header"]["controls"] if d["header"] else None, "C3_header_height": d["header"]["height"] if d["header"] else None,
+        "C3_header_overflow": {k: v["header"]["overflow"] for k, v in report["pages"].items() if v["header"]},
         "C3_header_height_mobile": (report["pages"]["dashboard_390_dark"]["header"] or {}).get("height"),
         "C4_row_height": d["rows"]["medianHeight"] if d["rows"] else None, "C4_rows_visible": d["rows"]["visibleInViewport"] if d["rows"] else None,
         "C5_page_height": d["docHeight"],

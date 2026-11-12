@@ -673,3 +673,20 @@ def test_mobile_app_bar_is_compact_and_opens_its_actions(stack, browser_ctx):
     wait_js(pg, "document.querySelector('.mobile-card')")
     assert pg.locator(".mobile-card[data-alert]:not([data-alert=none]) .chip").count() >= 1       # l'état d'alerte est écrit, pas seulement coloré
     ctx.close()
+
+
+@pytest.mark.parametrize("width", [768, 1024, 1440])
+def test_app_bar_never_overflows_or_overlaps(stack, browser_ctx, width):
+    ctx = browser_ctx.new_context(viewport={"width": width, "height": 900})
+    pg = ctx.new_page()
+    pg.goto(BASE + "/")
+    pg.wait_for_selector("tr[data-db]")
+    boxes = pg.evaluate("() => [...document.querySelectorAll('#appBar .app-bar__brand, #appBar .app-bar__center, #appBar .app-bar__toggle, #appBar .app-bar__actions')]"
+                        ".filter(e => e.getBoundingClientRect().width > 0).map(e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; })")
+    for i, a in enumerate(boxes):
+        for b in boxes[i + 1:]:
+            assert not (a[0] < b[2] - 1 and b[0] < a[2] - 1 and a[1] < b[3] - 1 and b[1] < a[3] - 1), f"éléments de la barre superposés à {width} px"
+        assert a[2] <= width + 1
+    if width < 1100:
+        assert pg.locator("#appBar").bounding_box()["height"] <= 64
+    ctx.close()

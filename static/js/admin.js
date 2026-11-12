@@ -26,11 +26,11 @@ const Admin = {
         panel.append(PageKit.field(t('usage.period'), select),
             el('div', { class: 'stat-cards' }, this.card(t('usage.viewers_now'), data.viewers_now), this.card(t('usage.unique_ips'), stats.total_unique_ips),
                 this.card(t('usage.avg_daily'), stats.avg_daily_unique), this.card(t('usage.today_unique'), stats.today_unique_count)),
-            PageKit.section(t('usage.peaks'), PageKit.table([{ label: t('common.date'), render: p => p.day }, { label: t('usage.peak'), render: p => p.peak_viewers }, { label: t('usage.at'), render: p => p.peak_at }], data.peaks)),
+            PageKit.section(t('usage.peaks'), PageKit.table([{ label: t('common.date'), render: p => p.day }, { label: t('usage.peak'), render: p => p.peak_viewers }, { label: t('usage.at'), render: p => PageKit.dateTime(p.peak_at) }], data.peaks)),
             PageKit.section(t('usage.alerts'), PageKit.table([{ label: t('common.date'), render: ([d]) => d }, { label: 'Traffic', render: ([, v]) => v.traffic },
                 { label: 'Pertes', render: ([, v]) => v.pertes }, { label: 'DB_DOWN', render: ([, v]) => v.db_down }, { label: 'Total', render: ([, v]) => v.total }], Object.entries(data.alerts_stats))),
             PageKit.section(t('usage.access'), PageKit.table([{ label: t('common.date'), render: l => l.date }, { label: 'IP', render: l => l.ip_address || '' },
-                { label: t('usage.visits'), render: l => l.access_count }, { label: t('usage.users'), render: l => l.unique_users }, { label: t('usage.last'), render: l => l.last_access || '' }], data.access_logs.slice(0, 100))));
+                { label: t('usage.visits'), render: l => l.access_count }, { label: t('usage.users'), render: l => l.unique_users }, { label: t('usage.last'), render: l => PageKit.dateTime(l.last_access) }], data.access_logs.slice(0, 100))));
     },
 
     // ---------------------------------------------------------------- 2. santé
@@ -95,7 +95,7 @@ const Admin = {
         panel.append(PageKit.table([
             { label: t('users.username'), render: s => s.username + (s.current ? ` (${t('users.you')})` : '') }, { label: t('users.role'), render: s => t(`role.${s.role}`) },
             { label: 'IP', render: s => s.ip }, { label: t('sessions.agent'), render: s => (s.user_agent || '').slice(0, 60) },
-            { label: t('sessions.opened'), render: s => s.created_at }, { label: t('sessions.last_seen'), render: s => s.last_seen },
+            { label: t('sessions.opened'), render: s => PageKit.dateTime(s.created_at) }, { label: t('sessions.last_seen'), render: s => PageKit.dateTime(s.last_seen) },
             { label: '', render: s => s.current ? '' : PageKit.button(t('sessions.revoke'), async () => {
                 if (await PageKit.guard(() => api(`/api/admin/sessions/${s.session_id}`, { method: 'DELETE' }))) this.loadSessions(panel);
             }, { danger: true }) }], sessions));
@@ -115,7 +115,7 @@ const Admin = {
         panel.append(el('div', { class: 'inline-form' }, PageKit.field(t('audit.days'), daysInput), PageKit.field(t('audit.action'), actionInput),
             PageKit.button(t('audit.filter'), apply, { primary: true }),
             el('a', { class: 'btn-secondary', id: 'audit-csv', href: `/api/admin/audit.csv?days=${days}`, download: 'autodo-audit.csv', text: t('audit.export') })),
-            PageKit.table([{ label: t('common.date'), render: e => e.at }, { label: t('audit.actor'), render: e => e.actor }, { label: 'IP', render: e => e.ip },
+            PageKit.table([{ label: t('common.date'), render: e => PageKit.dateTime(e.at) }, { label: t('audit.actor'), render: e => e.actor }, { label: 'IP', render: e => e.ip },
                 { label: t('audit.action'), render: e => e.action }, { label: t('audit.target'), render: e => e.target },
                 { label: t('audit.details'), render: e => e.details ? el('code', { text: JSON.stringify(e.details).slice(0, 200) }) : '' }], entries));
     },

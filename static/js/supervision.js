@@ -145,7 +145,7 @@ const Supervision = {
         clear(panel);
         const detail = el('div', { id: 'version-detail', class: 'kit-section' });
         panel.append(el('p', { class: 'hint', text: t('versions.hint') }), PageKit.table([
-            { label: '#', render: v => `v${v.id}` }, { label: t('common.date'), render: v => v.at }, { label: t('versions.author'), render: v => v.actor },
+            { label: '#', render: v => `v${v.id}` }, { label: t('common.date'), render: v => PageKit.dateTime(v.at) }, { label: t('versions.author'), render: v => v.actor },
             { label: t('versions.comment'), render: v => v.comment },
             { label: '', render: v => PageKit.button(t('versions.view'), () => PageKit.guard(() => this.showVersion(v.id, detail, panel))) }], versions), detail);
     },

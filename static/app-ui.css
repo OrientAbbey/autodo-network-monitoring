@@ -75,15 +75,19 @@ a.btn-primary:hover, a.btn-secondary:hover { text-decoration: none; }
 .menu-separator { height: 1px; margin: var(--sp-1) 0; background: var(--border); }
 .menu-group-label { padding: var(--sp-2) var(--sp-3) var(--sp-1); font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 
-/* mobile : barre ≤ 64 px (titre + état + bouton menu) ; les actions s'ouvrent dessous */
+/* écrans étroits (< 1100 px) : barre ≤ 64 px (titre + état + bouton menu) ; les actions s'ouvrent dessous */
+@media (max-width: 1100px) {
+  #appBar { flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
+  #appBar .app-bar__center { order: 2; flex: 0 0 auto; margin-left: auto; }
+  #appBar .app-bar__toggle { display: inline-flex; order: 3; }
+  #appBar .app-bar__actions { order: 4; flex: 1 0 100%; display: none; flex-wrap: wrap; margin-left: 0; padding-top: var(--sp-2); border-top: 1px solid var(--border); }
+  #appBar.is-open .app-bar__actions { display: flex; }
+  #appBar .app-bar__actions > * { flex: 1 1 auto; }
+}
 @media (max-width: 640px) {
   .app-bar { flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
+  .app-nav { order: 5; flex: 1 0 100%; overflow-x: auto; }
   .app-bar__meta { white-space: normal; font-size: var(--fs-xs); }
-  .app-bar__center { order: 2; flex: 0 0 auto; margin-left: auto; }
-  .app-bar__toggle { display: inline-flex; order: 3; }
-  .app-bar__actions { order: 4; flex: 1 0 100%; display: none; flex-wrap: wrap; margin-left: 0; padding-top: var(--sp-2); border-top: 1px solid var(--border); }
-  .app-bar.is-open .app-bar__actions { display: flex; }
-  .app-bar__actions > * { flex: 1 1 auto; }
   .status-strip { padding: 0 var(--sp-3); }
   .status-strip .status-strip__detail { display: none; }
   .menu-list { right: auto; left: 0; }
@@ -262,3 +266,6 @@ tr[data-alert]:not([data-alert="none"]) > td.location-cell { box-shadow: inset 4
 .mobile-card[data-alert]:not([data-alert="none"]) { border-left: 4px solid var(--bad); background: color-mix(in srgb, var(--bad) 8%, var(--surface)); }
 .mobile-card { border-left: 4px solid var(--border); }
 .mobile-card .chip { margin-left: var(--sp-2); }
+#usage-period { align-self: flex-start; width: auto; min-width: 200px; }
+body.wall .value { font-size: var(--fs-xl); }
+body.wall .trend { font-size: var(--fs-md); }
