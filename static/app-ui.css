@@ -235,3 +235,15 @@ body.wall .data-section.wall-hidden { display: none !important; }
 body.wall .data-table td, body.wall .data-table th { font-size: 1.15em; padding: 10px 12px; }
 body.wall .sparkline { width: 130px; height: 30px; }
 .wall-title { position: sticky; top: 0; z-index: 50; background: var(--accent-fill); color: var(--on-accent); font-size: var(--fs-xl); font-weight: 800; padding: 10px 24px; text-align: center; }
+
+/* ---------- U4 — avis, repérage des lignes en alerte ---------- */
+.notice { display: flex; align-items: center; gap: var(--sp-3); margin: 0; padding: var(--sp-2) var(--sp-3); background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--info); border-radius: var(--radius-sm); }
+.notice-warn { border-left-color: var(--warn); }
+.notice__icon { font-size: var(--fs-lg); line-height: 1; color: var(--warn); }
+.notice__text { flex: 1; margin: 0; font-size: var(--fs-sm); }
+.data-section > .notice { margin: var(--sp-3) var(--sp-4); }
+
+tr[data-alert]:not([data-alert="none"]) > td { background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
+tr[data-alert]:not([data-alert="none"]) > .location-cell { box-shadow: inset 4px 0 0 var(--bad); }
+.alert-flag { display: inline-block; margin-left: var(--sp-2); color: var(--bad); font-size: var(--fs-sm); line-height: 1; vertical-align: middle; }
+.location-cell .sparkline { display: inline-block; vertical-align: middle; margin: 0 0 0 var(--sp-2); width: 72px; height: 18px; }

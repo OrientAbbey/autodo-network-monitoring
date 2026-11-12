@@ -79,12 +79,11 @@
 
             <section class="data-section collapsible" id="section-{{ section_id }}" data-section-id="{{ section_id }}">
                 {% if section_id == 'gi' %}
-                <!-- Bannière d'avertissement pour GI -->
-                <div class="gi-warning-banner">
-                    <div class="banner-text">
-                        [Attention] Les données des Sorties GI Diagnet ne sont pas fiables en Busy Hour à cause de la
-                        saturation des Sondes !!!
-                    </div>
+                <!-- Avis GI : statique, fermable (mémorisé) -->
+                <div class="notice notice-warn" id="giNotice" role="note" data-notice-key="autodo.notice.gi.v1">
+                    <span class="notice__icon" aria-hidden="true">⚠</span>
+                    <p class="notice__text" data-i18n="notice.gi">[Attention] Les données des sorties GI Diagnet ne sont pas fiables en Busy Hour à cause de la saturation des sondes.</p>
+                    <button type="button" class="btn-ghost btn-icon" data-action="dismissNotice" data-i18n-attr="aria-label:common.close" aria-label="Fermer">✕</button>
                 </div>
                 {% endif %}
                 <h2 class="section-title" data-action="toggleSection">
