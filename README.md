@@ -31,7 +31,7 @@ core/                   toute la logique, un module = une responsabilité
   monitoring.py         cycle de supervision, tâches périodiques, watchdog, SSE (publication depuis le thread du cycle)
   ratelimit.py  logger.py
 routers/                routes HTTP : dashboard.py (pages, données, SSE, accusés), account.py (connexion), admin.py (supervision + admin), tickets.py
-templates/ static/      interface (aucun script inline : CSP stricte) ; static/js/ : scripts classiques à portée globale partagée, chargés dans
+templates/ static/      interface (refonte graphique : jetons dans static/css/tokens.css, voir CHANTIER_UI.md ; mesures reproductibles : demo/ui_audit.py) (aucun script inline : CSP stricte) ; static/js/ : scripts classiques à portée globale partagée, chargés dans
                         l'ordre common → i18n → prefs → session → sound → … (voir les <script> de chaque gabarit) ; static/app-ui.css = composants communs
 tests/                  unitaires + sécurité + intégration MariaDB ; tests/e2e : Playwright (pile complète simulée)
 demo/                   données simulées, faux API Orange, puits SMTP, prototype de détection, captures d'écran avant/après (voir demo/README.md)

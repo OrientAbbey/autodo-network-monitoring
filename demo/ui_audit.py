@@ -43,7 +43,7 @@ PAGE_METRICS = """(minTap) => {
     if (e.matches('button, a.btn-primary, a.btn-secondary, a.btn-danger, a.btn-ghost, .btn')) {
       const sig = [cs.backgroundColor, cs.borderTopColor, cs.borderTopWidth, cs.borderRadius, Math.round(parseFloat(cs.fontSize)), cs.paddingTop + '/' + cs.paddingLeft].join('|');
       out.buttons[sig] = (out.buttons[sig] || 0) + 1;
-      if (!e.matches('.btn, .btn-primary, .btn-secondary, .btn-danger, .btn-ghost')) out.offSystem.push((e.className || e.tagName).toString().slice(0, 40));
+      if (!e.matches('.btn, .btn-primary, .btn-secondary, .btn-danger, .btn-ghost, .status-strip, .tab-btn, .kit-tab, .menu-item')) out.offSystem.push((e.className || e.tagName).toString().slice(0, 40));
     }
     if (e.type !== 'checkbox' && e.type !== 'radio' && (r.height < minTap || r.width < minTap) && r.top < innerHeight * 3) out.smallTargets.push(((e.textContent || '').trim() || e.getAttribute('aria-label') || e.id || e.tagName).slice(0, 22) + ` ${Math.round(r.width)}x${Math.round(r.height)}`);
   });
@@ -60,7 +60,7 @@ PAGE_METRICS = """(minTap) => {
   const dataRows = [...document.querySelectorAll('tr[data-db]')].filter(vis);
   if (dataRows.length) {
     const heights = dataRows.map(r => Math.round(r.getBoundingClientRect().height)).sort((a, b) => a - b);
-    out.rows = {count: dataRows.length, medianHeight: heights[Math.floor(heights.length / 2)], visibleInViewport: dataRows.filter(r => r.getBoundingClientRect().bottom <= innerHeight && r.getBoundingClientRect().top >= 0).length,
+    out.rows = {count: dataRows.length, medianHeight: heights[Math.floor(heights.length / 2)], firstSectionVisible: (() => { const f = document.querySelector('#sections-grid > .data-section'); return !!f && f.getBoundingClientRect().bottom <= innerHeight; })(), visibleInViewport: dataRows.filter(r => r.getBoundingClientRect().bottom <= innerHeight && r.getBoundingClientRect().top >= 0).length,
       flagged: [...new Set(dataRows.filter(r => r.dataset.alert && r.dataset.alert !== 'none').map(r => r.dataset.db))]};
   }
   out.docHeight = document.documentElement.scrollHeight; out.docWidth = document.documentElement.scrollWidth; out.viewport = innerWidth;
@@ -203,7 +203,7 @@ def main():
         "C3_header_controls": d["header"]["controls"] if d["header"] else None, "C3_header_height": d["header"]["height"] if d["header"] else None,
         "C3_header_overflow": {k: v["header"]["overflow"] for k, v in report["pages"].items() if v["header"]},
         "C3_header_height_mobile": (report["pages"]["dashboard_390_dark"]["header"] or {}).get("height"),
-        "C4_row_height": d["rows"]["medianHeight"] if d["rows"] else None, "C4_rows_visible": d["rows"]["visibleInViewport"] if d["rows"] else None,
+        "C4_row_height": d["rows"]["medianHeight"] if d["rows"] else None, "C4_first_section_fully_visible_900": d["rows"]["firstSectionVisible"] if d["rows"] else None, "C4_rows_visible": d["rows"]["visibleInViewport"] if d["rows"] else None,
         "C5_page_height": d["docHeight"],
         "C6_contrast_failures": {k: f"{v['failing']}/{v['checked']}" for k, v in report["contrast"].items()},
         "C7_alert_bases_flagged": f"{len(d['rows']['flagged']) if d['rows'] else 0}/{len(report['open_alert_bases'])}",

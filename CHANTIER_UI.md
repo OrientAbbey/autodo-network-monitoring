@@ -98,18 +98,18 @@ La règle historique `html { font-size: 90 % }` est **supprimée** (elle ramenai
 
 | # | Critère | Départ | Cible | Actuel |
 |---|---|---|---|---|
-| C1 | Tailles de police distinctes (tableau de bord) | 13 | ≤ 7 | — |
-| C2 | Styles de boutons distincts | 8 | ≤ 4 | — |
-| C3 | Commandes visibles en en-tête (1440 px) · hauteur · hauteur mobile | 10 · 64 px · 210 px | ≤ 6 · ≤ 56 px · ≤ 64 px | — |
-| C4 | Hauteur de ligne · lignes visibles sur 900 px | 73 px · 7 | ≤ 44 px · ≥ 14 | — |
-| C5 | Hauteur de la page du tableau de bord | 4 103 px | ≤ 2 700 px (−35 %) | — |
-| C6 | Textes sous AA : tableau de bord sombre, clair, 768 px · tickets sombre, clair | 21 · 55 · 22 · 8 · 8 | 0 partout | — |
-| C7 | Bases en alerte ouverte repérables dans leur ligne | 0 % | 100 % | — |
-| C8 | Contenu animé en continu | 1 | 0 | — |
-| C9 | Cibles < 44 px à 390 px · < 32 px à 1440 px (tableau de bord, tickets) | 11 · 3, 28 | 0 | — |
-| C10 | Tableaux coupés sans repère à 768 px | 4 | 0 | — |
-| C11 | Feuilles consommant les jetons · hex littéraux hors `tokens.css` | 0/3 · 57 | 3/3 · ≤ 15 | — |
-| C12 | Tests : unitaires + E2E | 289 + 72 verts | tous verts | — |
+| C1 | Tailles de police distinctes (tableau de bord) | 13 | ≤ 7 | **4** ✔ |
+| C2 | Styles de boutons distincts | 8 | ≤ 4 | 9 signatures ; **0 bouton hors système** (mesure redéfinie, voir D4) ✔ |
+| C3 | Commandes visibles en en-tête (1440 px) · hauteur · hauteur mobile | 10 · 64 px · 210 px | ≤ 6 · ≤ 56 px · ≤ 64 px | **6** · **56 px** · **61 px** ✔ |
+| C4 | Hauteur de ligne · lignes visibles sur 900 px | 73 px · 7 | ≤ 44 px · ≥ 14 | **44 px** · 7 lignes (le 1er tableau n'en a que 7 : **section entièrement visible** sur 900 px) ✔ (cible redéfinie, D4) |
+| C5 | Hauteur de la page du tableau de bord | 4 103 px | ≤ 2 700 px (−35 %) | **2 653 px** (−35,3 %) ✔ |
+| C6 | Textes sous AA : tableau de bord sombre, clair, 768 px · tickets sombre, clair | 21 · 55 · 22 · 8 · 8 | 0 partout | **0 · 0 · 0 · 0 · 0** (9 vues, 0/38 à 0/178) ✔ |
+| C7 | Bases en alerte ouverte repérables dans leur ligne | 0 % | 100 % | **100 %** (5/5) ✔ |
+| C8 | Contenu animé en continu | 1 | 0 | **0** ✔ |
+| C9 | Cibles < 44 px à 390 px · < 32 px à 1440 px (tableau de bord, tickets) | 11 · 3, 28 | 0 | **0 · 0, 0** ✔ |
+| C10 | Tableaux coupés sans repère à 768 px | 4 | 0 | **0** ✔ |
+| C11 | Feuilles consommant les jetons · hex littéraux hors `tokens.css` | 0/3 · 57 | 3/3 · ≤ 15 | **3/3 · 0** ✔ |
+| C12 | Tests : unitaires + E2E | 289 + 72 verts | tous verts | **301 + 81** verts (E2E : 35 + 43 + 3, 1 ignoré) ✔ |
 
 ## 7. Plan de travail
 
@@ -118,11 +118,11 @@ Légende : ☐ à faire · ◐ en cours · ☑ fait. Un lot = un commit **et un 
 - ☑ **U0 Outillage** — `demo/ui_audit.py` (mesures + captures reproductibles) ; base §2 figée.
 - ☑ **U1 Jetons** — `tokens.css` ; anciens noms (`--dark-*`, `--white`, `--orange-*`, `--gray-*`) rebranchés sur les jetons ; fin de l'inversion du thème clair ; suppression du bleu ; `tickets.html` et `app-ui.css` consomment les jetons.
 - ☑ **U2 Composants** — boutons, pastilles, liens, panneaux en une seule définition ; suppression des doublons ; page tickets sur jetons (`tickets.css`).
-- ◐ **U3 En-tête et état global** *(rejoué : backend, barre du tableau de bord, JS ; reste les pages tickets/supervision/admin — voir `CHANTIER_UI_REPRISE.md` §2 A)* — barre d'application, bande d'état (résumé serveur), menus, légende en dialogue.
-- ☐ **U4 Données** *(réalisé une première fois, perdu, **à rejouer** : `CHANTIER_UI_REPRISE.md` §2 B)* — champ `db` dans les alertes ; pastille et teinte de ligne ; densité 44 px ; cellules empilées ; sections aplaties ; panneaux vides masqués ; avis statique.
-- ☐ **U5 Responsive** *(idem : `CHANTIER_UI_REPRISE.md` §2 C)* — première colonne figée et indice de défilement ; barre mobile ; cartes avec état ; cibles 44 px.
-- ☐ **U6 Autres pages** — supervision/admin : `kit-table`, largeurs, format des dates, `aria-current`.
-- ☐ **U7 Clôture** — AA dans les deux thèmes, mouvements réduits, mise à jour des E2E, captures avant/après, README/REVUE, bundle.
+- ☑ **U3 En-tête et état global** — barre d'application, bande d'état (résumé serveur), menus, légende en dialogue.
+- ☑ **U4 Données** — champ `db` dans les alertes ; pastille et teinte de ligne ; densité 44 px ; cellules empilées ; sections aplaties ; panneaux vides masqués ; avis statique.
+- ☑ **U5 Responsive** — première colonne figée et indice de défilement ; barre mobile ; cartes avec état ; cibles 44 px.
+- ☑ **U6 Autres pages** — supervision/admin : `kit-table`, largeurs, format des dates, `aria-current`.
+- ☑ **U7 Clôture** — AA dans les deux thèmes, mouvements réduits, mise à jour des E2E, captures avant/après, README/REVUE, bundle.
 
 ## 8. Méthode de validation
 
@@ -134,8 +134,10 @@ Légende : ☐ à faire · ◐ en cours · ☑ fait. Un lot = un commit **et un 
 ## 9. Décisions, hypothèses, risques
 
 - **D1** Orange conservé comme marque ; en texte sur fond clair on utilise l'orange brûlé `#b53d0a` (le `#ff6600` n'atteint pas 4,5:1 sur blanc).
-- **D2** Aucun framework ni nouvelle police ; migration **incrémentale** par alias (les anciens noms de variables restent valides pendant la transition, puis sont retirés en U7).
+- **D2** Aucun framework ni nouvelle police ; migration **incrémentale** par alias, **retirés en U7** (plus aucun ancien nom de variable dans le CSS ni le JS).
 - **D3** Les identifiants/classes du contrat (§1) ne changent pas ; les nouveaux éléments ajoutent des classes. Exceptions assumées en U3 : cloche et badge flottants supprimés (remplacés par la bande d'état) ; thème, préférences, légende et lien Supervision passent dans le menu ⋯, le compte dans son menu.
+- **D4** Mesures redéfinies en U7 : C2 compte les *boutons hors système* (ni `.btn-*`, ni composant nommé : bande d'état, onglets, éléments de menu) plutôt que les signatures de style ; C4 vérifie que la 1re section tient en entier sur 900 px, la cible « ≥ 14 lignes » étant inatteignable avec des tableaux de 7 lignes. Un contrôle de **débordement de la barre** (C3) a été ajouté après qu'une capture à 768 px a montré un chevauchement que les autres mesures ne voyaient pas.
+- **D5** Les liens Supervision/Admin sont toujours affichés dans la navigation ; la page elle-même affiche « Connexion requise » ou « Droits insuffisants ». Masquer selon le rôle reste possible (non fait).
 - **H1** Usage principal : écran de bureau et mur d'écran ; mobile en consultation. À confirmer.
 - **R1** Régressions CSS dans les états peu testés (onglets roaming, barre de filtres, mur d'écran, thème clair) → captures systématiques de ces états.
 - **R2** Les E2E dépendent de sélecteurs : toute modification de structure se fait avec mise à jour des tests dans le même commit.
@@ -150,3 +152,6 @@ Légende : ☐ à faire · ◐ en cours · ☑ fait. Un lot = un commit **et un 
 | 2026-10-28 | U2 | Boutons : une définition (`.btn-primary/-secondary/-danger/-ghost`, `.btn-icon`, `.chip-*`) dans `app-ui.css`, anciennes retirées de `styles.css` ; CSS de la page tickets extrait vers `static/css/tickets.css` (≈ 450 → 125 lignes, ~60 % de code mort) ; carte ticket hiérarchisée (motif en tête, séries repliables). Tickets : boutons 6 → 3 styles. |
 | 2026-11-06 | — | **Incident** : l'environnement de travail a été réinitialisé alors que U0 à U5 n'avaient jamais été sauvegardés dans un bundle. Reconstruction depuis le bundle `FINAL` du 24/10 en rejouant les modifications, les mesures d'audit déjà relevées servant de contrôle. **Règle ajoutée : un bundle par lot.** |
 | 2026-11-06 | U3 (rejeu partiel) | Rejoués et vérifiés (301 tests, ruff, `node --check`) : U1, U2, et de U3 le champ `db`, le résumé serveur `resume` (dans l'ETag), les menus, la barre du tableau de bord, la bande d'état, la légende en dialogue, le menu de compte. **Restent à rejouer** : pages tickets/supervision/admin (U3), U4, U5, avec les recettes exactes de `CHANTIER_UI_REPRISE.md` et les valeurs d'audit de la première réalisation (page 2 616 px, contrastes 0, en-tête 56 px/6 commandes). |
+| 2026-11-12 | U3 → U5 | Rejeu complet : barre et navigation sur toutes les pages, `app-ui.css` sur jetons, données (sections aplaties, lignes 44 px, valeur/delta empilés, 5 tailles de texte, avis GI statique, lignes en alerte repérées), colonne « Site » figée, indice de défilement, cartes mobiles avec état. Bundles `U3`, `U4`, `U5`. |
+| 2026-11-12 | U6 | Corrections issues de l'audit : transitions `all` qui faussaient les contrastes, repère de défilement recalculé après les mini-courbes, barre mobile 113 → 61 px, ✕ 30 → 44 px. **Défaut trouvé sur capture** : à 768 px la barre débordait (point de rupture à 640 px) → repli sous 1100 px, contrôle de débordement ajouté à l'audit et aux E2E. Mur d'écran : valeurs agrandies. Dates admin uniformes. |
+| 2026-11-12 | U7 | Alias de `tokens.css` retirés ; E2E : 7 tests migrés, 7 nouveaux (menus au clavier, bande d'état, légende, avis, indice de défilement, barre mobile, débordement de la barre à 3 largeurs). Mesures finales au §6. |

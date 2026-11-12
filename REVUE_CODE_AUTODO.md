@@ -894,3 +894,10 @@ pip install -r requirements.lock.txt
 ```
 
 *Fin du rapport.*
+
+## Annexe D — Refonte graphique (novembre 2026)
+
+Interface refaite sur un seul vocabulaire visuel (`static/css/tokens.css`, deux thèmes + daltonisme) : barre d'application de 56 px à 6 commandes avec bande d'état,
+lignes de 44 px, 4 tailles de police sur le tableau de bord, 0 contraste sous AA (9 vues), 0 couleur littérale hors jetons, repérage des bases en alerte (pastille + teinte),
+indice de défilement des tableaux larges, cartes mobiles avec état. Mesures et méthode : `CHANTIER_UI.md` §6 et §8 ; E2E : 81 tests verts. Limites : Chromium seul testé ;
+liens Supervision/Admin visibles pour tous (D5) ; l'incident du 06/11 (travail perdu faute de bundle) a conduit à la règle « un bundle par lot ».
