@@ -247,3 +247,16 @@ tr[data-alert]:not([data-alert="none"]) > td { background: color-mix(in srgb, va
 tr[data-alert]:not([data-alert="none"]) > .location-cell { box-shadow: inset 4px 0 0 var(--bad); }
 .alert-flag { display: inline-block; margin-left: var(--sp-2); color: var(--bad); font-size: var(--fs-sm); line-height: 1; vertical-align: middle; }
 .location-cell .sparkline { display: inline-block; vertical-align: middle; margin: 0 0 0 var(--sp-2); width: 72px; height: 18px; }
+
+/* ---------- U5 — responsive : colonne « Site » figée, indice de défilement, cartes avec état ---------- */
+.data-table th:first-child, .data-table td.location-cell { position: sticky; left: 0; z-index: 1; }
+.data-table th:first-child { background: var(--surface-2); z-index: 2; }
+.data-table td.location-cell { box-shadow: 1px 0 0 var(--border); }
+tr[data-alert]:not([data-alert="none"]) > td.location-cell { box-shadow: inset 4px 0 0 var(--bad), 1px 0 0 var(--border); }
+.scroll-hint { padding: var(--sp-1) var(--sp-3); font-size: var(--fs-xs); color: var(--text-muted); background: var(--surface-2); border-bottom: 1px solid var(--border); }
+.table-wrapper[data-scrollable] { box-shadow: inset -12px 0 10px -10px rgba(0, 0, 0, 0.35); }
+@media (max-width: 640px) {
+  .app-bar__meta .last-update, .app-bar__meta .next-label, .app-bar__meta .countdown { display: none; }
+}
+.mobile-card[data-alert]:not([data-alert="none"]) { border-left: 4px solid var(--bad); background: color-mix(in srgb, var(--bad) 8%, var(--surface)); }
+.mobile-card .chip { margin-left: var(--sp-2); }

@@ -22,7 +22,7 @@ const MobileCards = {
                 $$('tbody tr[data-db]', table).forEach(row => {
                     const key = `${section.dataset.sectionId}:${row.dataset.db}`;
                     const cells = Array.from(row.cells);
-                    const card = cards.get(key) || { name: cells[0].firstChild?.textContent.trim() || row.dataset.db, db: row.dataset.db, section: sectionName, rows: [], spark: cells[0].querySelector('.sparkline') };
+                    const card = cards.get(key) || { name: cells[0].firstChild?.textContent.trim() || row.dataset.db, db: row.dataset.db, alert: row.dataset.alert || 'none', section: sectionName, rows: [], spark: cells[0].querySelector('.sparkline') };
                     if (isTcp) {
                         card.rows.push([t('card.latency'), this.cellValue(cells, 1)], [t('card.tcp_no_response'), this.cellValue(cells, 5)]);
                     } else {
@@ -34,8 +34,10 @@ const MobileCards = {
         });
         clear(host);
         host.hidden = cards.size === 0;
-        cards.forEach(card => host.appendChild(el('article', { class: 'mobile-card', dataset: { db: card.db } },
-            el('h3', {}, card.name, el('small', { class: 'card-section', text: card.section })),
+        cards.forEach(card => host.appendChild(el('article', { class: 'mobile-card', dataset: { db: card.db, alert: card.alert } },
+            el('h3', {}, card.name,
+                card.alert !== 'none' ? el('span', { class: 'chip chip-bad', text: `● ${card.alert.split(' ').map(type => AlertManager.typeLabel(type)).join(', ')}` }) : null,
+                el('small', { class: 'card-section', text: card.section })),
             card.spark ? card.spark.cloneNode(true) : null,
             el('dl', {}, card.rows.map(([label, value]) => [el('dt', { text: label }), el('dd', { text: value })])))));
     }

@@ -12,10 +12,10 @@ from core.config import ConfigParams
 ROOT = Path(__file__).resolve().parent.parent
 JS_DIR = ROOT / "static" / "js"
 TEMPLATES = ROOT / "templates"
-NEW_FILES = ["common", "prefs", "session", "sound", "a11y", "ui", "wall", "sparklines", "mobile-cards", "page-kit", "supervision", "admin",
+NEW_FILES = ["common", "prefs", "session", "sound", "a11y", "ui", "wall", "sparklines", "table-scroll", "mobile-cards", "page-kit", "supervision", "admin",
              "ticket-actions", "param-labels"]
 PAGE_SCRIPTS = {
-    "dashboard.html": ["common", "i18n", "prefs", "session", "sound", "a11y", "ui", "state", "alerts", "live", "sections", "theme-filters", "render", "sparklines", "mobile-cards", "wall", "main"],
+    "dashboard.html": ["common", "i18n", "prefs", "session", "sound", "a11y", "ui", "state", "alerts", "live", "sections", "theme-filters", "render", "sparklines", "table-scroll", "mobile-cards", "wall", "main"],
     "base_app.html": ["common", "i18n", "prefs", "session", "sound", "a11y", "ui", "param-labels", "page-kit"],
     "tickets.html": ["common", "i18n", "prefs", "session", "sound", "a11y", "ui", "page-kit", "ticket-actions"],
 }
