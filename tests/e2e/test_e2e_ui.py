@@ -68,21 +68,23 @@ def test_every_data_row_carries_its_database_key(stack, page):
 def test_language_switch_translates_and_persists(stack, page):
     page.goto(BASE + "/")
     page.wait_for_selector("tr[data-db]")
+    page.click("#moreBtn")
     page.click("#prefsBtn")
     page.check("#prefs-dialog input[name=lang][value=en]")
-    assert page.inner_text("#autoUpdateBtn").strip() == "Auto update"
+    assert "Auto update" in page.inner_text("#autoUpdateBtn")
     assert page.get_attribute("html", "lang") == "en"
     assert "International Exit" in page.inner_text("#sections-grid")
     page.screenshot(path=str(SHOTS / "C02_prefs_dialog_en.png"))
     page.click("#prefs-dialog [data-action=closeDialog]")
     page.reload()
     page.wait_for_selector("tr[data-db]")
-    assert page.inner_text("#autoUpdateBtn").strip() == "Auto update"                         # mémorisé dans le navigateur
+    assert "Auto update" in page.inner_text("#autoUpdateBtn")                         # mémorisé dans le navigateur
     page.evaluate("localStorage.clear()")
 
 
 def test_palette_and_theme_preferences(stack, page):
     page.goto(BASE + "/")
+    page.click("#moreBtn")
     page.click("#prefsBtn")
     page.check("#prefs-dialog input[name=palette][value=colorblind]")
     page.check("#prefs-dialog input[name=theme][value=light]")
@@ -92,6 +94,7 @@ def test_palette_and_theme_preferences(stack, page):
 
 def test_share_link_applies_language_theme_palette_but_never_sound(stack, browser_ctx, page):
     page.goto(BASE + "/")
+    page.click("#moreBtn")
     page.click("#prefsBtn")
     page.check("#prefs-dialog input[name=lang][value=en]")
     page.check("#prefs-dialog input[name=palette][value=colorblind]")
@@ -248,13 +251,14 @@ def test_role_gates_on_reserved_pages(stack, supervisor, admin_api, page):
     assert "Droits insuffisants" in page.inner_text(".gate")                                     # superviseur ≠ admin
     page.goto(BASE + "/supervision")
     page.wait_for_selector("#tab-params")
-    assert page.locator("#nav-admin").count() == 0 and page.locator("#nav-supervision").count() == 1
+    assert page.get_attribute(".app-nav a[aria-current=page]", "href") == "/supervision"
 
 
 def test_logout_returns_to_visitor_and_leaves_reserved_pages(stack, supervisor, page):
     api_login(page, "sup1", SUP_PASSWORD)
     page.goto(BASE + "/supervision")
     page.wait_for_selector("#tab-params")
+    page.click("#accountBtn")
     page.click("#logoutBtn")
     page.wait_for_url(BASE + "/")
     page.wait_for_selector("#loginBtn")
@@ -587,3 +591,85 @@ def test_all_pages_are_clean_for_an_admin(stack, admin_api, page):
         page.wait_for_selector("#account-name", timeout=10000)
         page.wait_for_timeout(1200)
     assert problems == [], problems
+
+
+# ---------------------------------------------------------------- refonte graphique (U3 à U5)
+def test_more_menu_is_operable_with_the_keyboard(stack, page):
+    page.goto(BASE + "/")
+    page.wait_for_selector("tr[data-db]")
+    page.focus("#moreBtn")
+    page.keyboard.press("ArrowDown")
+    assert page.get_attribute("#moreBtn", "aria-expanded") == "true"
+    assert page.evaluate("() => document.activeElement.id") == "themeToggleBtn"
+    page.keyboard.press("ArrowDown")
+    assert page.evaluate("() => document.activeElement.id") == "prefsBtn"
+    page.keyboard.press("End")
+    assert page.evaluate("() => document.activeElement.id") == "configLink"
+    page.keyboard.press("Escape")
+    assert page.get_attribute("#moreBtn", "aria-expanded") == "false"
+    assert page.evaluate("() => document.activeElement.id") == "moreBtn"                        # le focus revient au bouton
+
+
+def test_status_strip_shows_alerts_and_jumps_to_the_row(stack, page):
+    insert_ticket(990101, database_name="kribi", reason="Test bande d'état")
+    ack_all()                                                                                    # la pop-up modale bloquerait le clic ; l'API invalide aussi le cache serveur
+    page.goto(BASE + "/")
+    page.wait_for_selector("tr[data-db]")
+    wait_js(page, "document.getElementById('statusStrip').classList.contains('is-bad')")
+    assert "alerte" in page.inner_text("#statusStrip")
+    row = page.locator("tr[data-db='kribi']").first
+    assert row.get_attribute("data-alert") not in (None, "none")
+    assert row.locator(".alert-flag").count() == 1                                                 # repère : pastille, pas la couleur seule
+    page.click("#statusStrip")
+    wait_js(page, "document.activeElement && document.activeElement.closest('tr[data-alert]') || "
+                  "document.querySelector('tr[data-alert]:not([data-alert=none])').getBoundingClientRect().top < innerHeight")
+
+
+def test_legend_opens_from_the_menu_and_closes_with_escape(stack, page):
+    page.goto(BASE + "/")
+    page.wait_for_selector("tr[data-db]")
+    page.click("#moreBtn")
+    page.click("#helpBtn")
+    page.wait_for_selector("#help-dialog[open]")
+    page.keyboard.press("Escape")
+    page.wait_for_selector("#help-dialog", state="detached")
+
+
+def test_gi_notice_is_static_and_dismissal_is_remembered(stack, page):
+    page.goto(BASE + "/")
+    page.wait_for_selector("tr[data-db]")
+    notice = page.locator("#giNotice")
+    assert notice.is_visible()
+    assert page.evaluate("() => getComputedStyle(document.getElementById('giNotice').querySelector('.notice__text')).animationName") == "none"
+    notice.locator("button").click()
+    assert page.locator("#giNotice").count() == 0
+    page.reload()
+    page.wait_for_selector("tr[data-db]")
+    assert page.locator("#giNotice").count() == 0                                                 # mémorisé
+    page.evaluate("localStorage.clear()")
+
+
+def test_wide_table_gets_a_scroll_hint_at_tablet_width(stack, browser_ctx):
+    ctx = browser_ctx.new_context(viewport={"width": 768, "height": 1024})
+    pg = ctx.new_page()
+    pg.goto(BASE + "/")
+    pg.wait_for_selector("tr[data-db]")
+    wait_js(pg, "document.querySelector('#table-wrapper-international_gi[data-scrollable]')")
+    assert pg.locator("#table-wrapper-international_gi").evaluate("w => w.previousElementSibling.classList.contains('scroll-hint') && !w.previousElementSibling.hidden")
+    assert pg.evaluate("() => document.documentElement.scrollWidth <= innerWidth")                 # la page ne défile pas, le tableau si
+    ctx.close()
+
+
+def test_mobile_app_bar_is_compact_and_opens_its_actions(stack, browser_ctx):
+    ctx = browser_ctx.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    pg = ctx.new_page()
+    pg.goto(BASE + "/")
+    pg.wait_for_selector("tr[data-db]", state="attached")
+    assert pg.locator("#appBar").bounding_box()["height"] <= 64
+    assert not pg.locator("#autoUpdateBtn").is_visible()
+    pg.click("#appBarToggle")
+    assert pg.get_attribute("#appBarToggle", "aria-expanded") == "true" and pg.locator("#autoUpdateBtn").is_visible()
+    pg.click("#appBarToggle")
+    wait_js(pg, "document.querySelector('.mobile-card')")
+    assert pg.locator(".mobile-card[data-alert]:not([data-alert=none]) .chip").count() >= 1       # l'état d'alerte est écrit, pas seulement coloré
+    ctx.close()

@@ -212,8 +212,14 @@ def test_alert_popup_is_an_accessible_modal_with_focus_management_and_escape(sta
 
 def test_icon_buttons_have_accessible_names_and_toggle_state(stack, page):
     _open_dashboard(page)
-    for sel in ("#themeToggleBtn", "#filterBtn", "#configLink", "#prefsBtn"):
+    for sel in ("#moreBtn", "#filterBtn"):
         assert page.get_attribute(sel, "aria-label"), f"{sel} sans libellé accessible"
+    assert page.get_attribute("#moreBtn", "aria-haspopup") == "menu" and page.get_attribute("#moreBtn", "aria-expanded") == "false"
+    page.click("#moreBtn")
+    assert page.get_attribute("#moreBtn", "aria-expanded") == "true"
+    for sel in ("#themeToggleBtn", "#prefsBtn", "#helpBtn", "#configLink"):
+        assert page.inner_text(sel).strip(), f"{sel} sans libellé"
+    page.keyboard.press("Escape")
     before = page.get_attribute("#autoUpdateBtn", "aria-pressed")
     page.evaluate("() => { const o = document.getElementById('alert-popup'); if (o) o.style.display = 'none'; }")
     page.click("#autoUpdateBtn")
@@ -227,7 +233,7 @@ def test_keyboard_only_reaches_the_main_controls(stack, page):
     for _ in range(14):
         page.keyboard.press("Tab")
         seen.add(page.evaluate("() => document.activeElement && document.activeElement.id"))
-    assert {"autoUpdateBtn", "themeToggleBtn", "prefsBtn", "configLink"} <= seen
+    assert {"statusStrip", "autoUpdateBtn", "filterBtn", "moreBtn"} <= seen
 
 
 # ====================================================================== mobile & second navigateur
