@@ -269,3 +269,4 @@ tr[data-alert]:not([data-alert="none"]) > td.location-cell { box-shadow: inset 4
 #usage-period { align-self: flex-start; width: auto; min-width: 200px; }
 body.wall .value { font-size: var(--fs-xl); }
 body.wall .trend { font-size: var(--fs-md); }
+.app-nav a { white-space: nowrap; }
