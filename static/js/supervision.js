@@ -67,7 +67,7 @@ const Supervision = {
             clear(summary);
             const keys = Object.keys(this.overridesDraft).filter(k => Object.keys(this.overridesDraft[k] || {}).length);
             summary.appendChild(el('strong', { text: t('overrides.with_custom') + ' ' }));
-            summary.append(...(keys.length ? keys.map(k => el('span', { class: 'chip', text: `${k} (${Object.keys(this.overridesDraft[k]).length})` })) : [t('common.none')]));
+            summary.append(...(keys.length ? keys.map(k => el('span', { class: 'chip chip-muted', text: `${k} (${Object.keys(this.overridesDraft[k]).length})` })) : [t('common.none')]));
         };
 
         const renderBase = () => {

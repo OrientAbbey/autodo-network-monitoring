@@ -11,19 +11,22 @@
 </head>
 
 <body data-requires="{{ requires }}" class="app-page">
+    <header class="app-bar">
+        <div class="app-bar__brand"><h1 class="app-bar__title">AUTODO</h1></div>
+        <nav class="app-nav" aria-label="Navigation">
+            <a href="/" data-i18n="nav.dashboard">Tableau de bord</a>
+            <a href="/tickets/" data-i18n="header.tickets">Tickets</a>
+            <a href="/supervision" {% if requires == 'supervision' %}aria-current="page"{% endif %} data-i18n="nav.supervision">Supervision</a>
+            <a href="/admin" {% if requires == 'admin' %}aria-current="page"{% endif %} data-i18n="nav.admin">Admin</a>
+        </nav>
+        <div class="app-bar__actions">
+            <button id="prefsBtn" class="btn-secondary btn-icon" type="button" data-action="openPrefs" data-i18n-attr="title:prefs.title;aria-label:prefs.title"
+                title="Préférences" aria-label="Préférences">🎛️</button>
+            <div id="account-widget" class="account-widget"></div>
+        </div>
+    </header>
     <div class="main-container">
-        <header class="header">
-            <div class="header-content">
-                <h1 class="page-title" data-i18n="{{ title_key }}">{{ title_default }}</h1>
-                <div class="controls">
-                    <a class="btn-secondary" href="/" data-i18n="nav.dashboard">Tableau de bord</a>
-                    <a class="btn-secondary" href="/tickets/" data-i18n="header.tickets">Tickets</a>
-                    <button id="prefsBtn" class="btn-secondary" type="button" data-action="openPrefs" data-i18n-attr="title:prefs.title;aria-label:prefs.title"
-                        title="Préférences" aria-label="Préférences">🎛️</button>
-                    <div id="account-widget" class="account-widget"></div>
-                </div>
-            </div>
-        </header>
+        <h2 class="page-heading" data-i18n="{{ title_key }}">{{ title_default }}</h2>
         <main id="app" class="page-content" aria-live="polite"></main>
     </div>
     <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>

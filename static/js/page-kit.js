@@ -57,7 +57,7 @@ const PageKit = {
     /** Tableau : columns = [{ label, render(row) -> Node|string, class }]. */
     table(columns, rows, { empty = t('common.none'), caption } = {}) {
         if (!rows.length) return el('p', { class: 'hint empty', text: empty });
-        return el('div', { class: 'table-scroll' }, el('table', { class: 'detail-table kit-table' },
+        return el('div', { class: 'table-scroll' }, el('table', { class: 'kit-table' },
             caption ? el('caption', { class: 'sr-only', text: caption }) : null,
             el('thead', {}, el('tr', {}, columns.map(c => el('th', { scope: 'col', class: c.class || '', text: c.label })))),
             el('tbody', {}, rows.map(row => el('tr', {}, columns.map(c => el('td', { class: c.class || '' }, c.render(row))))))));

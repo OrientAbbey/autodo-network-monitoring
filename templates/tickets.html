@@ -11,16 +11,33 @@
 </head>
 
 <body>
+    <header class="app-bar">
+        <div class="app-bar__brand"><h1 class="app-bar__title">AUTODO</h1></div>
+        <nav class="app-nav" aria-label="Navigation">
+            <a href="/" data-i18n="nav.dashboard">Tableau de bord</a>
+            <a href="/tickets/" aria-current="page" data-i18n="header.tickets">Tickets</a>
+            <a href="/supervision" data-i18n="nav.supervision">Supervision</a>
+            <a href="/admin" data-i18n="nav.admin">Admin</a>
+        </nav>
+        <div class="app-bar__actions">
+            <button id="prefsBtn" class="btn-secondary btn-icon" type="button" data-action="openPrefs" data-i18n-attr="title:prefs.title;aria-label:prefs.title" title="Préférences" aria-label="Préférences">🎛️</button>
+            <div id="account-widget" class="account-widget"></div>
+        </div>
+    </header>
     <div class="container">
-        <div class="header">
-            <h1>Network Monitoring Tickets</h1>
-            <div class="header-tools"><button id="prefsBtn" class="btn-secondary" type="button" data-action="openPrefs" data-i18n-attr="title:prefs.title;aria-label:prefs.title" title="Préférences" aria-label="Préférences">🎛️</button><div id="account-widget" class="account-widget"></div></div>
-            <div class="filters-toggle-container">
-                <button class="btn-primary" data-action="toggleFilters" aria-label="Afficher ou masquer les filtres">
+        <h2 class="page-heading">Network Monitoring Tickets</h2>
+        <div class="results-info">
+            <div>
+                <span id="resultsCount">Loading tickets...</span>
+                <span id="ttrSummary" class="results-ttr"></span>
+            </div>
+            <div class="button-group">
+                <div class="filters-toggle-container">
+                <button class="btn-secondary" data-action="toggleFilters" aria-label="Afficher ou masquer les filtres">
                     🔍 Filters <span id="filter-arrow">▼</span>
                 </button>
                 <div class="filters-container" id="filters-container">
-                    <div class="filter-label" style="text-align: center; margin-bottom: 15px;">🔍 Filters</div>
+                    <div class="filter-label filter-heading">🔍 Filters</div>
                     <div class="filter-group">
                         <label class="filter-label">ID Search:</label>
                         <input type="text" id="idSearch" class="filter-input" placeholder="Enter ticket ID...">
@@ -69,25 +86,16 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div style="display: flex; gap: 10px; margin-top: 15px;">
-                        <button class="btn-primary" style="flex: 1;" data-action="applyFilters">Apply</button>
-                        <button class="btn-secondary" style="flex: 1;" data-action="clearFilters">Clear</button>
+                    <div class="filter-actions">
+                        <button class="btn-primary" data-action="applyFilters">Apply</button>
+                        <button class="btn-secondary" data-action="clearFilters">Clear</button>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <div class="results-info">
-            <div>
-                <span id="resultsCount">Loading tickets...</span>
-                <span id="ttrSummary" style="color: var(--light-orange); margin-left: 20px;"></span>
-            </div>
-            <div class="button-group">
-                <button class="btn-secondary" data-action="goDashboard">📊 Dashboard</button>
                 <button class="btn-primary" data-action="refresh" aria-label="Actualiser la liste des tickets">🔄 Refresh</button>
             </div>
         </div>
-        <div id="activeFilters" style="color: var(--light-orange); font-size: 0.95em; margin-bottom: 10px;"></div>
+        <div id="activeFilters" class="results-filters"></div>
         <div class="tickets-grid" id="tickets-container"></div>
     </div>
 

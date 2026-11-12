@@ -241,7 +241,7 @@ body {
 
 .alert-popup-header {
   background: var(--danger);
-  color: var(--white);
+  color: var(--on-accent);
   padding: 20px;
   border-radius: var(--border-radius) var(--border-radius) 0 0;
   display: flex;
@@ -310,7 +310,7 @@ body {
 
 .alert-section-title .badge-open {
   background: var(--success);
-  color: var(--white);
+  color: var(--on-accent);
   padding: 4px 8px;
   border-radius: 12px;
   font-size: 0.8rem;
@@ -319,7 +319,7 @@ body {
 
 .alert-section-title .badge-closed {
   background: var(--danger);
-  color: var(--white);
+  color: var(--on-accent);
   padding: 4px 8px;
   border-radius: 12px;
   font-size: 0.8rem;
@@ -523,7 +523,7 @@ body {
 
 .section-title .badge-open {
   background: var(--danger);
-  color: var(--white);
+  color: var(--on-accent);
   padding: 2px 6px;
   border-radius: 8px;
   font-size: 0.7rem;
@@ -533,7 +533,7 @@ body {
 
 .section-title .badge-closed {
   background: var(--success);
-  color: var(--white);
+  color: var(--on-accent);
   padding: 2px 6px;
   border-radius: 8px;
   font-size: 0.7rem;
@@ -810,12 +810,12 @@ body {
 
 .section-type.gi {
   background: var(--success);
-  color: var(--white);
+  color: var(--on-accent);
 }
 
 .section-type.camtel {
   background: var(--danger);
-  color: var(--white);
+  color: var(--on-accent);
 }
 
 .section-type.roaming {
@@ -959,7 +959,7 @@ html {
 .gi-warning-banner {
   width: 100%;
   background: var(--danger);
-  color: var(--white);
+  color: var(--on-accent);
   padding: 10px 0;
   margin-bottom: 15px;
   border-radius: var(--border-radius);
