@@ -58,12 +58,12 @@
 .close-sidebar-btn {
   background: none;
   border: none;
-  color: white;
+  color: var(--on-accent);
   font-size: var(--fs-lg);
   cursor: pointer;
   padding: 0;
-  width: 30px;
-  height: 30px;
+  width: var(--control-h);
+  height: var(--control-h);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -138,51 +138,12 @@
 .filter-status {
   margin-top: 10px;
   padding: 8px 12px;
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
+  background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+  border: 1px solid var(--warn);
   border-radius: 4px;
-  color: #856404;
+  color: var(--text);
   font-size: var(--fs-sm);
   text-align: center;
-}
-
-/* Dark theme adjustments for sidebar */
-:root[data-theme="dark"] .filter-sidebar {
-  background: var(--dark-secondary);
-  border-left-color: var(--gray-light);
-}
-
-:root[data-theme="dark"] .filter-sidebar-header {
-  background: var(--orange-primary);
-}
-
-:root[data-theme="dark"] .filter-option:hover {
-  background: var(--dark-light);
-}
-
-:root[data-theme="dark"] .filter-group h4 {
-  color: var(--white);
-  border-bottom-color: var(--gray-light);
-}
-
-:root[data-theme="dark"] .filter-option span {
-  color: var(--white);
-}
-
-:root[data-theme="dark"] .filter-actions .btn-secondary {
-  background: var(--dark-light);
-  color: var(--white);
-  border-color: var(--gray-light);
-}
-
-:root[data-theme="dark"] .filter-actions .btn-secondary:hover {
-  background: var(--gray-light);
-}
-
-:root[data-theme="dark"] .filter-status {
-  background: rgba(255, 193, 7, 0.1);
-  border-color: rgba(255, 193, 7, 0.3);
-  color: #ffc107;
 }
 
 /* Mobile responsiveness */
@@ -447,12 +408,12 @@ body {
 
 /* ===== ALERTES ===== */
 .alert {
-  background: #1a1a1a;
-  color: var(--white);
+  background: var(--surface-2);
+  color: var(--text);
   padding: 15px 20px;
   border-radius: var(--border-radius);
   margin-bottom: 20px;
-  border: 2px solid #1a1a1a;
+  border: 2px solid var(--surface-2);
 }
 
 .alert h3 {
@@ -465,9 +426,10 @@ body {
 }
 
 /* ===== SECTIONS EXTENSIBLES ===== */
+/* seul le fond est animé : une transition « all » faussait aussi la couleur du texte (et les mesures de contraste) */
 .collapsible .section-title {
   user-select: none;
-  transition: var(--transition);
+  transition: background var(--transition);
 }
 
 .collapsible .section-title:hover { background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); }
@@ -476,7 +438,7 @@ body {
 
 .toggle-icon {
   font-size: var(--fs-xs);
-  transition: var(--transition);
+  transition: transform var(--transition);
   cursor: pointer;
 }
 

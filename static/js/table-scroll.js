@@ -16,5 +16,5 @@ const TableScroll = {
     }
 };
 
-['dashboard-updated', 'resize'].forEach(name => (name === 'resize' ? window : document).addEventListener(name, () => requestAnimationFrame(() => TableScroll.update())));
+['dashboard-updated', 'sparklines-ready', 'resize'].forEach(name => (name === 'resize' ? window : document).addEventListener(name, () => requestAnimationFrame(() => TableScroll.update())));
 document.addEventListener('prefs-changed', event => { if (event.detail.key === 'lang') $$('.scroll-hint').forEach(h => { h.textContent = t('table.scroll_hint'); }); });

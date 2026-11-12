@@ -28,7 +28,7 @@ ADMIN, FIRST_PASSWORD, PASSWORD = "admin", "Admin-Initial-1", "Audit-Passw0rd1"
 # ----------------------------------------------------------------------------- mesures exécutées dans la page
 PAGE_METRICS = """(minTap) => {
   const vis = e => { const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
-  const out = {fonts: {}, buttons: {}, smallTargets: [], animations: [], clipped: [], header: null, rows: null};
+  const out = {fonts: {}, buttons: {}, offSystem: [], smallTargets: [], animations: [], clipped: [], header: null, rows: null};
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   while (walker.nextNode()) {
     const t = walker.currentNode, e = t.parentElement;
@@ -39,9 +39,11 @@ PAGE_METRICS = """(minTap) => {
   document.querySelectorAll(interactive).forEach(e => {
     if (!vis(e) || e.closest('dialog:not([open])')) return;
     const r = e.getBoundingClientRect(), cs = getComputedStyle(e);
+    if (r.right <= 0 || r.left >= innerWidth) return;            // hors écran (volet latéral fermé) : pas une cible atteignable
     if (e.matches('button, a.btn-primary, a.btn-secondary, a.btn-danger, a.btn-ghost, .btn')) {
       const sig = [cs.backgroundColor, cs.borderTopColor, cs.borderTopWidth, cs.borderRadius, Math.round(parseFloat(cs.fontSize)), cs.paddingTop + '/' + cs.paddingLeft].join('|');
       out.buttons[sig] = (out.buttons[sig] || 0) + 1;
+      if (!e.matches('.btn, .btn-primary, .btn-secondary, .btn-danger, .btn-ghost')) out.offSystem.push((e.className || e.tagName).toString().slice(0, 40));
     }
     if (e.type !== 'checkbox' && e.type !== 'radio' && (r.height < minTap || r.width < minTap) && r.top < innerHeight * 3) out.smallTargets.push(((e.textContent || '').trim() || e.getAttribute('aria-label') || e.id || e.tagName).slice(0, 22) + ` ${Math.round(r.width)}x${Math.round(r.height)}`);
   });
@@ -194,7 +196,7 @@ def main():
 
     d = report["pages"]["dashboard_1440_dark"]
     summary = {
-        "C1_fonts_dashboard": len(d["fonts"]), "C2_button_styles_dashboard": len(d["buttons"]), "C2_button_styles_tickets": len(report["pages"]["tickets_1440_dark"]["buttons"]),
+        "C1_fonts_dashboard": len(d["fonts"]), "C2_button_styles_dashboard": len(d["buttons"]), "C2_buttons_off_system_dashboard": sorted(set(d["offSystem"])), "C2_button_styles_tickets": len(report["pages"]["tickets_1440_dark"]["buttons"]),
         "C3_header_controls": d["header"]["controls"] if d["header"] else None, "C3_header_height": d["header"]["height"] if d["header"] else None,
         "C3_header_height_mobile": (report["pages"]["dashboard_390_dark"]["header"] or {}).get("height"),
         "C4_row_height": d["rows"]["medianHeight"] if d["rows"] else None, "C4_rows_visible": d["rows"]["visibleInViewport"] if d["rows"] else None,
