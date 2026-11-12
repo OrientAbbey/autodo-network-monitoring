@@ -45,8 +45,8 @@ const TableManager = {
 // ====== UTILITAIRES UI ======
 const UIUtils = {
     trendColorToCss(colorCode) {
-        const colors = { up: 'var(--success)', down: 'var(--danger)' };
-        return colors[colorCode] || 'var(--gray-light)';
+        const colors = { up: 'var(--ok)', down: 'var(--bad)' };
+        return colors[colorCode] || 'var(--text-muted)';
     },
 
     secondsToNextFiveMinute() {

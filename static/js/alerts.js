@@ -262,7 +262,7 @@ const AlertManager = {
                     return `<div class="alert" data-alerte-id="${esc(a.id)}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;${!isOpen ? 'opacity:0.7;' : ''}">
                         <span>
                             ${titreMessage}
-                            <span style="margin-left:8px;padding:2px 8px;border-radius:8px;font-size:0.95em;font-weight:bold;vertical-align:middle;background:${isOpen ? 'var(--danger)' : 'var(--success)'};color:white;">
+                            <span style="margin-left:8px;padding:2px 8px;border-radius:8px;font-size:0.95em;font-weight:bold;vertical-align:middle;background:${isOpen ? 'var(--bad)' : 'var(--ok)'};color:white;">
                                 ${isOpen ? 'OPEN' : 'CLOSED'}
                             </span>${a.validation_state === 'pending' ? `<span class="badge-pending">${esc(t('alert.pending'))}</span>` : ''}${a.acked ? `<span class="badge-acked" title="${esc(a.acked_by || '')}">✓ ${esc(t('alert.acked'))}</span>` : ''}<br>
                             ${esc(t('alert.values'))}: ${(a.valeurs || []).map(v => (v == null ? '—' : Number(v).toFixed(3))).join(' → ')}<br>${esc(t('alert.date'))}: ${esc(a.creation_time || a.date || 'N/A')}

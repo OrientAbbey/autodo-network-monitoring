@@ -146,10 +146,10 @@ const AutoUpdateManager = {
 
         if (statusElement) {
             statusElement.textContent = STATE.isAutoUpdateEnabled ? 'ON' : 'OFF';
-            statusElement.style.color = STATE.isAutoUpdateEnabled ? 'var(--success)' : 'var(--danger)';
+            statusElement.style.color = STATE.isAutoUpdateEnabled ? 'var(--ok)' : 'var(--bad)';
         }
         if (button) {
-            button.style.borderColor = STATE.isAutoUpdateEnabled ? 'var(--success)' : 'var(--danger)';
+            button.style.borderColor = STATE.isAutoUpdateEnabled ? 'var(--ok)' : 'var(--bad)';
             button.setAttribute('aria-pressed', String(!!STATE.isAutoUpdateEnabled));
         }
     }
