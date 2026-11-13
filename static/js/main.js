@@ -74,41 +74,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }, { passive: true });
 });
 
-// ====== EXPOSITION GLOBALE ======
-Object.assign(window, {
-    refreshPage: refreshDashboardData,
-    toggleSection: SectionManager.toggleSection,
-    showTab: TabManager.showTab,
-    toggleAutoUpdate: AutoUpdateManager.toggleAutoUpdate.bind(AutoUpdateManager),
-    toggleTheme: toggleTheme,
-    acknowledgeAlert: () => AlertManager.acknowledge(),
-    AlertManager,
-    lastDashboardData: null,
-    handleTypeFilterChange: handleTypeFilterChange
-});
-
-// Intercepter updateDashboardDOM pour sauvegarder les données
-const origUpdateDashboardDOM = updateDashboardDOM;
-updateDashboardDOM = function (data) {
-    window.lastDashboardData = data;
-    origUpdateDashboardDOM(data);
-};
-
-// ====== STYLES POUR CURSEUR ======
-(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `.clickable-row, .clickable-cell { cursor: pointer !important; }`;
-    document.head.appendChild(style);
-})();
-
 // ====== ACTIONS (remplacent les attributs onclick= inline, incompatibles avec la CSP) ======
 const ACTIONS = {
     acknowledgeAlert: () => AlertManager.acknowledge(),
-    toggleAutoUpdate: () => toggleAutoUpdate(),
+    toggleAutoUpdate: () => AutoUpdateManager.toggleAutoUpdate(),
     toggleTheme: () => toggleTheme(),
     clearDismissedAlerts: () => AlertManager.clearDismissedAlerts(),
-    toggleSection: (el) => toggleSection(el),
-    showTab: (el, e) => showTab(el.dataset.tab, el.dataset.interval, e),
+    toggleSection: (titleElement) => SectionManager.toggleSection(titleElement),
+    showTab: (tabButton, event) => TabManager.showTab(tabButton.dataset.tab, tabButton.dataset.interval, event),
     dismissAlerte: (el) => AlertManager.dismissAlerte(el.dataset.id),
     jumpToAlert: () => AlertManager.jumpToFirst(),
     dismissNotice: (button) => {
@@ -132,5 +105,5 @@ document.addEventListener('submit', (e) => { if (e.target.hasAttribute('data-no-
 // Échap acquitte la pop-up d'alerte (accessibilité clavier)
 document.addEventListener('keydown', (e) => {
     const pop = document.getElementById('alert-popup');
-    if (e.key === 'Escape' && pop && getComputedStyle(pop).display !== 'none') acknowledgeAlert();
+    if (e.key === 'Escape' && pop && getComputedStyle(pop).display !== 'none') AlertManager.acknowledge();
 });

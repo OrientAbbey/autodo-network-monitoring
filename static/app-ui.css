@@ -267,3 +267,4 @@ tr[data-alert]:not([data-alert="none"]) > td.location-cell { box-shadow: inset 4
 body.wall .value { font-size: var(--fs-xl); }
 body.wall .trend { font-size: var(--fs-md); }
 .app-nav a { white-space: nowrap; }
+.clickable-row, .clickable-cell { cursor: pointer; }

@@ -1,3 +1,4 @@
+/* global Data -- défini par tickets.js, chargé avant ce script ; absent sur les autres pages (d'où le `typeof`). */
 // AUTODO — Actions sur les tickets (page /tickets) : chronologie (tous), puis — rôle supervision — valider, rejeter, supprimer,
 // commenter (avec envoi optionnel à Orange) et retour d'expérience « réel / faux positif ».
 // Dépend de : common.js, i18n.js, session.js, page-kit.js.
