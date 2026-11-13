@@ -70,6 +70,7 @@ def test_config_save_is_partial_atomic_and_cached():
 def test_large_json_is_gzipped_but_the_sse_stream_is_not(client, monkeypatch):
     from core import constants, tickets
     monkeypatch.setattr(tickets, "dashboard_alerts", lambda filters=None: {"traffic": [], "pertes": []})
+    monkeypatch.setattr(tickets, "alerts_summary", lambda: {})        # ce test isole la compression HTTP : aucune base requise
     with constants.DASHBOARD_CACHE_LOCK:
         constants.set_dashboard({"recap": {f"db{i}": {"v": "x" * 50} for i in range(400)}})
     try:
