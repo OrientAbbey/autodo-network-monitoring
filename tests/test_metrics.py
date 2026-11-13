@@ -15,7 +15,7 @@ def _db(sessions, no_response):
 
 
 def test_aggregate_tcp_no_response_uses_raw_counts():                       # régression M-06
-    totals = metrics._calculate_totals_optimized({"a": _db(1000, 100), "b": _db(1000, 100)}, {"a": "A", "b": "B"})
+    totals = metrics._aggregate_site_totals({"a": _db(1000, 100), "b": _db(1000, 100)}, {"a": "A", "b": "B"})
     assert float(totals["tcp_no_response_start"]) == pytest.approx(10.0)    # 200 / 2 000 sessions
 
 
@@ -23,14 +23,14 @@ def test_null_column_does_not_break_the_dashboard_calculation(monkeypatch):    #
     rec = {"tcp_dw": 1, "udp_dw": None, "icmp_dw": 0, "other_dw": 0, "#tcp_loss_dw": 0, "#tcp_pkt_dw": 1,
            "#tcp_no_response_to_syn": 0, "#tcp_block_wp_up": 0, "#tcp_synack_core": 0, "Irt_tcp_core_td22": 0, "#tcp_sessions": 1}
     monkeypatch.setattr(constants, "LABELS", {"international": {}, "utilisateur": {}, "roaming": {}})
-    metrics._process_data_for_interval({"db": {"s": rec, "e": rec}}, "5min", {"5min": {"start_str": "s", "end_str": "e"}},
+    metrics._fill_recaps_for_interval({"db": {"s": rec, "e": rec}}, "5min", {"5min": {"start_str": "s", "end_str": "e"}},
                                        {"5min": {}}, {"5min": {}}, {"5min": {}}, [], {})
 
 
 def test_dashboard_links_are_relative_go_urls_without_internal_hosts():     # M-12
-    link = metrics._go("traffic", "kribi")
+    link = metrics._exnet_link("traffic", "kribi")
     assert link == "/go/traffic/kribi?end_date=__END_TIMESTAMP__"
-    assert "SGi" in metrics._go("loss", "douala_gi", "SGi")
+    assert "SGi" in metrics._exnet_link("loss", "douala_gi", "SGi")
 
 
 def test_build_dashboard_smoke_with_missing_database(monkeypatch):

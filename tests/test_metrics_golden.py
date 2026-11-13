@@ -1,4 +1,4 @@
-"""Test « golden » : la sortie de ``metrics._process_data_for_interval`` doit rester STRICTEMENT identique
+"""Test « golden » : la sortie de ``metrics._fill_recaps_for_interval`` doit rester STRICTEMENT identique
 à celle de l'implémentation d'origine (copier-coller par catégorie) après sa refonte pilotée par table.
 Régénérer ``tests/golden_dashboard.json`` uniquement si le format du tableau de bord change volontairement."""
 import json
@@ -50,7 +50,7 @@ def run_all():
         out = {}
         for interval in CPS:
             recap, tdd_recap, roaming, inacc = {i: {} for i in CPS}, {i: {} for i in CPS}, {i: {} for i in CPS}, []
-            metrics._process_data_for_interval(data, interval, CPS, recap, tdd_recap, roaming, inacc, tdd)
+            metrics._fill_recaps_for_interval(data, interval, CPS, recap, tdd_recap, roaming, inacc, tdd)
             out[interval] = {"recap": recap[interval], "tdd": tdd_recap[interval], "roaming": roaming[interval], "inaccessible": inacc}
         return json.loads(json.dumps(out))
     finally:

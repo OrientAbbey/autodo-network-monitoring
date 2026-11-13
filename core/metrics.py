@@ -1,7 +1,7 @@
 """MÉTRIQUES DU TABLEAU DE BORD — calcul pur Python (aucune E/S, pas de DataFrame).
 
 Volume traité par cycle : ≤ 20 bases × 3 intervalles × 2 relevés ≈ 120 lignes → des dictionnaires suffisent ;
-polars (import ≈ 100 ms, ≈ 30 Mo) n'apporterait aucun gain à cette échelle et a été retiré du projet.
+polars (import ≈ 100 start_metrics, ≈ 30 Mo) n'apporterait aucun gain à cette échelle et a été retiré du projet.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from .logger import get_logger
 logger = get_logger(__name__)
 
 
-def _go(kind: str, db_key: str, c_param: str | None = None) -> str:
+def _exnet_link(kind: str, db_key: str, c_param: str | None = None) -> str:
     """Lien vers le portail ExNet via /go/ (le JS remplace __END_TIMESTAMP__ avant l'ouverture)."""
     return f"/go/{kind}/{db_key}?end_date=__END_TIMESTAMP__" + (f"&c={c_param}" if c_param else "")
 
@@ -27,9 +27,10 @@ _EMPTY_METRICS = {
 }
 
 
-def _num(rec: dict, key: str, default: float = 0.0) -> float:
-    v = rec.get(key)
-    return float(v) if v is not None else default
+def _number_or_default(record: dict, key: str, default: float = 0.0) -> float:
+    """Valeur numérique du champ `key` d'un relevé, ou `default` si elle est absente (NULL en base)."""
+    value = record.get(key)
+    return float(value) if value is not None else default
 
 
 def _is_empty(rec) -> bool:
@@ -40,78 +41,81 @@ def _compute_metrics(rec: dict) -> dict:
     """Métriques dérivées d'UN relevé 5 min (None = relevé vide)."""
     if _is_empty(rec):
         return dict(_EMPTY_METRICS)
-    sessions = _num(rec, "#tcp_sessions")
-    synack = _num(rec, "#tcp_synack_core")
-    queries = _num(rec, "dns_queries")
-    malformed, woresp = _num(rec, "dns_malformed_ul"), _num(rec, "dns_queries_woresp")
+    sessions = _number_or_default(rec, "#tcp_sessions")
+    synack = _number_or_default(rec, "#tcp_synack_core")
+    queries = _number_or_default(rec, "dns_queries")
+    malformed, woresp = _number_or_default(rec, "dns_malformed_ul"), _number_or_default(rec, "dns_queries_woresp")
     return {
-        "total": sum(_num(rec, p) for p in _PROTOCOLS) * constants.DEBIT_FACTOR,
-        "pertes": 100 * _num(rec, "#tcp_loss_dw") / max(1, _num(rec, "#tcp_pkt_dw", 1.0)),
-        "tcp_no_response": (_num(rec, "#tcp_no_response_to_syn") / max(1, sessions)) * 100,
-        "tcp_block_wp_up": (_num(rec, "#tcp_block_wp_up") / max(1, sessions)) * 100,
-        "latence": (_num(rec, "Irt_tcp_core_td22") / synack) if synack > 0 else 0,
+        "total": sum(_number_or_default(rec, p) for p in _PROTOCOLS) * constants.DEBIT_FACTOR,
+        "pertes": 100 * _number_or_default(rec, "#tcp_loss_dw") / max(1, _number_or_default(rec, "#tcp_pkt_dw", 1.0)),
+        "tcp_no_response": (_number_or_default(rec, "#tcp_no_response_to_syn") / max(1, sessions)) * 100,
+        "tcp_block_wp_up": (_number_or_default(rec, "#tcp_block_wp_up") / max(1, sessions)) * 100,
+        "latence": (_number_or_default(rec, "Irt_tcp_core_td22") / synack) if synack > 0 else 0,
         "dns_malformed": (malformed / max(1, queries)) * 100 if queries > 0 else 0,
         "dns_no_response": (woresp / max(1, queries)) * 100 if queries > 0 else 0,
-        "tcp_loss_dw_raw": _num(rec, "#tcp_loss_dw"), "tcp_pkt_dw_raw": _num(rec, "#tcp_pkt_dw"),
-        "tcp_no_response_raw": _num(rec, "#tcp_no_response_to_syn"), "tcp_block_wp_up_raw": _num(rec, "#tcp_block_wp_up"),
+        "tcp_loss_dw_raw": _number_or_default(rec, "#tcp_loss_dw"), "tcp_pkt_dw_raw": _number_or_default(rec, "#tcp_pkt_dw"),
+        "tcp_no_response_raw": _number_or_default(rec, "#tcp_no_response_to_syn"), "tcp_block_wp_up_raw": _number_or_default(rec, "#tcp_block_wp_up"),
         "tcp_sessions_raw": sessions, "dns_malformed_raw": malformed, "dns_queries_raw": queries, "dns_queries_woresp_raw": woresp,
     }
 
 
-def _nz(v):
-    return 0 if v is None else v
+def _zero_if_missing(value):
+    return 0 if value is None else value
 
 
-def _block(kind: str, ms: dict, me: dict, key: str, extra: dict | None = None, dns: bool = False) -> dict:
-    """Bloc {start, end, taux, <extras>, trend_icon, trend_color} pour une métrique (table de description, pas de copier-coller)."""
-    s, e = ms[key], me[key]
-    icon, color = _trend_arrow_and_tone(kind, _nz(e), _nz(s))
-    taux = ((s or 0) - (e or 0)) if dns else (_nz(s) - _nz(e))
-    return {"start": s, "end": e, "taux": taux, **(extra or {}), "trend_icon": icon, "trend_color": color}
+def _metric_block(kind: str, start_metrics: dict, end_metrics: dict, key: str, extra: dict | None = None, dns: bool = False) -> dict:
+    """Bloc {start, end, taux, <extras>, trend_icon, trend_color} d'une métrique (table de description, pas de copier-coller).
+
+    `taux` = début − fin ; pour le DNS, une valeur absente compte pour 0 des deux côtés.
+    """
+    start, end = start_metrics[key], end_metrics[key]
+    arrow, tone = _trend_arrow_and_tone(kind, _zero_if_missing(end), _zero_if_missing(start))
+    rate = ((start or 0) - (end or 0)) if dns else (_zero_if_missing(start) - _zero_if_missing(end))
+    return {"start": start, "end": end, "taux": rate, **(extra or {}), "trend_icon": arrow, "trend_color": tone}
 
 
-def _entry(ms: dict, me: dict, db_key: str) -> dict:
-    pair = lambda k: {"start": ms[k], "end": me[k]}           # noqa: E731
+def _site_entry(start_metrics: dict, end_metrics: dict, db_key: str) -> dict:
+    pair = lambda k: {"start": start_metrics[k], "end": end_metrics[k]}           # noqa: E731
     return {
-        "total": _block("traffic", ms, me, "total"),
-        "pertes": _block("pertes", ms, me, "pertes", {
-            "tcp_loss_dw_start": ms["tcp_loss_dw_raw"], "tcp_pkt_dw_start": ms["tcp_pkt_dw_raw"],
-            "tcp_loss_dw_end": me["tcp_loss_dw_raw"], "tcp_pkt_dw_end": me["tcp_pkt_dw_raw"]}),
+        "total": _metric_block("traffic", start_metrics, end_metrics, "total"),
+        "pertes": _metric_block("pertes", start_metrics, end_metrics, "pertes", {
+            "tcp_loss_dw_start": start_metrics["tcp_loss_dw_raw"], "tcp_pkt_dw_start": start_metrics["tcp_pkt_dw_raw"],
+            "tcp_loss_dw_end": end_metrics["tcp_loss_dw_raw"], "tcp_pkt_dw_end": end_metrics["tcp_pkt_dw_raw"]}),
         "tcp_metrics": {
-            "tcp_no_response": _block("tcp_no_response", ms, me, "tcp_no_response", {
-                "tcp_no_response_start": ms["tcp_no_response_raw"], "tcp_no_response_end": me["tcp_no_response_raw"]}),
-            "tcp_block_wp_up": _block("tcp_block_wp_up", ms, me, "tcp_block_wp_up", {
-                "tcp_block_wp_up_start": ms["tcp_block_wp_up_raw"], "tcp_block_wp_up_end": me["tcp_block_wp_up_raw"]}),
-            "latence": _block("latence", ms, me, "latence"),
+            "tcp_no_response": _metric_block("tcp_no_response", start_metrics, end_metrics, "tcp_no_response", {
+                "tcp_no_response_start": start_metrics["tcp_no_response_raw"], "tcp_no_response_end": end_metrics["tcp_no_response_raw"]}),
+            "tcp_block_wp_up": _metric_block("tcp_block_wp_up", start_metrics, end_metrics, "tcp_block_wp_up", {
+                "tcp_block_wp_up_start": start_metrics["tcp_block_wp_up_raw"], "tcp_block_wp_up_end": end_metrics["tcp_block_wp_up_raw"]}),
+            "latence": _metric_block("latence", start_metrics, end_metrics, "latence"),
             "tcp_sessions": pair("tcp_sessions_raw"),
         },
         "dns_metrics": {
-            "dns_malformed": _block("dns_malformed", ms, me, "dns_malformed", {
-                "dns_malformed_start": ms["dns_malformed_raw"], "dns_malformed_end": me["dns_malformed_raw"],
-                "queries_start": ms["dns_queries_raw"], "queries_end": me["dns_queries_raw"]}, dns=True),
-            "dns_no_response": _block("dns_no_response", ms, me, "dns_no_response", {
-                "dns_no_response_start": ms["dns_queries_woresp_raw"], "dns_no_response_end": me["dns_queries_woresp_raw"],
-                "queries_start": ms["dns_queries_raw"], "queries_end": me["dns_queries_raw"]}, dns=True),
+            "dns_malformed": _metric_block("dns_malformed", start_metrics, end_metrics, "dns_malformed", {
+                "dns_malformed_start": start_metrics["dns_malformed_raw"], "dns_malformed_end": end_metrics["dns_malformed_raw"],
+                "queries_start": start_metrics["dns_queries_raw"], "queries_end": end_metrics["dns_queries_raw"]}, dns=True),
+            "dns_no_response": _metric_block("dns_no_response", start_metrics, end_metrics, "dns_no_response", {
+                "dns_no_response_start": start_metrics["dns_queries_woresp_raw"], "dns_no_response_end": end_metrics["dns_queries_woresp_raw"],
+                "queries_start": start_metrics["dns_queries_raw"], "queries_end": end_metrics["dns_queries_raw"]}, dns=True),
         },
-        "link": {"total": _go("traffic", db_key), "pertes": _go("loss", db_key), "tcp_service_access": _go("tcp_service_access", db_key),
-                 "tcp_tts": _go("tcp_tts", db_key), "dns": _go("dns", db_key)},
+        "link": {"total": _exnet_link("traffic", db_key), "pertes": _exnet_link("loss", db_key), "tcp_service_access": _exnet_link("tcp_service_access", db_key),
+                 "tcp_tts": _exnet_link("tcp_tts", db_key), "dns": _exnet_link("dns", db_key)},
     }
 
 
-_NA = {"start": "N/A", "end": "N/A", "taux": "N/A", "trend_icon": "↔", "trend_color": "neutral"}
+_NOT_AVAILABLE = {"start": "N/A", "end": "N/A", "taux": "N/A", "trend_icon": "↔", "trend_color": "neutral"}
 
 
-def _tdd_entry(start_rec, end_rec, db_key: str) -> dict:
+def _tdd_site_entry(start_rec, end_rec, db_key: str) -> dict:
     """Colonne TDD (bases « utilisateur ») : métriques si les deux relevés existent, sinon « N/A »."""
     if not (start_rec and end_rec):
-        return {"total": dict(_NA), "pertes": dict(_NA), "link": {"total": None, "pertes": None}}
-    ms, me = _compute_metrics(start_rec), _compute_metrics(end_rec)
-    return {"total": _block("traffic", ms, me, "total"),
-            "pertes": _block("pertes", ms, me, "pertes", {"pkt_start": ms["tcp_pkt_dw_raw"], "pkt_end": me["tcp_pkt_dw_raw"]}),
-            "link": {"total": _go("traffic", db_key, "SGi"), "pertes": _go("loss", db_key, "SGi")}}
+        return {"total": dict(_NOT_AVAILABLE), "pertes": dict(_NOT_AVAILABLE), "link": {"total": None, "pertes": None}}
+    start_metrics, end_metrics = _compute_metrics(start_rec), _compute_metrics(end_rec)
+    return {"total": _metric_block("traffic", start_metrics, end_metrics, "total"),
+            "pertes": _metric_block("pertes", start_metrics, end_metrics, "pertes", {"pkt_start": start_metrics["tcp_pkt_dw_raw"], "pkt_end": end_metrics["tcp_pkt_dw_raw"]}),
+            "link": {"total": _exnet_link("traffic", db_key, "SGi"), "pertes": _exnet_link("loss", db_key, "SGi")}}
 
 
-def _process_data_for_interval(data_dict: dict, interval: str, checkpoints: dict, recap: dict, tdd_recap: dict,
+def _fill_recaps_for_interval(data_dict: dict, interval: str, checkpoints: dict, recap: dict, tdd_recap: dict,
                                roaming_recap: dict, inaccessible_dbs: list, tdd_data: dict) -> None:
     """Remplit ``recap`` / ``roaming_recap`` / ``tdd_recap`` pour un intervalle (début → fin)."""
     start_str, end_str = checkpoints[interval]["start_str"], checkpoints[interval]["end_str"]
@@ -122,17 +126,17 @@ def _process_data_for_interval(data_dict: dict, interval: str, checkpoints: dict
                 inaccessible_dbs.append(db_key)
             logger.warning("Données manquantes pour %s : %s -> %s", db_key, start_rec, end_rec)
             continue
-        entry = _entry(_compute_metrics(start_rec), _compute_metrics(end_rec), db_key)
+        entry = _site_entry(_compute_metrics(start_rec), _compute_metrics(end_rec), db_key)
         (roaming_recap if "roaming" in db_key else recap)[interval][db_key] = entry
         if db_key in constants.LABELS["utilisateur"]:
             t = tdd_data.get(db_key, {})
-            tdd_recap[interval][db_key] = _tdd_entry(t.get(start_str), t.get(end_str), db_key)
+            tdd_recap[interval][db_key] = _tdd_site_entry(t.get(start_str), t.get(end_str), db_key)
 
 
-def _calculate_totals_optimized(
+def _aggregate_site_totals(
     data_dict: dict[str, dict[str, dict]], label_dict: dict[str, dict]
 ) -> dict[str, str]:
-    """Calcule les totaux pour toutes les bases de données de manière optimisée"""
+    """Somme, pour les bases de `label_dict`, les valeurs de début/fin d'un intervalle et en déduit les taux de variation globaux."""
     totals = {
         "traffic_start": 0,
         "traffic_end": 0,
@@ -432,21 +436,21 @@ def _totals_with_trend(totals_by_interval: dict, metric_kind: str) -> dict:
 
 
 def build_dashboard(all_data_dashboard: dict, tdd_data: dict, checkpoints: dict, current_checkpoint: datetime) -> dict:
-    """Assemble le JSON du tableau de bord (même structure que l'ancienne ``precalculate_dashboard_data``)."""
+    """Assemble le JSON du tableau de bord (mêend_metrics structure que l'ancienne ``precalculate_dashboard_data``)."""
     recap = {interval: {} for interval in checkpoints}
     tdd_recap = {interval: {} for interval in checkpoints}
     roaming_recap = {interval: {} for interval in checkpoints}
     inaccessible_dbs: list = []
     for interval in checkpoints:
-        _process_data_for_interval(all_data_dashboard, interval, checkpoints, recap, tdd_recap, roaming_recap,
+        _fill_recaps_for_interval(all_data_dashboard, interval, checkpoints, recap, tdd_recap, roaming_recap,
                                    inaccessible_dbs, tdd_data)
     labels = constants.LABELS
-    totals_international = {i: _calculate_totals_optimized(recap[i], labels["international"]) for i in checkpoints}
-    totals_gi = {i: _calculate_totals_optimized(recap[i], labels["utilisateur"]) for i in checkpoints}
-    totals_tdd = {i: _calculate_totals_optimized(tdd_recap[i], labels["utilisateur"]) for i in checkpoints}
-    totals_roaming = {i: _calculate_totals_optimized(roaming_recap[i], labels["roaming"]) for i in checkpoints}
+    totals_international = {i: _aggregate_site_totals(recap[i], labels["international"]) for i in checkpoints}
+    totals_gi = {i: _aggregate_site_totals(recap[i], labels["utilisateur"]) for i in checkpoints}
+    totals_tdd = {i: _aggregate_site_totals(tdd_recap[i], labels["utilisateur"]) for i in checkpoints}
+    totals_roaming = {i: _aggregate_site_totals(roaming_recap[i], labels["roaming"]) for i in checkpoints}
     combined = {**labels["international"], **labels["utilisateur"]}
-    totals_international_gi = {i: _calculate_totals_optimized(recap[i], combined) for i in checkpoints}
+    totals_international_gi = {i: _aggregate_site_totals(recap[i], combined) for i in checkpoints}
 
     def trend(totals, *keys):
         return {k: _totals_with_trend(totals, k) for k in keys}
