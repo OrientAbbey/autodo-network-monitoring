@@ -80,30 +80,32 @@ def _row(label: str, value) -> str:
             f'<td style="padding:3px 0">{e(str(value))}</td></tr>')
 
 
-def ticket_card(t: dict, highlight: bool = False) -> str:
-    closed = t.get("status") == "closed"
+def ticket_card(ticket: dict, highlight: bool = False) -> str:
+    """Carte HTML d'un ticket pour l'e-mail (styles en ligne, valeurs échappées) ; `highlight` ajoute le badge « NOUVEAU »."""
+    closed = ticket.get("status") == "closed"
     color = "#4CAF50" if closed else "#ff4444"
-    orange_id = t.get("external_api_ticket_id") or t.get("orange_ticket_id") or "N/A"
+    orange_id = ticket.get("external_api_ticket_id") or ticket.get("orange_ticket_id") or "N/A"
     badges = ""
-    if t.get("type") == "traffic" and t.get("pertes_warnings"):
+    if ticket.get("type") == "traffic" and ticket.get("pertes_warnings"):
         badges += ' <span style="color:#ff6b6b;font-weight:bold">Pertes: High</span>'
     if highlight:
         badges += ' <span style="background:#ff9800;color:#fff;padding:2px 6px;border-radius:3px;font-size:12px">NOUVEAU</span>'
     return f"""
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #ddd;border-left:6px solid {color};margin:0 0 14px 0">
 <tr><td style="padding:10px 12px;background:#fafafa">
-  <b>{e(str(t.get('type', 'Unknown')).upper())}</b> <span style="color:#666">#{e(str(t.get('id', 'N/A')))}</span>{badges}
-  <span style="float:right;background:{color};color:#fff;padding:2px 8px;border-radius:3px;font-size:12px">{e(str(t.get('status', 'open')))}</span>
+  <b>{e(str(ticket.get('type', 'Unknown')).upper())}</b> <span style="color:#666">#{e(str(ticket.get('id', 'N/A')))}</span>{badges}
+  <span style="float:right;background:{color};color:#fff;padding:2px 8px;border-radius:3px;font-size:12px">{e(str(ticket.get('status', 'open')))}</span>
 </td></tr>
 <tr><td style="padding:8px 12px"><table role="presentation" cellpadding="0" cellspacing="0" style="font-size:14px">
-{_row('Agent', t.get('agent', 'DIAGNET'))}{_row('Sévérité', t.get('severity', 'critical'))}
-{_row('Ticket Orange', orange_id)}{_row('Site', t.get('site', '-'))}{_row('Base', t.get('database_name', '-'))}
-{_row('Horodatage', t.get('timestamp', '-'))}{_row('Valeur', t.get('value', '-'))}
-{_row('Description', t.get('description') or t.get('reason') or '-')}
+{_row('Agent', ticket.get('agent', 'DIAGNET'))}{_row('Sévérité', ticket.get('severity', 'critical'))}
+{_row('Ticket Orange', orange_id)}{_row('Site', ticket.get('site', '-'))}{_row('Base', ticket.get('database_name', '-'))}
+{_row('Horodatage', ticket.get('timestamp', '-'))}{_row('Valeur', ticket.get('value', '-'))}
+{_row('Description', ticket.get('description') or ticket.get('reason') or '-')}
 </table></td></tr></table>"""
 
 
 def build_email(open_tickets: list[dict], recipient_name: str, highlight_id=None) -> tuple[str, str]:
+    """Sujet et corps HTML d'un e-mail listant les tickets ouverts ; `highlight_id` marque le ticket nouveau."""
     n = len(open_tickets)
     subject = (f"Nouveau Ticket - {open_tickets[0].get('type', 'Unknown')} Issue" if n == 1
                else f"Alertes Réseau - {n} Tickets Ouverts")
@@ -163,6 +165,7 @@ def notify_new_tickets(new_tickets: list[dict], open_tickets: list[dict]) -> Non
 
 
 def _notify_job(new_tickets: list[dict], open_tickets: list[dict]) -> None:
+    """Envoie les e-mails de nouveaux tickets (sans jamais lever) : un message par destinataire qui n'a pas encore été notifié de ces tickets ; les envois réussis sont mémorisés."""
     try:
         recipients = load_recipients()
         if not recipients:
@@ -171,15 +174,15 @@ def _notify_job(new_tickets: list[dict], open_tickets: list[dict]) -> None:
         ids = [t["id"] for t in open_tickets]
         highlight = new_tickets[0]["id"]
         messages, who = [], []
-        for r in recipients:
-            if set(map(str, ids)) - _already_notified(r["email"]):
-                subject, body = build_email(open_tickets, r["name"], highlight)
-                messages.append((r["email"], subject, body))
-                who.append(r["email"])
+        for recipient in recipients:
+            if set(map(str, ids)) - _already_notified(recipient["email"]):
+                subject, body = build_email(open_tickets, recipient["name"], highlight)
+                messages.append((recipient["email"], subject, body))
+                who.append(recipient["email"])
         ok, failed = _send_batch(messages)
-        for to in who:
-            if to not in failed:
-                _remember(to, ids)
+        for address in who:
+            if address not in failed:
+                _remember(address, ids)
         logger.info("E-mails de nouveaux tickets : %d envoyé(s), %d échec(s)", ok, len(failed))
     except Exception:
         logger.exception("Erreur lors de l'envoi des notifications")

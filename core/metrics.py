@@ -75,6 +75,7 @@ def _metric_block(kind: str, start_metrics: dict, end_metrics: dict, key: str, e
 
 
 def _site_entry(start_metrics: dict, end_metrics: dict, db_key: str) -> dict:
+    """Entrée d'une base pour le tableau de bord : un bloc par métrique (trafic, pertes, TCP, latence, DNS) avec valeurs de début/fin, taux et tendance."""
     pair = lambda k: {"start": start_metrics[k], "end": end_metrics[k]}           # noqa: E731
     return {
         "total": _metric_block("traffic", start_metrics, end_metrics, "total"),

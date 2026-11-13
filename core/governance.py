@@ -45,6 +45,7 @@ def audit(actor: str, ip: str, action: str, target: str = "", details: dict | No
 
 
 def list_audit(action: str | None = None, actor: str | None = None, days: int = 30, limit: int = 500) -> list[dict]:
+    """Entrées du journal d'audit des `days` derniers jours, les plus récentes d'abord, filtrables par action et par auteur (`limit` borné à 5000) ; `details` est décodé du JSON."""
     where, params = ["at >= :since"], {"since": fmt(_now() - timedelta(days=days)), "lim": max(1, min(limit, 5000))}
     for column, value in (("action", action), ("actor", actor)):
         if value:

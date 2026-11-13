@@ -11,6 +11,7 @@ _configured = False
 
 
 def _setup_root() -> None:
+    """Configure une seule fois le logger racine : fichier tournant (5 Mo × 3, niveau DEBUG) et console (niveau LOG_LEVEL, INFO par défaut), même format ; apscheduler est ramené à WARNING."""
     global _configured
     if _configured:
         return

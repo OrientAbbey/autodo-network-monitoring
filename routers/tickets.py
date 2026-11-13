@@ -23,6 +23,7 @@ def _json(data, status_code: int = 200) -> Response:
 
 @tickets_router.get("/")
 def tickets_view(request: Request):
+    """Page /tickets : première page de tickets et options des filtres (types, sites, bases, statuts, périodes)."""
     rows, total = tickets.load_page(limit=PAGE_LIMIT)
     sites = sorted({t["site"] for t in rows if t.get("site")})
     dbs = sorted({t["database_name"] for t in rows if t.get("database_name")})

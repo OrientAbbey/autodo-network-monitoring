@@ -342,18 +342,19 @@ def job_viewer_peak() -> None:
 
 
 async def sse_publish(event: dict, app) -> None:
-    subs = getattr(app.state, "sse_subscribers", None)
-    if not subs:
+    """Pousse un évènement à chaque abonné SSE ; si la file d'un abonné est pleine on écarte son plus ancien évènement, et on retire l'abonné s'il est en erreur."""
+    subscribers = getattr(app.state, "sse_subscribers", None)
+    if not subscribers:
         return
     async with app.state.sse_subscribers_lock:
-        for q in list(subs):
+        for subscriber_queue in list(subscribers):
             try:
-                if q.full():
+                if subscriber_queue.full():
                     with suppress(Exception):
-                        q.get_nowait()
-                q.put_nowait(event)
+                        subscriber_queue.get_nowait()
+                subscriber_queue.put_nowait(event)
             except Exception:
-                subs.discard(q)
+                subscribers.discard(subscriber_queue)
 
 
 def next_tick(now: datetime) -> datetime:

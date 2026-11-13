@@ -132,22 +132,23 @@ async def sse_events(request: Request):
     async with app.state.sse_subscribers_lock:
         app.state.sse_subscribers.add(queue)
 
-    async def gen():
+    async def stream_events():
+        """Générateur du flux SSE : envoie « hello », puis les évènements de la file de l'abonné, avec un signal de maintien toutes les 15 s ; désinscrit l'abonné à la déconnexion."""
         try:
             yield f"event: hello\ndata: {orjson.dumps({'type': 'hello'}).decode()}\n\n"
             while True:
                 if await request.is_disconnected():
                     break
                 try:
-                    ev = await asyncio.wait_for(queue.get(), timeout=15)
-                    yield format_sse(ev)
+                    event = await asyncio.wait_for(queue.get(), timeout=15)
+                    yield format_sse(event)
                 except asyncio.TimeoutError:
                     yield ": keep-alive\n\n"
         finally:
             async with app.state.sse_subscribers_lock:
                 app.state.sse_subscribers.discard(queue)
 
-    return StreamingResponse(gen(), media_type="text/event-stream",
+    return StreamingResponse(stream_events(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 

@@ -27,6 +27,7 @@ BASE = Path(__file__).parent
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Cycle de vie de l'application : prépare la base et les comptes, lie la boucle SSE, démarre l'ordonnanceur, puis, à l'arrêt, laisse finir le cycle en cours, arrête les notifications et ferme les connexions."""
     logger.info("=== Démarrage d'AUTODO ===")
     anyio.to_thread.current_default_thread_limiter().total_tokens = 20     # borne le pool de threads de l'API
     constants.reload_database_configurations()

@@ -42,6 +42,7 @@ INSERT_DEFAULTS = {"validation_state": "auto"}      # colonnes NOT NULL sans val
 # Conversions ligne SQL <-> dict
 # ============================================================================
 def _row_to_ticket(row: dict) -> dict:
+    """Ligne SQL → dictionnaire de ticket : dates formatées en texte, colonnes JSON décodées."""
     ticket = dict(row)
     for column in DT_COLS:
         if isinstance(ticket.get(column), datetime):

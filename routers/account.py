@@ -28,6 +28,7 @@ def session_view(session: auth.Session) -> dict:
 
 @account_router.post("/api/login")
 def login(body: LoginBody, request: Request, response: Response):
+    """Connexion : limitation par IP (429 après trop d'échecs), vérification des identifiants, ouverture de session (cookie) et trace d'audit des succès comme des échecs."""
     ip = get_real_ip(request)
     if auth.limiter.blocked(ip):
         raise HTTPException(429, "Trop de tentatives, réessayez plus tard", headers={"Retry-After": "900"})

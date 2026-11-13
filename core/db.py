@@ -50,6 +50,7 @@ def _sqlite_pragmas(dbapi_conn, _record):
 
 
 def local_engine() -> Engine:
+    """Moteur SQLAlchemy de la base locale (tickets, comptes, historique), créé une seule fois et partagé par tous les threads."""
     global _local_engine
     with _lock:
         if _local_engine is None:
@@ -186,6 +187,7 @@ def _add_idx(conn: Connection, table: str, idx: str, ddl: str, unique: bool = Fa
 
 
 def _m1_baseline(conn: Connection) -> None:
+    """Migration 1 : crée les tables d'origine (tickets_tb, daily_users, logs, ticket_counters, notification_state) si elles n'existent pas."""
     conn.execute(text("""CREATE TABLE IF NOT EXISTS tickets_tb (
         id BIGINT NOT NULL PRIMARY KEY, type VARCHAR(20) NOT NULL, site VARCHAR(50) NOT NULL,
         database_name VARCHAR(50) NOT NULL, timestamp DATETIME NOT NULL, value DECIMAL(10,3) NOT NULL,

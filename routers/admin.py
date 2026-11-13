@@ -298,7 +298,8 @@ def history_backfill(body: BackfillBody, request: Request, session=admin_only):
 # ============================================================================
 @admin_router.get("/api/admin/detectors")
 async def list_detectors(_requires_admin=admin_only):
-    def build():
+    def build_detector_list():
+        """Liste des détecteurs avec leur état d'entraînement, le nombre de verdicts des 24 dernières heures et la disponibilité de l'apprentissage."""
         states, counts = shadow.get_states(), shadow.verdict_counts(24)
         items = []
         for key, info in shadow.DETECTORS.items():
@@ -312,7 +313,7 @@ async def list_detectors(_requires_admin=admin_only):
                 item["model_trained"] = anomaly_ml.has_model("quality")
             items.append(item)
         return {"detectors": items, "ml_available": anomaly_ml.ml_available(), "shadow_enabled": bool(load_config().get("shadow_detectors"))}
-    return _json(await _run(build))
+    return _json(await _run(build_detector_list))
 
 
 class DetectorToggle(BaseModel):

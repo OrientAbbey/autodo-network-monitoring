@@ -131,6 +131,7 @@ def _active_admin_count(conn) -> int:
 # Création et modification
 # ============================================================================
 def create_user(username: str, display_name: str, role: str, password: str, *, must_change_password: bool = True) -> dict:
+    """Crée un compte actif (mot de passe haché, changement imposé à la première connexion par défaut). Lève AccountError si le rôle est inconnu, le mot de passe trop faible ou l'identifiant déjà pris."""
     if role not in ROLES:
         raise AccountError("Rôle inconnu.")
     name = _normalize_username(username)
