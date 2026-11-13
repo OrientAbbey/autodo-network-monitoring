@@ -375,9 +375,11 @@ function updateDashboardDOM(data) {
                 const cellLinkPertes = recap?.link?.pertes && recap.link.pertes !== '#' ? recap.link.pertes : null;
 
                 if (interval === 'now') {
+                    const nowTraffic = recap?.total?.end ?? '';
+                    const nowLoss = recap?.pertes?.end ?? '';
                     roamingTable += `<td class="roaming-cell">
-                        <div class="metric${cellLinkTotal ? ' clickable-cell' : ''}"${cellLinkTotal ? ` data-link-total='${cellLinkTotal}'` : ''} title="DIAGNET EXNET: open Traffic View"><span>Traffic:</span><span class="value">${end !== '' ? Number(end).toFixed(2) : '-'}</span></div>
-                        <div class="metric${cellLinkPertes ? ' clickable-cell' : ''}"${cellLinkPertes ? ` data-link-pertes='${cellLinkPertes}'` : ''} title="DIAGNET EXNET: open Packet Loss View"><span>Pertes:</span><span class="value">${endp !== '' ? Number(endp).toFixed(3) : '-'}</span></div>
+                        <div class="metric${cellLinkTotal ? ' clickable-cell' : ''}"${cellLinkTotal ? ` data-link-total='${cellLinkTotal}'` : ''} title="DIAGNET EXNET: open Traffic View"><span>Traffic:</span><span class="value">${nowTraffic !== '' ? Number(nowTraffic).toFixed(2) : '-'}</span></div>
+                        <div class="metric${cellLinkPertes ? ' clickable-cell' : ''}"${cellLinkPertes ? ` data-link-pertes='${cellLinkPertes}'` : ''} title="DIAGNET EXNET: open Packet Loss View"><span>Pertes:</span><span class="value">${nowLoss !== '' ? Number(nowLoss).toFixed(3) : '-'}</span></div>
                     </td>`;
                 } else {
                     const start = recap?.total?.start ?? '';
