@@ -94,11 +94,11 @@ function updateDashboardDOM(data) {
         intervals.forEach(interval => {
             const recapLoc = recapData[interval] && recapData[interval][loc];
             const start = recapLoc?.total?.start ?? '';
-            const diff = recapLoc?.total?.taux != null ? Math.abs(Number(recapLoc.total.taux)).toFixed(2) : '';
+            const variation = recapLoc?.total?.taux != null ? Math.abs(Number(recapLoc.total.taux)).toFixed(2) : '';
 
             row += `<td class="traffic-cell${linkTotal ? ' clickable-cell' : ''}"${linkTotal ? ` data-link-total='${linkTotal}'` : ''} title="DIAGNET EXNET: open Traffic View"><span class="value">${start !== '' ? Number(start).toFixed(2) : '-'}</span>`;
-            if (recapLoc && diff) {
-                row += `<span class="trend" style="color:${UIUtils.trendColorToCss(recapLoc.total?.trend_color)}">${recapLoc.total?.trend_icon ?? ''}${diff}</span>`;
+            if (recapLoc && variation) {
+                row += `<span class="trend" style="color:${UIUtils.trendColorToCss(recapLoc.total?.trend_color)}">${recapLoc.total?.trend_icon ?? ''}${variation}</span>`;
             }
             row += `</td>`;
         });
@@ -110,11 +110,11 @@ function updateDashboardDOM(data) {
         intervals.forEach(interval => {
             const recapLoc = recapData[interval] && recapData[interval][loc];
             const start = recapLoc?.pertes?.start ?? '';
-            const diff = recapLoc?.pertes?.taux != null ? Math.abs(Number(recapLoc.pertes.taux)).toFixed(3) : '';
+            const variation = recapLoc?.pertes?.taux != null ? Math.abs(Number(recapLoc.pertes.taux)).toFixed(3) : '';
 
             row += `<td class="loss-cell${linkPertes ? ' clickable-cell' : ''}"${linkPertes ? ` data-link-pertes='${linkPertes}'` : ''} title="DIAGNET EXNET: open Packet Loss View"><span class="value">${start !== '' ? Number(start).toFixed(3) : '-'}</span>`;
-            if (recapLoc && diff) {
-                row += `<span class="trend" style="color:${UIUtils.trendColorToCss(recapLoc.pertes?.trend_color)}">${recapLoc.pertes?.trend_icon ?? ''}${diff}</span>`;
+            if (recapLoc && variation) {
+                row += `<span class="trend" style="color:${UIUtils.trendColorToCss(recapLoc.pertes?.trend_color)}">${recapLoc.pertes?.trend_icon ?? ''}${variation}</span>`;
             }
             row += `</td>`;
         });
@@ -134,13 +134,13 @@ function updateDashboardDOM(data) {
         row += `<td class="traffic-cell"><span class="value">${totNow !== '' ? Number(totNow).toFixed(2) : '-'}</span></td>`;
 
         intervals.forEach(interval => {
-            const tot = trafficTotals[interval];
-            const start = parseFloat(tot?.traffic_start);
-            const diff = tot?.taux_traffic != null ? Math.abs(tot?.taux_traffic).toFixed(2) : '';
+            const intervalTotals = trafficTotals[interval];
+            const start = parseFloat(intervalTotals?.traffic_start);
+            const variation = intervalTotals?.taux_traffic != null ? Math.abs(intervalTotals?.taux_traffic).toFixed(2) : '';
 
             row += `<td class="traffic-cell"><span class="value">${!isNaN(start) ? start.toFixed(2) : '-'}</span>`;
-            if (tot && diff) {
-                row += `<span class="trend" style="color:${UIUtils.trendColorToCss(tot.trend_color)}">${tot.trend_icon ?? ''}${diff}</span>`;
+            if (intervalTotals && variation) {
+                row += `<span class="trend" style="color:${UIUtils.trendColorToCss(intervalTotals.trend_color)}">${intervalTotals.trend_icon ?? ''}${variation}</span>`;
             }
             row += `</td>`;
         });
@@ -150,13 +150,13 @@ function updateDashboardDOM(data) {
         row += `<td class="loss-cell separator-col"><span class="value">${totNowPertes !== '' ? Number(totNowPertes).toFixed(3) : '-'}</span></td>`;
 
         intervals.forEach(interval => {
-            const tot = pertesTotals[interval];
-            const start = parseFloat(tot?.pertes_start);
-            const diff = tot?.taux_pertes != null ? Math.abs(tot?.taux_pertes).toFixed(3) : '';
+            const intervalTotals = pertesTotals[interval];
+            const start = parseFloat(intervalTotals?.pertes_start);
+            const variation = intervalTotals?.taux_pertes != null ? Math.abs(intervalTotals?.taux_pertes).toFixed(3) : '';
 
             row += `<td class="loss-cell"><span class="value">${!isNaN(start) ? start.toFixed(3) : '-'}</span>`;
-            if (tot && diff) {
-                row += `<span class="trend" style="color:${UIUtils.trendColorToCss(tot.trend_color)}">${tot.trend_icon ?? ''}${diff}</span>`;
+            if (intervalTotals && variation) {
+                row += `<span class="trend" style="color:${UIUtils.trendColorToCss(intervalTotals.trend_color)}">${intervalTotals.trend_icon ?? ''}${variation}</span>`;
             }
             row += `</td>`;
         });
@@ -235,9 +235,9 @@ function updateDashboardDOM(data) {
 
             intervals.forEach(interval => {
                 const intervalData = recapData[interval] && recapData[interval][loc]?.tcp_metrics?.[metric];
-                const val = intervalData?.start ?? '';
+                const startValue = intervalData?.start ?? '';
 
-                row += `<td class="tcp-cell${linkValue ? ' clickable-cell' : ''}"${linkValue ? ` ${linkAttr}='${linkValue}'` : ''} title="${linkValue ? 'DIAGNET EXNET: open TCP ' + (metric === 'latence' ? 'TTS' : 'Service Access') + ' View' : ''}"><span class="value">${val !== '' ? Number(val).toFixed(decimalPlaces) : '-'}</span>`;
+                row += `<td class="tcp-cell${linkValue ? ' clickable-cell' : ''}"${linkValue ? ` ${linkAttr}='${linkValue}'` : ''} title="${linkValue ? 'DIAGNET EXNET: open TCP ' + (metric === 'latence' ? 'TTS' : 'Service Access') + ' View' : ''}"><span class="value">${startValue !== '' ? Number(startValue).toFixed(decimalPlaces) : '-'}</span>`;
 
                 // Add trend for interval data if available
                 if (intervalData && intervalData.taux != null) {
@@ -267,9 +267,9 @@ function updateDashboardDOM(data) {
 
             intervals.forEach(interval => {
                 const intervalData = recapData[interval] && recapData[interval][loc]?.dns_metrics?.[metric];
-                const val = intervalData?.start ?? '';
+                const startValue = intervalData?.start ?? '';
 
-                row += `<td class="tcp-cell${dnsClickableClass}"${dnsLinkAttr} title="${dnsLinkValue ? 'DIAGNET EXNET: open DNS Summary View' : ''}"><span class="value">${val !== '' ? Number(val).toFixed(decimalPlaces) : '-'}</span>`;
+                row += `<td class="tcp-cell${dnsClickableClass}"${dnsLinkAttr} title="${dnsLinkValue ? 'DIAGNET EXNET: open DNS Summary View' : ''}"><span class="value">${startValue !== '' ? Number(startValue).toFixed(decimalPlaces) : '-'}</span>`;
                 if (intervalData && intervalData.taux != null) {
                     const trendColor = intervalData.trend_color || 'neutral';
                     const trendIcon = intervalData.trend_icon || '';

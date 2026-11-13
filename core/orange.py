@@ -240,35 +240,35 @@ def sync_outbox(client: OrangeClient, on_failed: Callable | None = None, now: st
         return stats
     now = now or fmt(now_local().replace(tzinfo=None))
     budget = settings.orange_batch_size
-    for t in tickets.claim_for_orange(("pending",), budget, now):
+    for ticket in tickets.claim_for_orange(("pending",), budget, now):
         if client.breaker.state == "open":
             break
         oid = None
-        if settings.orange_lookup_external_id and str(t.get("orange_last_error") or "").startswith("ambiguous"):
-            oid = client.find_by_external_id(t["id"])
-        res = Result(True, orange_id=oid) if oid else client.create_ticket(t)
+        if settings.orange_lookup_external_id and str(ticket.get("orange_last_error") or "").startswith("ambiguous"):
+            oid = client.find_by_external_id(ticket["id"])
+        res = Result(True, orange_id=oid) if oid else client.create_ticket(ticket)
         if res.ok and res.orange_id:
             # si le ticket a été fermé localement entre-temps, l'état « closed » est préservé (condition sur l'état)
-            ok = tickets.update_fields(t["id"], {"external_api_ticket_id": res.orange_id, "orange_sync_state": "synced",
+            ok = tickets.update_fields(ticket["id"], {"external_api_ticket_id": res.orange_id, "orange_sync_state": "synced",
                                                  "orange_next_retry_at": None, "orange_last_error": None},
                                        expected_state="pending")
             if not ok:
-                tickets.update_fields(t["id"], {"external_api_ticket_id": res.orange_id})
-            ticket_log.log_event(t["id"], "orange_created", f"Ticket créé chez Orange : {res.orange_id}")
+                tickets.update_fields(ticket["id"], {"external_api_ticket_id": res.orange_id})
+            ticket_log.log_event(ticket["id"], "orange_created", f"Ticket créé chez Orange : {res.orange_id}")
             stats["created"] += 1
         else:
-            _schedule_retry(t, res, now, "pending", on_failed)
+            _schedule_retry(ticket, res, now, "pending", on_failed)
             stats["retry" if res.retryable else "failed"] += 1
-    for t in tickets.claim_for_orange(("close_pending",), budget, now):
+    for ticket in tickets.claim_for_orange(("close_pending",), budget, now):
         if client.breaker.state == "open":
             break
-        res = client.restore(t["external_api_ticket_id"])
+        res = client.restore(ticket["external_api_ticket_id"])
         if res.ok:
-            tickets.update_fields(t["id"], {"orange_sync_state": "closed", "orange_next_retry_at": None, "orange_last_error": None})
-            ticket_log.log_event(t["id"], "orange_restored", f"Ticket {t['external_api_ticket_id']} restauré chez Orange")
+            tickets.update_fields(ticket["id"], {"orange_sync_state": "closed", "orange_next_retry_at": None, "orange_last_error": None})
+            ticket_log.log_event(ticket["id"], "orange_restored", f"Ticket {ticket['external_api_ticket_id']} restauré chez Orange")
             stats["restored"] += 1
         else:
-            _schedule_retry(t, res, now, "close_pending", on_failed)
+            _schedule_retry(ticket, res, now, "close_pending", on_failed)
             stats["retry" if res.retryable else "failed"] += 1
     if any(stats.values()):
         logger.info("Orange sync: %s", stats)

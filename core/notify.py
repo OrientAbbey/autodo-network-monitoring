@@ -159,7 +159,7 @@ def _send_batch(messages: list[tuple[str, str, str]]) -> tuple[int, list[str]]:
 def notify_new_tickets(new_tickets: list[dict], open_tickets: list[dict]) -> None:
     """Planifie (hors thread de détection) l'envoi aux destinataires qui n'ont pas encore été notifiés."""
     if new_tickets:
-        _pool.submit(_notify_job, [dict(t) for t in new_tickets], [dict(t) for t in open_tickets])
+        _pool.submit(_notify_job, [dict(ticket) for ticket in new_tickets], [dict(ticket) for ticket in open_tickets])
 
 
 def _notify_job(new_tickets: list[dict], open_tickets: list[dict]) -> None:

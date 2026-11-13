@@ -133,13 +133,13 @@ def run_cycle() -> dict:
         all_ts, alert_ts, cps = build_windows(checkpoint, {**cfg, "traffic_consecutive_drops_count": widest_drop_window(cfg, overrides)})
 
         snaps = collector.collect_all(all_ts, alert_ts, monitor_roaming=bool(cfg.get("alerts_enable_roaming", False)))
-        stats["sources_failed"] = [k for k, s in snaps.items() if not s.ok]
+        stats["sources_failed"] = [k for k, sample in snaps.items() if not sample.ok]
 
         # --- tableau de bord (même si certaines bases sont en échec)
-        dash = {k: ({ts: s.whole.get(ts, collector.EMPTY_ROW) for ts in all_ts} if s.ok else {ts: None for ts in all_ts})
-                for k, s in snaps.items()}
-        tdd = {k: ({ts: s.apn.get(ts, collector.EMPTY_ROW) for ts in all_ts} if s.ok else {ts: None for ts in all_ts})
-               for k, s in snaps.items() if k in constants.LABELS.get("utilisateur", {})}
+        dash = {k: ({ts: sample.whole.get(ts, collector.EMPTY_ROW) for ts in all_ts} if sample.ok else {ts: None for ts in all_ts})
+                for k, sample in snaps.items()}
+        tdd = {k: ({ts: sample.apn.get(ts, collector.EMPTY_ROW) for ts in all_ts} if sample.ok else {ts: None for ts in all_ts})
+               for k, sample in snaps.items() if k in constants.LABELS.get("utilisateur", {})}
         try:
             cps_dash = {i: {**c, "end": c["end"].replace(tzinfo=constants.CAMEROON_TZ),
                             "start": c["start"].replace(tzinfo=constants.CAMEROON_TZ)} for i, c in cps.items()}
@@ -174,7 +174,7 @@ def _process_monitoring(snapshots_by_base: dict, alert_ts: list, now_str: str, c
     # une fenêtre ouverte « maintenant » ne s'appliquerait pas)
     silenced = governance.silenced_databases()
     open_list = tickets.load_open()                              # UNE lecture par cycle
-    open_ticket_by_base_and_type = {(t["database_name"], t["type"]): t for t in open_list}
+    open_ticket_by_base_and_type = {(ticket["database_name"], ticket["type"]): ticket for ticket in open_list}
     changes = tickets.ChangeSet()
     orange_enabled = get_orange().configured
     id_factory = tickets.next_id
@@ -203,8 +203,8 @@ def _process_monitoring(snapshots_by_base: dict, alert_ts: list, now_str: str, c
             db_cfg = config_for(db_key, cfg, overrides)      # seuils globaux + surcharges de CETTE base
             evaluated_bases += 1
             stamps, traffic, loss = build_series(snap, alert_ts)
-            traffic_samples = [{"timestamp": s, "value": v} for s, v in zip(stamps, traffic, strict=True)]
-            loss_samples = [{"timestamp": s, "value": v} for s, v in zip(stamps, loss, strict=True)]
+            traffic_samples = [{"timestamp": stamp, "value": value} for stamp, value in zip(stamps, traffic, strict=True)]
+            loss_samples = [{"timestamp": stamp, "value": value} for stamp, value in zip(stamps, loss, strict=True)]
             # (J-1 en tête de série ; la détection n'examine que les valeurs récentes)
             db_context = tickets.DbContext(
                 db_key=db_key, now=now_str, traffic_values=traffic_samples, loss_values=loss_samples,
@@ -228,7 +228,7 @@ def _process_monitoring(snapshots_by_base: dict, alert_ts: list, now_str: str, c
     announced = tickets.visible_to_recipients(created)           # une création en attente de validation n'est PAS annoncée par e-mail
     if announced:                                                # (l'e-mail part à l'approbation : voir routers/tickets.py)
         closed_ids = {tid for tid, f in changes.updates.items() if f.get("status") == "closed"}
-        still_open = tickets.visible_to_recipients([t for t in open_list if t["id"] not in closed_ids] + created)
+        still_open = tickets.visible_to_recipients([ticket for ticket in open_list if ticket["id"] not in closed_ids] + created)
         notify.notify_new_tickets(announced, still_open)
     # Historique local puis détecteurs « futurs » en mode ombre : aucun des deux ne peut faire échouer le cycle ni toucher un ticket
     rows_recorded = history.record_snapshots(snapshots_by_base)

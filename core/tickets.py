@@ -64,12 +64,12 @@ def _row_to_ticket(row: dict) -> dict:
 
 def _prepare(fields: dict) -> dict:
     out = {}
-    for k, v in fields.items():
-        if k in JSON_COLS:
-            v = json.dumps(v if v is not None else [], default=str)
-        elif k == "value" and v is not None:
-            v = round(float(v), 3)
-        out[k] = v
+    for column_name, value in fields.items():
+        if column_name in JSON_COLS:
+            value = json.dumps(value if value is not None else [], default=str)
+        elif column_name == "value" and value is not None:
+            value = round(float(value), 3)
+        out[column_name] = value
     return out
 
 
@@ -394,7 +394,7 @@ def _last_value(values: list) -> float | None:
     return values[-1]["value"] if values else None
 
 
-def apply_actions(ctx: DbContext, actions: list[rules.Action], tickets_by_type: dict, cs: ChangeSet,
+def apply_actions(ctx: DbContext, actions: list[rules.Action], tickets_by_type: dict, changes: ChangeSet,
                   id_factory: Callable[[], int] = next_id) -> None:
     """Traduit les actions décidées par ``rules.plan_actions`` en changements (sans toucher à la base)."""
     traffic_t, pertes_t = tickets_by_type.get("traffic"), tickets_by_type.get("pertes")
@@ -405,39 +405,39 @@ def apply_actions(ctx: DbContext, actions: list[rules.Action], tickets_by_type: 
             new_traffic = _new_ticket(ctx, "traffic", ctx.traffic_values, ctx.traffic.reason, ctx.traffic.category, id_factory)
             if a.attach_pertes:
                 new_traffic.update(rules.attach_pertes(new_traffic, loss_last, ctx.now))
-            cs.inserts.append(new_traffic)
-            cs.events.append(("create_traffic", new_traffic["id"], ctx.db_key))
-            _log_creation(cs, new_traffic, ctx.now)
+            changes.inserts.append(new_traffic)
+            changes.events.append(("create_traffic", new_traffic["id"], ctx.db_key))
+            _log_creation(changes, new_traffic, ctx.now)
         elif a.kind == "create_pertes":
-            t = _new_ticket(ctx, "pertes", ctx.loss_values, ctx.pertes.reason, ctx.pertes.category, id_factory)
-            cs.inserts.append(t)
-            cs.events.append(("create_pertes", t["id"], ctx.db_key))
-            _log_creation(cs, t, ctx.now)
+            ticket = _new_ticket(ctx, "pertes", ctx.loss_values, ctx.pertes.reason, ctx.pertes.category, id_factory)
+            changes.inserts.append(ticket)
+            changes.events.append(("create_pertes", ticket["id"], ctx.db_key))
+            _log_creation(changes, ticket, ctx.now)
         elif a.kind in ("update_traffic", "update_pertes"):
-            t = traffic_t if a.kind == "update_traffic" else pertes_t
-            if t is None:
+            ticket = traffic_t if a.kind == "update_traffic" else pertes_t
+            if ticket is None:
                 continue
             if a.kind == "update_traffic":
-                fields = rules.evaluate_update(t, ctx.traffic_values, ctx.traffic.reason, ctx.traffic.category, ctx.cfg)
+                fields = rules.evaluate_update(ticket, ctx.traffic_values, ctx.traffic.reason, ctx.traffic.category, ctx.cfg)
                 current = _last_value(ctx.traffic_values)
             else:
-                fields = rules.evaluate_update(t, ctx.loss_values, ctx.pertes.reason, ctx.pertes.category, ctx.cfg)
+                fields = rules.evaluate_update(ticket, ctx.loss_values, ctx.pertes.reason, ctx.pertes.category, ctx.cfg)
                 current = _last_value(ctx.loss_values)
-            _update_and_log(cs, t, fields, ctx.now)
+            _update_and_log(changes, ticket, fields, ctx.now)
             if a.attach_pertes:
-                _update_and_log(cs, t, rules.attach_pertes(t, loss_last, ctx.now), ctx.now)
-            _maybe_note(cs, t, current, ctx.cfg, ctx.now)
-            cs.events.append((a.kind, t["id"], ctx.db_key))
+                _update_and_log(changes, ticket, rules.attach_pertes(ticket, loss_last, ctx.now), ctx.now)
+            _maybe_note(changes, ticket, current, ctx.cfg, ctx.now)
+            changes.events.append((a.kind, ticket["id"], ctx.db_key))
         elif a.kind == "try_close":
-            t = traffic_t if a.ticket_type == "traffic" else pertes_t
-            if t is None:
+            ticket = traffic_t if a.ticket_type == "traffic" else pertes_t
+            if ticket is None:
                 continue
             values = ctx.traffic_values if a.ticket_type == "traffic" else ctx.loss_values
-            fields = rules.evaluate_closure(t, values, ctx.now, ctx.cfg, ctx.mode7d)
-            fields = _close_fields(t, fields)
-            _update_and_log(cs, t, fields, ctx.now)
+            fields = rules.evaluate_closure(ticket, values, ctx.now, ctx.cfg, ctx.mode7d)
+            fields = _close_fields(ticket, fields)
+            _update_and_log(changes, ticket, fields, ctx.now)
             if fields.get("status") == "closed":
-                cs.events.append((f"close_{a.ticket_type}", t["id"], ctx.db_key))
+                changes.events.append((f"close_{a.ticket_type}", ticket["id"], ctx.db_key))
 
 
 def apply_db_down(ctx_db_key: str, state: str, minutes: float, last_update_str: str | None, now: str, cfg: dict,

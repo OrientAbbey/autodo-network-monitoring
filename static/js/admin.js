@@ -190,20 +190,20 @@ const Admin = {
                 PageKit.button(t('analysis.forecast'), () => PageKit.guard(() => this.runForecast(base.value, out))),
                 PageKit.field(t('analysis.capacity'), capacity),
                 PageKit.button(t('analysis.capacity_run'), () => PageKit.guard(async () => {
-                    const r = await api(`/api/admin/analysis/capacity?db_key=${encodeURIComponent(base.value)}&capacity_gbps=${capacity.value}`);
-                    clear(out).append(el('h4', { text: t('analysis.capacity') }), this.kv(r));
+                    const capacityResult = await api(`/api/admin/analysis/capacity?db_key=${encodeURIComponent(base.value)}&capacity_gbps=${capacity.value}`);
+                    clear(out).append(el('h4', { text: t('analysis.capacity') }), this.kv(capacityResult));
                 })),
                 PageKit.button(t('analysis.shifts'), () => PageKit.guard(async () => {
-                    const r = await api(`/api/admin/analysis/level-shifts?db_key=${encodeURIComponent(base.value)}`);
-                    clear(out).append(el('h4', { text: t('analysis.shifts') }), r.shifts.length ? el('ul', {}, r.shifts.map(s => el('li', { text: `${s.day} — ${s.explanation}` }))) : el('p', { class: 'hint', text: t('analysis.no_shift', { days: r.days_of_data }) }));
+                    const shiftsResult = await api(`/api/admin/analysis/level-shifts?db_key=${encodeURIComponent(base.value)}`);
+                    clear(out).append(el('h4', { text: t('analysis.shifts') }), shiftsResult.shifts.length ? el('ul', {}, shiftsResult.shifts.map(s => el('li', { text: `${s.day} — ${s.explanation}` }))) : el('p', { class: 'hint', text: t('analysis.no_shift', { days: shiftsResult.days_of_data }) }));
                 }))), out));
     },
 
     async runForecast(dbKey, out) {
-        const r = await api(`/api/admin/analysis/forecast?db_key=${encodeURIComponent(dbKey)}&days=14`);
+        const forecast = await api(`/api/admin/analysis/forecast?db_key=${encodeURIComponent(dbKey)}&days=14`);
         clear(out).append(el('h4', { text: t('analysis.forecast') }),
-            el('p', { class: 'hint', text: t('analysis.forecast_hint', { start: r.forecast_start, std: r.residual_std }) }),
-            PageKit.lineChart([{ values: r.expected, class: 'chart-expected' }], { band: { lower: r.lower, upper: r.upper }, label: t('analysis.forecast') }));
+            el('p', { class: 'hint', text: t('analysis.forecast_hint', { start: forecast.forecast_start, std: forecast.residual_std }) }),
+            PageKit.lineChart([{ values: forecast.expected, class: 'chart-expected' }], { band: { lower: forecast.lower, upper: forecast.upper }, label: t('analysis.forecast') }));
     },
 
     // ---------------------------------------------------------------- 7. simulation « et si ? »

@@ -209,9 +209,9 @@
         // Load criteria on page load for filtering purposes only
         const loadCriteriaForFiltering = async () => {
             try {
-                const r = await fetch('/api/config');
-                if (r.ok) {
-                    const response = await r.json();
+                const configResponse = await fetch('/api/config');
+                if (configResponse.ok) {
+                    const response = await configResponse.json();
                     try {
                         const criteria = response.data;
                         // Merge with defaults to ensure all properties exist
