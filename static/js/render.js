@@ -94,8 +94,6 @@ function updateDashboardDOM(data) {
         intervals.forEach(interval => {
             const recapLoc = recapData[interval] && recapData[interval][loc];
             const start = recapLoc?.total?.start ?? '';
-            const end = recapLoc?.total?.end ?? '';
-            // const diff = (start !== '' && end !== '') ? Math.abs(parseFloat(start) - parseFloat(end)).toFixed(2) : '';
             const diff = recapLoc?.total?.taux != null ? Math.abs(Number(recapLoc.total.taux)).toFixed(2) : '';
 
             row += `<td class="traffic-cell${linkTotal ? ' clickable-cell' : ''}"${linkTotal ? ` data-link-total='${linkTotal}'` : ''} title="DIAGNET EXNET: open Traffic View"><span class="value">${start !== '' ? Number(start).toFixed(2) : '-'}</span>`;
@@ -112,8 +110,6 @@ function updateDashboardDOM(data) {
         intervals.forEach(interval => {
             const recapLoc = recapData[interval] && recapData[interval][loc];
             const start = recapLoc?.pertes?.start ?? '';
-            const end = recapLoc?.pertes?.end ?? '';
-            // const diff = (start !== '' && end !== '') ? Math.abs(parseFloat(start) - parseFloat(end)).toFixed(3) : '';
             const diff = recapLoc?.pertes?.taux != null ? Math.abs(Number(recapLoc.pertes.taux)).toFixed(3) : '';
 
             row += `<td class="loss-cell${linkPertes ? ' clickable-cell' : ''}"${linkPertes ? ` data-link-pertes='${linkPertes}'` : ''} title="DIAGNET EXNET: open Packet Loss View"><span class="value">${start !== '' ? Number(start).toFixed(3) : '-'}</span>`;
@@ -140,8 +136,6 @@ function updateDashboardDOM(data) {
         intervals.forEach(interval => {
             const tot = trafficTotals[interval];
             const start = parseFloat(tot?.traffic_start);
-            const end = parseFloat(tot?.traffic_end);
-            // const diff = (!isNaN(start) && !isNaN(end)) ? Math.abs(start - end).toFixed(2) : '';
             const diff = tot?.taux_traffic != null ? Math.abs(tot?.taux_traffic).toFixed(2) : '';
 
             row += `<td class="traffic-cell"><span class="value">${!isNaN(start) ? start.toFixed(2) : '-'}</span>`;
@@ -158,8 +152,6 @@ function updateDashboardDOM(data) {
         intervals.forEach(interval => {
             const tot = pertesTotals[interval];
             const start = parseFloat(tot?.pertes_start);
-            const end = parseFloat(tot?.pertes_end);
-            // const diff = (!isNaN(start) && !isNaN(end)) ? Math.abs(start - end).toFixed(3) : '';
             const diff = tot?.taux_pertes != null ? Math.abs(tot?.taux_pertes).toFixed(3) : '';
 
             row += `<td class="loss-cell"><span class="value">${!isNaN(start) ? start.toFixed(3) : '-'}</span>`;
@@ -383,20 +375,14 @@ function updateDashboardDOM(data) {
                 const cellLinkPertes = recap?.link?.pertes && recap.link.pertes !== '#' ? recap.link.pertes : null;
 
                 if (interval === 'now') {
-                    const end = recap?.total?.end ?? '';
-                    const endp = recap?.pertes?.end ?? '';
                     roamingTable += `<td class="roaming-cell">
                         <div class="metric${cellLinkTotal ? ' clickable-cell' : ''}"${cellLinkTotal ? ` data-link-total='${cellLinkTotal}'` : ''} title="DIAGNET EXNET: open Traffic View"><span>Traffic:</span><span class="value">${end !== '' ? Number(end).toFixed(2) : '-'}</span></div>
                         <div class="metric${cellLinkPertes ? ' clickable-cell' : ''}"${cellLinkPertes ? ` data-link-pertes='${cellLinkPertes}'` : ''} title="DIAGNET EXNET: open Packet Loss View"><span>Pertes:</span><span class="value">${endp !== '' ? Number(endp).toFixed(3) : '-'}</span></div>
                     </td>`;
                 } else {
                     const start = recap?.total?.start ?? '';
-                    const end = recap?.total?.end ?? '';
                     const startp = recap?.pertes?.start ?? '';
-                    const endp = recap?.pertes?.end ?? '';
-                    // const diffTraffic = (start !== '' && end !== '') ? Math.abs(parseFloat(start) - parseFloat(end)).toFixed(2) : '';
                     const diffTraffic = recap?.total?.taux != null ? Math.abs(Number(recap.total.taux)).toFixed(2) : '';
-                    // const diffPertes = (startp !== '' && endp !== '') ? Math.abs(parseFloat(startp) - parseFloat(endp)).toFixed(3) : '';
                     const diffPertes = recap?.pertes?.taux != null ? Math.abs(Number(recap.pertes.taux)).toFixed(3) : '';
 
                     roamingTable += `<td class="roaming-cell">

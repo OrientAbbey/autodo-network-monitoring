@@ -65,7 +65,7 @@ def _nz(v):
 def _block(kind: str, ms: dict, me: dict, key: str, extra: dict | None = None, dns: bool = False) -> dict:
     """Bloc {start, end, taux, <extras>, trend_icon, trend_color} pour une métrique (table de description, pas de copier-coller)."""
     s, e = ms[key], me[key]
-    icon, color = _get_trend_icon_and_color(kind, _nz(e), _nz(s))
+    icon, color = _trend_arrow_and_tone(kind, _nz(e), _nz(s))
     taux = ((s or 0) - (e or 0)) if dns else (_nz(s) - _nz(e))
     return {"start": s, "end": e, "taux": taux, **(extra or {}), "trend_icon": icon, "trend_color": color}
 
@@ -319,232 +319,114 @@ def _calculate_totals_optimized(
 
     return {k: f"{v:.2f}" for k, v in totals.items()}
 
-def _get_trend_icon_and_color(type_, now, prev, prev_seq=None):
+# Flèches affichées à côté des valeurs, et « tonalité » (classe CSS) de la variation :
+# « down » = dégradation (rouge), « up » = amélioration (vert), « neutral » = sans enjeu.
+ARROW_UP, ARROW_DOWN, ARROW_FLAT = "↑", "↓", "↔"
+TONE_DEGRADED, TONE_IMPROVED, TONE_NEUTRAL = "down", "up", "neutral"
+
+# Indicateurs dont la valeur est mauvaise dès qu'elle dépasse un seuil absolu : (clé de configuration, valeur par défaut).
+# Le seuil de pertes sert aussi d'approximation pour les requêtes DNS mal formées.
+_ABSOLUTE_THRESHOLD_BY_KIND = {
+    "tcp_no_response": ("alert_tcp_no_response_threshold", 100),
+    "tcp_block_wp_up": ("alert_tcp_block_wp_up_threshold", 100),
+    "latence": ("alert_latence_threshold_ms", 100),
+    "dns_malformed": ("alert_pertes_threshold", 3.0),
+    "dns_no_response": ("alert_tcp_no_response_threshold", 100),
+}
+# Types de total connus pour la tendance ; tout autre type (les pertes) est traité comme « pertes ».
+_TREND_KINDS = {"traffic", *_ABSOLUTE_THRESHOLD_BY_KIND}
+
+
+def _percent_change(current: float, previous: float) -> float:
+    """Variation en % de `previous` vers `current` ; 0 si la référence est nulle (évite la division par zéro)."""
+    if previous == 0:
+        return 0
+    return (current - previous) / previous * 100
+
+
+def _arrow_for_change(change: float) -> str:
+    if change > 0:
+        return ARROW_UP
+    if change < 0:
+        return ARROW_DOWN
+    return ARROW_FLAT
+
+
+def _traffic_tone(config: dict, current: float, previous: float, earlier_values: list | None) -> str:
+    """Le trafic est dégradé s'il chute d'au moins le seuil instantané, ou après N baisses consécutives cumulant
+    au moins le seuil minimal ; amélioré s'il monte d'au moins le seuil de hausse."""
+    change_percent = _percent_change(current, previous)
+    required_drops = config["traffic_consecutive_drops_count"]
+
+    consecutive_drops = False
+    if earlier_values and len(earlier_values) >= required_drops - 1:
+        sequence = [previous, *earlier_values, current]
+        step_changes = [_percent_change(sequence[i + 1], sequence[i]) for i in range(len(sequence) - 1)]
+        every_step_is_a_drop = all(step < 0 for step in step_changes[-required_drops:])
+        window_start = sequence[-(required_drops + 1)]
+        cumulative_drop_percent = -_percent_change(sequence[-1], window_start)      # positif en cas de baisse
+        consecutive_drops = every_step_is_a_drop and cumulative_drop_percent >= config["traffic_consecutive_drops_min_percent"]
+
+    if change_percent < 0 and abs(change_percent) >= config["alert_traffic_threshold_percent"]:
+        return TONE_DEGRADED
+    if consecutive_drops:
+        return TONE_DEGRADED
+    if change_percent > 0 and change_percent >= config.get("traffic_up_threshold_percent", 10):
+        return TONE_IMPROVED
+    return TONE_NEUTRAL
+
+
+def _loss_tone(config: dict, current: float, absolute_change: float) -> str:
+    """Pertes : dégradées au-dessus du seuil ; améliorées si sous le seuil ET en baisse."""
+    threshold = config["alert_pertes_threshold"]
+    if current > threshold:
+        return TONE_DEGRADED
+    if absolute_change < 0:
+        return TONE_IMPROVED
+    return TONE_NEUTRAL
+
+
+def _trend_arrow_and_tone(metric_kind: str, current: float, previous: float, earlier_values: list | None = None) -> tuple[str, str]:
+    """Flèche et tonalité d'une valeur par rapport à la précédente.
+
+    `earlier_values` : valeurs de départ des intervalles plus courts, du plus proche au plus ancien (trafic seulement).
+    Un type inconnu donne une variation neutre (↔).
+    """
     config = load_config()
-    icon = "↔"
-    color = "neutral"
+    absolute_change = current - previous
 
-    # Petite fonction utilitaire
-    def percent_change(curr, prev):
-        if prev == 0:
-            return 0
-        return ((curr - prev) / prev) * 100
+    if metric_kind == "traffic":
+        return _arrow_for_change(_percent_change(current, previous)), _traffic_tone(config, current, previous, earlier_values)
+    if metric_kind == "pertes":
+        return _arrow_for_change(absolute_change), _loss_tone(config, current, absolute_change)
+    if metric_kind in _ABSOLUTE_THRESHOLD_BY_KIND:
+        config_key, default_threshold = _ABSOLUTE_THRESHOLD_BY_KIND[metric_kind]
+        tone = TONE_DEGRADED if current > config.get(config_key, default_threshold) else TONE_NEUTRAL
+        return _arrow_for_change(absolute_change), tone
+    return ARROW_FLAT, TONE_NEUTRAL
 
-    # Variation principale
-    diff_percent = percent_change(now, prev)
 
-    # === TRAFFIC ===
-    if type_ == "traffic":
-        is_consecutive_drops = False
+def _totals_with_trend(totals_by_interval: dict, metric_kind: str) -> dict:
+    """Pour chaque intervalle : valeurs de début/fin, flèche, tonalité et taux de variation de `metric_kind`."""
+    def start_value(interval: str) -> float:
+        raw = totals_by_interval[interval][f"{metric_kind}_start"]
+        return float(raw) if raw != "" else 0
 
-        if prev_seq and len(prev_seq) >= config["traffic_consecutive_drops_count"] - 1:
-            # Construire la séquence complète : [prev] + prev_seq + [now]
-            full_seq = [prev] + prev_seq + [now]
-
-            # Calculer les variations consécutives
-            percentage_drops = [
-                percent_change(full_seq[i + 1], full_seq[i])
-                for i in range(len(full_seq) - 1)
-            ]
-            
-            # # Vérifier si toutes les dernières n baisses dépassent le seuil
-            # is_consecutive_drops = all(
-            #     (change < 0 and abs(change) >= config['traffic_consecutive_drops_min_percent'])
-            #     for change in percentage_drops[-config['traffic_consecutive_drops_count']:]
-            # )
-
-            # 1) Vérifier qu'il s'agit bien de N baisses successives
-            required = config["traffic_consecutive_drops_count"]
-            recent_changes = percentage_drops[-required:]
-            are_successive_drops = all(change < 0 for change in recent_changes)
-
-            # 2) Appliquer le critère sur la baisse cumulée sur N pas
-            #    Baisse cumulée = pourcentage entre la valeur de début et de fin de la fenêtre
-            start_val = full_seq[-(required + 1)]
-            end_val = full_seq[-1]
-            cumulative_drop_percent = -percent_change(
-                end_val, start_val
-            )  # positif si baisse cumulée
-
-            is_consecutive_drops = are_successive_drops and (
-                cumulative_drop_percent
-                >= config["traffic_consecutive_drops_min_percent"]
-            )
-
-        # Coloration
-        if (
-            diff_percent < 0
-            and abs(diff_percent) >= config["alert_traffic_threshold_percent"]
-        ):
-            color = "down"
-        elif is_consecutive_drops:
-            color = "down"
-        elif (
-            diff_percent > 0 and diff_percent >= config.get("traffic_up_threshold_percent", 10)
-        ):
-            color = "up"
-        else:
-            color = "neutral"
-
-        # Détermination de l'icône
-        if diff_percent > 0:
-            icon = "↑"
-        elif diff_percent < 0:
-            icon = "↓"
-
-    # === PERTES ===
-    elif type_ == "pertes":
-        diff_abs = now - prev  # variation absolue
-
-        # Icone (hausse/baisse absolue)
-        if diff_abs > 0:
-            icon = "↑"
-        elif diff_abs < 0:
-            icon = "↓"
-
-        # Couleur
-        if now > config["alert_pertes_threshold"]:
-            color = "down"  # pertes au-dessus du seuil
-        elif now <= config["alert_pertes_threshold"] and diff_abs < 0:
-            color = "up"  # pertes en baisse et sous le seuil
-        else:
-            color = "neutral"
-
-    # === TCP NO RESPONSE ===
-    elif type_ == "tcp_no_response":
-        diff_abs = now - prev  # variation absolue
-
-        # Icone (hausse/baisse absolue)
-        if diff_abs > 0:
-            icon = "↑"
-        elif diff_abs < 0:
-            icon = "↓"
-
-        # Couleur : rouge si valeur actuelle dépasse le seuil
-        if now > config.get("alert_tcp_no_response_threshold", 100):
-            color = "down"
-        else:
-            color = "neutral"
-
-    # === TCP BLOCK UP ===
-    elif type_ == "tcp_block_wp_up":
-        diff_abs = now - prev  # variation absolue
-
-        # Icone (hausse/baisse absolue)
-        if diff_abs > 0:
-            icon = "↑"
-        elif diff_abs < 0:
-            icon = "↓"
-
-        # Couleur : rouge si valeur actuelle dépasse le seuil
-        if now > config.get("alert_tcp_block_wp_up_threshold", 100):
-            color = "down"
-        else:
-            color = "neutral"
-
-    # === LATENCE ===
-    elif type_ == "latence":
-        diff_abs = now - prev  # variation absolue
-
-        # Icone (hausse/baisse absolue)
-        if diff_abs > 0:
-            icon = "↑"
-        elif diff_abs < 0:
-            icon = "↓"
-
-        # Couleur : rouge si valeur actuelle dépasse le seuil (en ms)
-        if now > config.get("alert_latence_threshold_ms", 100):
-            color = "down"
-        else:
-            color = "neutral"
-
-    # === DNS MALFORMED ===
-    elif type_ == "dns_malformed":
-        diff_abs = now - prev
-        if diff_abs > 0:
-            icon = "↑"
-        elif diff_abs < 0:
-            icon = "↓"
-
-        # Use the pertes threshold as a proxy for DNS malformed
-        if now > config.get("alert_pertes_threshold", 3.0):
-            color = "down"
-        else:
-            color = "neutral"
-
-    # === DNS NO RESPONSE ===
-    elif type_ == "dns_no_response":
-        diff_abs = now - prev
-        if diff_abs > 0:
-            icon = "↑"
-        elif diff_abs < 0:
-            icon = "↓"
-
-        # Use the tcp no response threshold
-        if now > config.get("alert_tcp_no_response_threshold", 100):
-            color = "down"
-        else:
-            color = "neutral"
-
-    return icon, color
-
-def _get_totals_with_trend(totals_dict, key_type):
+    trend_kind = metric_kind if metric_kind in _TREND_KINDS else "pertes"
+    intervals = list(totals_by_interval)
     result = {}
-    intervals = list(totals_dict.keys())
-    for idx, interval in enumerate(intervals):
-        start = (
-            float(totals_dict[interval][f"{key_type}_start"])
-            if totals_dict[interval][f"{key_type}_start"] != ""
-            else 0
-        )
-        end = (
-            float(totals_dict[interval][f"{key_type}_end"])
-            if totals_dict[interval][f"{key_type}_end"] != ""
-            else 0
-        )
-        prev_seq = []
-        if idx == 0:
-            prev_seq = []
-        elif idx == 1:
-            prev_seq = [
-                (
-                    float(totals_dict[intervals[0]][f"{key_type}_start"])
-                    if totals_dict[intervals[0]][f"{key_type}_start"] != ""
-                    else 0
-                )
-            ]
-        else:
-            prev_seq = [
-                (
-                    float(totals_dict[intervals[idx - 1]][f"{key_type}_start"])
-                    if totals_dict[intervals[idx - 1]][f"{key_type}_start"] != ""
-                    else 0
-                ),
-                (
-                    float(totals_dict[intervals[idx - 2]][f"{key_type}_start"])
-                    if totals_dict[intervals[idx - 2]][f"{key_type}_start"] != ""
-                    else 0
-                ),
-            ]
-
-        # Déterminer le type pour _get_trend_icon_and_color
-        trend_type = key_type
-        if key_type in ["tcp_no_response", "tcp_block_wp_up", "latence"]:
-            trend_type = key_type
-        elif key_type == "traffic":
-            trend_type = "traffic"
-        elif key_type in ["dns_malformed", "dns_no_response"]:
-            trend_type = key_type
-        else:  # pertes
-            trend_type = "pertes"
-
-        icon, color = _get_trend_icon_and_color(trend_type, end, start, prev_seq)
+    for position, interval in enumerate(intervals):
+        end_raw = totals_by_interval[interval][f"{metric_kind}_end"]
+        start, end = start_value(interval), float(end_raw) if end_raw != "" else 0
+        # départs des deux intervalles précédents (plus courts), du plus proche au plus lointain
+        earlier_starts = [start_value(intervals[i]) for i in (position - 1, position - 2) if i >= 0]
+        arrow, tone = _trend_arrow_and_tone(trend_kind, end, start, earlier_starts)
         result[interval] = {
-            f"{key_type}_start": start,
-            f"{key_type}_end": end,
-            "trend_icon": icon,
-            "trend_color": color,
-            f"taux_{key_type}": totals_dict[interval][f"taux_{key_type}"],
+            f"{metric_kind}_start": start,
+            f"{metric_kind}_end": end,
+            "trend_icon": arrow,
+            "trend_color": tone,
+            f"taux_{metric_kind}": totals_by_interval[interval][f"taux_{metric_kind}"],
         }
     return result
 
@@ -567,7 +449,7 @@ def build_dashboard(all_data_dashboard: dict, tdd_data: dict, checkpoints: dict,
     totals_international_gi = {i: _calculate_totals_optimized(recap[i], combined) for i in checkpoints}
 
     def trend(totals, *keys):
-        return {k: _get_totals_with_trend(totals, k) for k in keys}
+        return {k: _totals_with_trend(totals, k) for k in keys}
 
     meta = constants.FRONTEND_METADATA
     return {

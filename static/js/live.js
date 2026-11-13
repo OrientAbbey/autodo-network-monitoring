@@ -84,7 +84,6 @@ const AutoUpdateManager = {
             };
             this.sse.onerror = (event) => {
                 this.sseErrorCount++;
-                console.log(`SSE connection error #${this.sseErrorCount}/${this.maxSseRetries}`);
 
                 if (this.sseErrorCount >= this.maxSseRetries) {
                     console.error('SSE connection failed after', this.maxSseRetries, 'attempts. Stopping auto-update.');
@@ -132,7 +131,7 @@ const AutoUpdateManager = {
 
     stopAutoUpdate() {
         if (this.sse) {
-            try { this.sse.close(); } catch (e) { }
+            try { this.sse.close(); } catch (e) { /* déjà fermée */ }
             this.sse = null;
         }
         // Reset error count when stopping
