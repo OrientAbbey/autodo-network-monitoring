@@ -110,8 +110,8 @@ def load_database_configurations() -> tuple[dict[str, dict[str, str]], dict[str,
                         roaming_types.add(key.split('_roaming_')[1])  # Part after _roaming_
 
         # Convert sets to sorted lists for frontend metadata
-        roaming_cities = sorted(list(roaming_cities))
-        roaming_types = sorted(list(roaming_types))
+        roaming_cities = sorted(roaming_cities)
+        roaming_types = sorted(roaming_types)
 
         return db_configs, labels, db_key_to_cparam, location_mapping, international_names, gi_names, roaming_cities, roaming_types
 
@@ -212,5 +212,3 @@ EXNET_DNS_LINK = os.getenv(
     "EXNET_DNS_LINK",
     "https://{db_host}/exnet/diagnet/user_plane/dns_summary.php?c={c_param}&selected=&ipset=*&end_date=__END_TIMESTAMP__&display=7200&type=%",
 )
-
-CONFIG_FILE = Path(__file__).parent.parent / "config.json"

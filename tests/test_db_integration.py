@@ -286,7 +286,7 @@ def fake_diagnet(test_db):
         for i in range(12):
             c.execute(t("INSERT INTO whole_5min (SAUV_td32, tcp_dw, udp_dw, icmp_dw, other_dw, `#tcp_loss_dw`, `#tcp_pkt_dw`) VALUES (:d, 3750000000, 0, 0, 0, 90, 1000)"),
                       {"d": base + timedelta(minutes=5 * i)})
-    collector.reset_cache()
+    collector.clear_mode_cache()
     from seed_demo_data import admin_conn      # compte DIAGNET avec droits d'ÉCRITURE : le garde-fou READ ONLY doit les neutraliser
     adm = admin_conn(); cur = adm.cursor()
     # The CI runner connects to the MariaDB service through its bridge IP.

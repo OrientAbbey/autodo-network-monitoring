@@ -35,5 +35,3 @@ def get_logger(name: str) -> logging.Logger:
     _setup_root()
     return logging.getLogger(name)
 
-
-app_logger = get_logger("AUTODO")

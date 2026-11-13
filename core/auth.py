@@ -237,11 +237,6 @@ def require_role(minimum_role: str, *, allow_password_change: bool = False):
     return Depends(dependency)
 
 
-def optional_session():
-    """Dépendance qui retourne la session ou None (le visiteur est autorisé)."""
-    return Depends(current_session)
-
-
 def actor_name(session: Session | None) -> str:
     return session.username if session else "visiteur"
 

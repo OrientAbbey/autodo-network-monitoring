@@ -167,10 +167,6 @@ def _finish_config_change(actor: str, ip: str, before: dict, comment: str, actio
 # ============================================================================
 # Maintenance et silences
 # ============================================================================
-def _as_db_datetime(value: str | datetime) -> str:
-    return fmt(parse(value))
-
-
 def add_window(db_key: str, starts_at: str | datetime, ends_at: str | datetime, reason: str, created_by: str,
                auto_silence: bool = False) -> int:
     start, end = parse(starts_at), parse(ends_at)

@@ -29,7 +29,6 @@ logger = get_logger(__name__)
 STEP_MINUTES = 5
 POINTS_PER_DAY = 288
 TRAFFIC_COLUMNS = ("tcp_dw", "udp_dw", "icmp_dw", "other_dw")
-METRIC_COLUMNS = ("traffic_gbps", "loss_pct", "latency_ms", "tcp_no_response_pct", "tcp_block_wp_up_pct", "dns_malformed_pct")
 BACKFILL_CHUNK_DAYS = 5          # taille d'une lecture DIAGNET : 5 jours = 1 440 lignes par requête
 
 

@@ -31,7 +31,7 @@ logger = get_logger(__name__)
 NUM_COLS = ("tcp_dw", "udp_dw", "icmp_dw", "other_dw", "#tcp_loss_dw", "#tcp_pkt_dw", "#tcp_no_response_to_syn",
             "#tcp_block_wp_up", "#tcp_synack_core", "Irt_tcp_core_td22", "#tcp_sessions")
 DNS_COLS = ("dns_malformed_ul", "dns_queries_woresp", "dns_queries")
-EMPTY_ROW = {c: None for c in NUM_COLS + DNS_COLS}
+EMPTY_ROW = dict.fromkeys(NUM_COLS + DNS_COLS)
 
 _SUM = ", ".join(f"SUM(`{c}`) AS `{c}`" for c in NUM_COLS)
 SQL_WHOLE = text("SELECT SAUV_td32, " + ", ".join(f"`{c}`" for c in NUM_COLS) +
@@ -72,7 +72,6 @@ class DbSnapshot:
     apn: dict = field(default_factory=dict)          # idem, TDD (bases « utilisateur »)
     last_update: datetime | None = None           # UTC naïf
     mode7d: float | None = None
-    duration_s: float = 0.0
 
 
 _mode_cache: dict[str, tuple[float, float | None]] = {}
@@ -92,7 +91,6 @@ def _rows(conn, stmt, ts: list, **extra) -> dict:
 
 def _collect_one(db_key: str, timestamps: list, latest_alert_ts: datetime, want_monitoring: bool) -> DbSnapshot:
     snap = DbSnapshot(db_key)
-    t0 = time.monotonic()
     if settings.diagnet_source == "fake":                       # démo : aucune base DIAGNET interrogée
         try:
             f = demo_data.fake_fields(db_key, timestamps, latest_alert_ts, want_monitoring)
@@ -102,7 +100,6 @@ def _collect_one(db_key: str, timestamps: list, latest_alert_ts: datetime, want_
         except Exception as e:
             snap.error = f"{type(e).__name__}: {str(e)[:200]}"
             logger.warning("Collecte simulée %s en échec : %s", db_key, snap.error)
-        snap.duration_s = time.monotonic() - t0
         return snap
     cfg = constants.DB_CONFIGS.get(db_key, {})
     host, db_name = cfg.get("host"), cfg.get("db_name")
@@ -114,7 +111,7 @@ def _collect_one(db_key: str, timestamps: list, latest_alert_ts: datetime, want_
             dns = _rows(conn, SQL_DNS, timestamps, ips=list(settings.dns_reference_ips))
             whole = _rows(conn, SQL_WHOLE, timestamps)
             for ts, row in whole.items():
-                row.update({k: v for k, v in dns.get(ts, {}).items()})
+                row.update(dns.get(ts, {}))
             snap.whole = whole
             if db_key in constants.LABELS.get("utilisateur", {}):
                 apn = _rows(conn, SQL_APN, timestamps, apn="%tdd%")
@@ -135,7 +132,6 @@ def _collect_one(db_key: str, timestamps: list, latest_alert_ts: datetime, want_
     except Exception as e:                                      # base injoignable, table absente, délai dépassé…
         snap.error = f"{type(e).__name__}: {str(e)[:200]}"
         logger.warning("Collecte %s en échec : %s", db_key, snap.error)
-    snap.duration_s = time.monotonic() - t0
     return snap
 
 
@@ -186,6 +182,7 @@ def collect_all(timestamps: list, alert_timestamps: list, monitor_roaming: bool 
     return results
 
 
-def reset_cache() -> None:
+def clear_mode_cache() -> None:
+    """Vide le cache du mode sur 7 jours (utilisé par les tests pour repartir d'un état neuf)."""
     with _mode_lock:
         _mode_cache.clear()
