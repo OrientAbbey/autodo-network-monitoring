@@ -50,7 +50,7 @@ def _field_description(name: str, info) -> dict:
 
 
 @admin_router.get("/api/supervision/config-schema")
-def config_schema(_s=supervision):
+def config_schema(_requires_supervision=supervision):
     fields = [_field_description(n, i) for n, i in ConfigParams.model_fields.items()]
     databases = [{"key": key, "site": cfg.get("site", ""), "label": constants.LOCATION_MAPPING.get(key, key)}
                  for key, cfg in constants.DB_CONFIGS.items()]
@@ -101,7 +101,7 @@ class MaintenanceBody(BaseModel):
 
 
 @admin_router.get("/api/supervision/maintenance")
-def list_maintenance(_s=supervision):
+def list_maintenance(_requires_supervision=supervision):
     return _json({"windows": governance.list_windows()})
 
 
@@ -131,12 +131,12 @@ def delete_maintenance(window_id: int, request: Request, session=supervision):
 # SUPERVISION — versions de configuration
 # ============================================================================
 @admin_router.get("/api/supervision/config-versions")
-def config_versions(_s=supervision):
+def config_versions(_requires_supervision=supervision):
     return _json({"versions": governance.list_config_versions()})
 
 
 @admin_router.get("/api/supervision/config-versions/{version_id}")
-def config_version(version_id: int, _s=supervision):
+def config_version(version_id: int, _requires_supervision=supervision):
     version = governance.get_config_version(version_id)
     if version is None:
         raise HTTPException(404, "Version introuvable")
@@ -154,7 +154,7 @@ async def restore_config_version(version_id: int, request: Request, session=supe
 
 
 @admin_router.get("/api/supervision/tickets-to-validate")
-def tickets_to_validate(_s=supervision):
+def tickets_to_validate(_requires_supervision=supervision):
     return _json({"tickets": tickets.pending_validation()})
 
 
@@ -179,7 +179,7 @@ class ResetPasswordBody(BaseModel):
 
 
 @admin_router.get("/api/admin/users")
-def list_users(_s=admin_only):
+def list_users(_requires_admin=admin_only):
     return _json({"users": accounts.list_users()})
 
 
@@ -238,19 +238,19 @@ def revoke_session(session_id: str, request: Request, session=admin_only):
 
 @admin_router.get("/api/admin/audit")
 def audit_list(action: str | None = Query(None, max_length=64), actor: str | None = Query(None, max_length=64),
-               days: int = Query(30, ge=1, le=400), _s=admin_only):
+               days: int = Query(30, ge=1, le=400), _requires_admin=admin_only):
     return _json({"entries": governance.list_audit(action, actor, days)})
 
 
 @admin_router.get("/api/admin/audit.csv")
-def audit_export(days: int = Query(30, ge=1, le=400), _s=admin_only):
+def audit_export(days: int = Query(30, ge=1, le=400), _requires_admin=admin_only):
     csv_text = governance.audit_csv(governance.list_audit(days=days, limit=5000))
     return Response(csv_text, media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": 'attachment; filename="autodo-audit.csv"'})
 
 
 @admin_router.get("/api/admin/usage")
-def usage(request: Request, period: str = Query("7days", pattern="^(today|7days|1month|3months)$"), _s=admin_only):
+def usage(request: Request, period: str = Query("7days", pattern="^(today|7days|1month|3months)$"), _requires_admin=admin_only):
     access = analytics.access_logs(period)
     subscribers = getattr(request.app.state, "sse_subscribers", set())
     return _json({"period": period, "viewers_now": len(subscribers), "access_logs": access["access_logs"],
@@ -259,7 +259,7 @@ def usage(request: Request, period: str = Query("7days", pattern="^(today|7days|
 
 
 @admin_router.get("/api/admin/health")
-def health(_s=admin_only):
+def health(_requires_admin=admin_only):
     scheduler = constants.scheduler
     jobs = [{"id": job.id, "next_run": job.next_run_time.strftime("%Y-%m-%d %H:%M:%S") if job.next_run_time else None}
             for job in (scheduler.get_jobs() if scheduler else [])]
@@ -280,7 +280,7 @@ class BackfillBody(BaseModel):
 
 
 @admin_router.get("/api/admin/history")
-async def history_stats(_s=admin_only):
+async def history_stats(_requires_admin=admin_only):
     return _json(await _run(history.stats))
 
 
@@ -297,7 +297,7 @@ def history_backfill(body: BackfillBody, request: Request, session=admin_only):
 # ADMIN — détecteurs « futurs » (mode ombre)
 # ============================================================================
 @admin_router.get("/api/admin/detectors")
-async def list_detectors(_s=admin_only):
+async def list_detectors(_requires_admin=admin_only):
     def build():
         states, counts = shadow.get_states(), shadow.verdict_counts(24)
         items = []
@@ -369,7 +369,7 @@ async def train_detector(key: str, request: Request, body: TrainBody = TrainBody
 
 
 @admin_router.get("/api/admin/detectors/report")
-async def detectors_report(days: int = Query(7, ge=1, le=90), _s=admin_only):
+async def detectors_report(days: int = Query(7, ge=1, le=90), _requires_admin=admin_only):
     return _json(await _run(shadow.shadow_report, days))
 
 
@@ -377,7 +377,7 @@ async def detectors_report(days: int = Query(7, ge=1, le=90), _s=admin_only):
 # ADMIN — analyses à la demande (D3 prévision / capacité, D5 ruptures)
 # ============================================================================
 @admin_router.get("/api/admin/analysis/forecast")
-async def analysis_forecast(db_key: str = Query(pattern=DB_KEY_PATTERN), days: int = Query(14, ge=2, le=60), _s=admin_only):
+async def analysis_forecast(db_key: str = Query(pattern=DB_KEY_PATTERN), days: int = Query(14, ge=2, le=60), _requires_admin=admin_only):
     """Courbe attendue pour les 24 h suivant le dernier relevé (bande ≈ 95 %)."""
     grid = await _run(history.traffic_grid, db_key, days)
     if grid is None:
@@ -394,13 +394,13 @@ async def analysis_forecast(db_key: str = Query(pattern=DB_KEY_PATTERN), days: i
 
 @admin_router.get("/api/admin/analysis/capacity")
 async def analysis_capacity(db_key: str = Query(pattern=DB_KEY_PATTERN), capacity_gbps: float = Query(gt=0, le=10000),
-                            days: int = Query(60, ge=7, le=180), _s=admin_only):
+                            days: int = Query(60, ge=7, le=180), _requires_admin=admin_only):
     daily = await _run(history.daily_stats, db_key, days)
     return _json({"db_key": db_key, **anomaly.capacity_projection([d["peak"] for d in daily], capacity_gbps)})
 
 
 @admin_router.get("/api/admin/analysis/level-shifts")
-async def analysis_level_shifts(db_key: str = Query(pattern=DB_KEY_PATTERN), days: int = Query(90, ge=20, le=400), _s=admin_only):
+async def analysis_level_shifts(db_key: str = Query(pattern=DB_KEY_PATTERN), days: int = Query(90, ge=20, le=400), _requires_admin=admin_only):
     daily = await _run(history.daily_stats, db_key, days)
     shifts = anomaly.level_shifts([(d["day"], d["mean"]) for d in daily])
     return _json({"db_key": db_key, "days_of_data": len(daily),
@@ -417,7 +417,7 @@ class SimulationBody(BaseModel):
 
 
 @admin_router.post("/api/admin/simulation")
-async def run_simulation(body: SimulationBody, _s=admin_only):
+async def run_simulation(body: SimulationBody, _requires_admin=admin_only):
     """Rejoue la configuration candidate sur l'historique local. N'enregistre RIEN."""
     unknown = [k for k in body.config if k not in ConfigParams.model_fields]
     if unknown:

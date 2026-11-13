@@ -55,8 +55,8 @@ def load_recipients() -> list[dict]:
 # État des notifications (base)
 # ----------------------------------------------------------------------------
 def _already_notified(recipient: str) -> set[str]:
-    with local_conn() as c:
-        r = c.execute(text("SELECT ticket_ids FROM notification_state WHERE recipient = :r"), {"r": recipient.lower()}).first()
+    with local_conn() as conn:
+        r = conn.execute(text("SELECT ticket_ids FROM notification_state WHERE recipient = :r"), {"r": recipient.lower()}).first()
     return {x for x in (r[0] or "").split(",") if x} if r else set()
 
 
@@ -67,8 +67,8 @@ def _remember(recipient: str, ticket_ids: Iterable) -> None:
     else:
         sql = ("INSERT INTO notification_state (recipient, ticket_ids, sent_at) VALUES (:r, :t, :s) "
                "ON DUPLICATE KEY UPDATE ticket_ids = :t, sent_at = :s")
-    with local_tx() as c:
-        c.execute(text(sql),
+    with local_tx() as conn:
+        conn.execute(text(sql),
                   {"r": recipient.lower(), "t": ",".join(str(i) for i in ticket_ids), "s": fmt(now_local().replace(tzinfo=None))})
 
 

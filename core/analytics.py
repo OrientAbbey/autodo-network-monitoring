@@ -95,7 +95,7 @@ def record_viewer_peak(viewers_now: int) -> None:
     if viewers_now <= 0:
         return
     now = now_local().replace(tzinfo=None)
-    with local_tx() as c:
+    with local_tx() as conn:
         if settings.db_backend == "sqlite":
             sql = ("INSERT INTO usage_peaks (`day`, peak_viewers, peak_at) VALUES (:d, :n, :t) "
                    "ON CONFLICT(`day`) DO UPDATE SET "
@@ -105,28 +105,28 @@ def record_viewer_peak(viewers_now: int) -> None:
         else:
             sql = ("INSERT INTO usage_peaks (`day`, peak_viewers, peak_at) VALUES (:d, :n, :t) ON DUPLICATE KEY UPDATE "
                    "peak_at = IF(:n > peak_viewers, :t, peak_at), peak_viewers = GREATEST(peak_viewers, :n)")
-        c.execute(text(sql), {"d": now.strftime("%Y-%m-%d"), "n": int(viewers_now), "t": fmt(now)})
+        conn.execute(text(sql), {"d": now.strftime("%Y-%m-%d"), "n": int(viewers_now), "t": fmt(now)})
 
 
 def peak_today() -> int:
-    with local_conn() as c:
-        value = c.execute(text("SELECT peak_viewers FROM usage_peaks WHERE `day` = :d"),
+    with local_conn() as conn:
+        value = conn.execute(text("SELECT peak_viewers FROM usage_peaks WHERE `day` = :d"),
                           {"d": now_local().replace(tzinfo=None).strftime("%Y-%m-%d")}).scalar()
     return int(value or 0)
 
 
 def viewer_peaks(period: str = "7days") -> list[dict]:
     cutoff = period_to_cutoff(period).strftime("%Y-%m-%d")
-    with local_conn() as c:
-        rows = fetch_all(c, "SELECT `day`, peak_viewers, peak_at FROM usage_peaks WHERE `day` >= :c ORDER BY `day` DESC", c=cutoff)
+    with local_conn() as conn:
+        rows = fetch_all(conn, "SELECT `day`, peak_viewers, peak_at FROM usage_peaks WHERE `day` >= :c ORDER BY `day` DESC", c=cutoff)
     return [{"day": str(r["day"]), "peak_viewers": int(r["peak_viewers"]), "peak_at": fmt(r["peak_at"])} for r in rows]
 
 
 def access_logs(period: str = "7days") -> dict:
     """Journaux d'accès + statistiques, en UNE requête (le reste est dérivé en Python)."""
     cutoff = period_to_cutoff(period).strftime("%Y-%m-%d")
-    with local_conn() as c:
-        rows = fetch_all(c, """SELECT `date`, last_ip AS ip_address, SUM(visits_count) AS access_count,
+    with local_conn() as conn:
+        rows = fetch_all(conn, """SELECT `date`, last_ip AS ip_address, SUM(visits_count) AS access_count,
                 MAX(last_seen) AS last_access, COUNT(DISTINCT client_id) AS unique_users
                 FROM daily_users WHERE `date` >= :c GROUP BY `date`, last_ip ORDER BY `date` DESC, last_ip ASC""", c=cutoff)
     logs = [{"date": str(r["date"]), "ip_address": r["ip_address"], "access_count": int(r["access_count"] or 0),
@@ -149,13 +149,13 @@ def purge(retention_days: int | None = None, batch: int = 5000) -> dict:
     limit_day = (now_local().replace(tzinfo=None) - timedelta(days=days)).strftime("%Y-%m-%d")
     total = 0
     while True:
-        with local_tx() as c:
+        with local_tx() as conn:
             if settings.db_backend == "sqlite":     # SQLite n'accepte pas DELETE ... LIMIT : borne par rowid
                 sql = (f"DELETE FROM daily_users WHERE rowid IN "
                        f"(SELECT rowid FROM daily_users WHERE `date` < :v LIMIT {batch})")
             else:
                 sql = f"DELETE FROM daily_users WHERE `date` < :v LIMIT {batch}"
-            n = c.execute(text(sql), {"v": limit_day}).rowcount
+            n = conn.execute(text(sql), {"v": limit_day}).rowcount
         total += n
         if n < batch:
             break

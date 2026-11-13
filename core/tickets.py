@@ -42,24 +42,24 @@ INSERT_DEFAULTS = {"validation_state": "auto"}      # colonnes NOT NULL sans val
 # Conversions ligne SQL <-> dict
 # ============================================================================
 def _row_to_ticket(row: dict) -> dict:
-    t = dict(row)
-    for c in DT_COLS:
-        if isinstance(t.get(c), datetime):
-            t[c] = fmt(t[c])
-    for c in JSON_COLS:
-        v = t.get(c)
-        if isinstance(v, (str, bytes)):
+    ticket = dict(row)
+    for column in DT_COLS:
+        if isinstance(ticket.get(column), datetime):
+            ticket[column] = fmt(ticket[column])
+    for column in JSON_COLS:
+        raw_value = ticket.get(column)
+        if isinstance(raw_value, (str, bytes)):
             try:
-                t[c] = json.loads(v)
+                ticket[column] = json.loads(raw_value)
             except Exception:
-                t[c] = []
-        elif v is None:
-            t[c] = []
+                ticket[column] = []
+        elif raw_value is None:
+            ticket[column] = []
     for numeric in ("value", "last_note_value"):
-        if isinstance(t.get(numeric), Decimal):
-            t[numeric] = float(t[numeric])
-    t["ttr_human"] = t["human_readable"] = rules.ttr_human(t.get("ttr_seconds"))
-    return t
+        if isinstance(ticket.get(numeric), Decimal):
+            ticket[numeric] = float(ticket[numeric])
+    ticket["ttr_human"] = ticket["human_readable"] = rules.ttr_human(ticket.get("ttr_seconds"))
+    return ticket
 
 
 def _prepare(fields: dict) -> dict:
@@ -78,8 +78,8 @@ def _prepare(fields: dict) -> dict:
 # ============================================================================
 def load_open() -> list[dict]:
     """Tickets ouverts — UNE requête par cycle."""
-    with local_conn() as c:
-        return [_row_to_ticket(r) for r in fetch_all(c, "SELECT * FROM tickets_tb WHERE status = 'open'")]
+    with local_conn() as conn:
+        return [_row_to_ticket(r) for r in fetch_all(conn, "SELECT * FROM tickets_tb WHERE status = 'open'")]
 
 
 def load_page(limit: int = 1000, offset: int = 0, status: str | None = None,
@@ -96,15 +96,15 @@ def load_page(limit: int = 1000, offset: int = 0, status: str | None = None,
             where.append(f"{col} = :{col}")
             p[col] = val
     w = (" WHERE " + " AND ".join(where)) if where else ""
-    with local_conn() as c:
-        total = fetch_one(c, f"SELECT COUNT(*) AS n FROM tickets_tb{w}", **{k: v for k, v in p.items() if k in ("status", "type", "database_name")})["n"]
-        rows = fetch_all(c, f"SELECT * FROM tickets_tb{w} ORDER BY (status = 'open') DESC, timestamp DESC LIMIT :limit OFFSET :offset", **p)
+    with local_conn() as conn:
+        total = fetch_one(conn, f"SELECT COUNT(*) AS n FROM tickets_tb{w}", **{k: v for k, v in p.items() if k in ("status", "type", "database_name")})["n"]
+        rows = fetch_all(conn, f"SELECT * FROM tickets_tb{w} ORDER BY (status = 'open') DESC, timestamp DESC LIMIT :limit OFFSET :offset", **p)
     return [_row_to_ticket(r) for r in rows], int(total)
 
 
 def counts() -> dict:
-    with local_conn() as c:
-        r = fetch_one(c, "SELECT COUNT(*) AS total, COALESCE(SUM(status = 'open'), 0) AS open_n FROM tickets_tb WHERE status <> 'deleted'")
+    with local_conn() as conn:
+        r = fetch_one(conn, "SELECT COUNT(*) AS total, COALESCE(SUM(status = 'open'), 0) AS open_n FROM tickets_tb WHERE status <> 'deleted'")
     return {"total": int(r["total"]), "open": int(r["open_n"])}
 
 
@@ -129,8 +129,8 @@ def alerts_summary() -> dict:
         hit = _alerts_cache.get("__summary__")
         if hit and now - hit[0] < ALERTS_TTL:
             return hit[1]
-    with local_conn() as c:
-        rows = fetch_all(c, "SELECT type, database_name FROM tickets_tb WHERE status = 'open' AND validation_state <> 'pending'")
+    with local_conn() as conn:
+        rows = fetch_all(conn, "SELECT type, database_name FROM tickets_tb WHERE status = 'open' AND validation_state <> 'pending'")
     by_db: dict[str, set[str]] = {}
     by_type = {"traffic": 0, "pertes": 0, "db_down": 0}
     for row in rows:
@@ -172,8 +172,8 @@ def dashboard_alerts(filters: dict | None = None) -> dict:
     stmt = text(sql)
     if "types" in p:
         stmt = stmt.bindparams(bindparam("types", expanding=True))
-    with local_conn() as c:
-        rows = [dict(r) for r in c.execute(stmt, p).mappings().all()]
+    with local_conn() as conn:
+        rows = [dict(r) for r in conn.execute(stmt, p).mappings().all()]
     result = {"traffic": [], "pertes": []}
     for a in rows:
         try:
@@ -197,8 +197,8 @@ def dashboard_alerts(filters: dict | None = None) -> dict:
 
 def alerts_stats(period: str = "7days") -> dict:
     cutoff = fmt(period_to_cutoff(period))
-    with local_conn() as c:
-        rows = fetch_all(c, """SELECT DATE(timestamp) AS day,
+    with local_conn() as conn:
+        rows = fetch_all(conn, """SELECT DATE(timestamp) AS day,
                 SUM(type = 'traffic') AS traffic, SUM(type = 'pertes') AS pertes, SUM(type = 'db_down') AS db_down, COUNT(*) AS total
                 FROM tickets_tb WHERE timestamp >= :c GROUP BY DATE(timestamp) ORDER BY day DESC""", c=cutoff)
     return {str(r["day"]): {k: int(r[k] or 0) for k in ("traffic", "pertes", "db_down", "total")} for r in rows}
@@ -211,19 +211,19 @@ def next_id() -> int:
     """YYYYMMDDNNN, attribué atomiquement ; suffixe à 4 chiffres au-delà de 999 tickets/jour."""
     day = now_local().date()
     prefix = int(day.strftime("%Y%m%d"))
-    with local_tx() as c:
-        seed = int(c.execute(text("SELECT COALESCE(MAX(id), :base) FROM tickets_tb WHERE id BETWEEN :lo AND :hi"),
+    with local_tx() as conn:
+        seed = int(conn.execute(text("SELECT COALESCE(MAX(id), :base) FROM tickets_tb WHERE id BETWEEN :lo AND :hi"),
                              {"base": prefix * 1000, "lo": prefix * 1000, "hi": prefix * 1000 + 999}).scalar()) - prefix * 1000
         if settings.db_backend == "sqlite":
             day_s = day.isoformat()
-            row = c.execute(text("SELECT n FROM ticket_counters WHERE day = :d"), {"d": day_s}).scalar()
+            row = conn.execute(text("SELECT n FROM ticket_counters WHERE day = :d"), {"d": day_s}).scalar()
             n = (int(row) + 1) if row is not None else (seed + 1)
-            c.execute(text("INSERT INTO ticket_counters (day, n) VALUES (:d, :n) ON CONFLICT(day) DO UPDATE SET n = :n"),
-                      {"d": day_s, "n": n})
+            conn.execute(text("INSERT INTO ticket_counters (day, n) VALUES (:d, :n) ON CONFLICT(day) DO UPDATE SET n = :n"),
+                         {"d": day_s, "n": n})
         else:
-            c.execute(text("INSERT INTO ticket_counters (day, n) VALUES (:d, LAST_INSERT_ID(:n)) "
-                           "ON DUPLICATE KEY UPDATE n = LAST_INSERT_ID(n + 1)"), {"d": day, "n": seed + 1})
-            n = int(c.execute(text("SELECT LAST_INSERT_ID()")).scalar())
+            conn.execute(text("INSERT INTO ticket_counters (day, n) VALUES (:d, LAST_INSERT_ID(:n)) "
+                              "ON DUPLICATE KEY UPDATE n = LAST_INSERT_ID(n + 1)"), {"d": day, "n": seed + 1})
+            n = int(conn.execute(text("SELECT LAST_INSERT_ID()")).scalar())
     return prefix * 1000 + n if n < 1000 else int(f"{prefix}{n:04d}")
 
 
@@ -248,27 +248,27 @@ class ChangeSet:
             ticket.update(fields)                       # vue en mémoire cohérente pour la suite du cycle
 
 
-def persist(cs: ChangeSet) -> list[int]:
+def persist(changes: ChangeSet) -> list[int]:
     """Applique le ChangeSet dans UNE transaction. Retourne les ID en conflit de version (réévalués au cycle suivant)."""
     conflicts: list[int] = []
-    if not cs.inserts and not cs.updates and not cs.log:
+    if not changes.inserts and not changes.updates and not changes.log:
         return conflicts
-    cols = ", ".join(f"`{c}`" for c in INSERT_COLS)
-    vals = ", ".join(f":{c}" for c in INSERT_COLS)
-    with local_tx() as c:
-        if cs.inserts:
-            rows = [_prepare({k: (t.get(k) if t.get(k) is not None else INSERT_DEFAULTS.get(k)) for k in INSERT_COLS}) for t in cs.inserts]
-            c.execute(text(f"INSERT INTO tickets_tb ({cols}) VALUES ({vals})"), rows)      # strict : jamais d'écrasement
-        for tid, fields in cs.updates.items():
+    cols = ", ".join(f"`{column}`" for column in INSERT_COLS)
+    vals = ", ".join(f":{column}" for column in INSERT_COLS)
+    with local_tx() as conn:
+        if changes.inserts:
+            rows = [_prepare({k: (t.get(k) if t.get(k) is not None else INSERT_DEFAULTS.get(k)) for k in INSERT_COLS}) for t in changes.inserts]
+            conn.execute(text(f"INSERT INTO tickets_tb ({cols}) VALUES ({vals})"), rows)      # strict : jamais d'écrasement
+        for tid, fields in changes.updates.items():
             f = {k: v for k, v in _prepare(fields).items() if k in _UPDATABLE}
             if not f:
                 continue
             sets = ", ".join(f"`{k}` = :{k}" for k in f)
-            res = c.execute(text(f"UPDATE tickets_tb SET {sets}, version = version + 1 WHERE id = :_id AND version = :_v"),
-                            {**f, "_id": tid, "_v": cs.versions.get(tid, 0)})
+            res = conn.execute(text(f"UPDATE tickets_tb SET {sets}, version = version + 1 WHERE id = :_id AND version = :_v"),
+                            {**f, "_id": tid, "_v": changes.versions.get(tid, 0)})
             if res.rowcount == 0:
                 conflicts.append(tid)
-        ticket_log.insert_events(c, cs.log)                     # même transaction : chronologie toujours cohérente avec les tickets
+        ticket_log.insert_events(conn, changes.log)                     # même transaction : chronologie toujours cohérente avec les tickets
     if conflicts:
         logger.warning("Conflit de version sur les tickets %s (modifiés en parallèle) — réévaluation au prochain cycle", conflicts)
     invalidate_alert_cache()
@@ -282,8 +282,8 @@ def update_fields(ticket_id: int, fields: dict, *, expected_state: str | None = 
         return False
     sets = ", ".join(f"`{k}` = :{k}" for k in f)
     cond = " AND orange_sync_state = :_exp" if expected_state else ""
-    with local_tx() as c:
-        r = c.execute(text(f"UPDATE tickets_tb SET {sets}, version = version + 1 WHERE id = :_id{cond}"),
+    with local_tx() as conn:
+        r = conn.execute(text(f"UPDATE tickets_tb SET {sets}, version = version + 1 WHERE id = :_id{cond}"),
                       {**f, "_id": ticket_id, **({"_exp": expected_state} if expected_state else {})})
         return r.rowcount == 1
 
@@ -476,12 +476,12 @@ def claim_for_orange(states: tuple, limit: int, now: str) -> list[dict]:
     stmt = text("SELECT * FROM tickets_tb WHERE orange_sync_state IN :states AND "
                 "(orange_next_retry_at IS NULL OR orange_next_retry_at <= :now) ORDER BY timestamp LIMIT :n"
                 ).bindparams(bindparam("states", expanding=True))
-    with local_conn() as c:
-        rows = [dict(r) for r in c.execute(stmt, {"states": list(states), "now": now, "n": limit}).mappings()]
+    with local_conn() as conn:
+        rows = [dict(r) for r in conn.execute(stmt, {"states": list(states), "now": now, "n": limit}).mappings()]
     claimed: list[dict] = []
     for r in rows:
-        with local_tx() as c:
-            res = c.execute(text("UPDATE tickets_tb SET orange_next_retry_at = :lease, version = version + 1 "
+        with local_tx() as conn:
+            res = conn.execute(text("UPDATE tickets_tb SET orange_next_retry_at = :lease, version = version + 1 "
                                  "WHERE id = :id AND version = :v"), {"lease": lease, "id": r["id"], "v": r["version"]})
             if res.rowcount == 1:
                 claimed.append(_row_to_ticket({**r, "version": r["version"] + 1}))
@@ -490,15 +490,15 @@ def claim_for_orange(states: tuple, limit: int, now: str) -> list[dict]:
 
 def orange_queue_counts() -> dict:
     """Nombre de tickets par état de synchronisation Orange (page « santé » de l'admin)."""
-    with local_conn() as c:
-        rows = fetch_all(c, "SELECT orange_sync_state AS state, COUNT(*) AS n FROM tickets_tb GROUP BY orange_sync_state")
+    with local_conn() as conn:
+        rows = fetch_all(conn, "SELECT orange_sync_state AS state, COUNT(*) AS n FROM tickets_tb GROUP BY orange_sync_state")
     return {r["state"]: int(r["n"]) for r in rows}
 
 
 def open_with_orange_id() -> list[dict]:
-    with local_conn() as c:
+    with local_conn() as conn:
         return [_row_to_ticket(r) for r in fetch_all(
-            c, "SELECT * FROM tickets_tb WHERE status = 'open' AND orange_sync_state = 'synced' "
+            conn, "SELECT * FROM tickets_tb WHERE status = 'open' AND orange_sync_state = 'synced' "
                "AND external_api_ticket_id IS NOT NULL AND external_api_ticket_id <> ''")]
 
 
@@ -506,8 +506,8 @@ def open_with_orange_id() -> list[dict]:
 # Décisions humaines (superviseur) : validation, rejet, suppression, commentaire, retour d'expérience
 # ============================================================================
 def get_ticket(ticket_id: int) -> dict | None:
-    with local_conn() as c:
-        row = fetch_one(c, "SELECT * FROM tickets_tb WHERE id = :id", id=ticket_id)
+    with local_conn() as conn:
+        row = fetch_one(conn, "SELECT * FROM tickets_tb WHERE id = :id", id=ticket_id)
     return _row_to_ticket(row) if row else None
 
 
@@ -521,8 +521,8 @@ def real_tickets_since(since_utc: datetime) -> list[dict]:
 
     Les bases DIAGNET sont en UTC et les tickets en heure locale : on compare toujours des instants de même référence.
     """
-    with local_conn() as c:
-        rows = fetch_all(c, "SELECT id, type, database_name, timestamp FROM tickets_tb WHERE timestamp >= :s "
+    with local_conn() as conn:
+        rows = fetch_all(conn, "SELECT id, type, database_name, timestamp FROM tickets_tb WHERE timestamp >= :s "
                             "AND status <> 'deleted' AND validation_state <> 'rejected'", s=fmt(since_utc))
     for row in rows:
         row["utc"] = local_to_utc_naive(row["timestamp"])
@@ -532,8 +532,8 @@ def real_tickets_since(since_utc: datetime) -> list[dict]:
 
 def pending_validation() -> list[dict]:
     """Créations en attente de validation (tickets encore ouverts)."""
-    with local_conn() as c:
-        rows = fetch_all(c, "SELECT * FROM tickets_tb WHERE validation_state = 'pending' AND status = 'open' ORDER BY timestamp")
+    with local_conn() as conn:
+        rows = fetch_all(conn, "SELECT * FROM tickets_tb WHERE validation_state = 'pending' AND status = 'open' ORDER BY timestamp")
     return [_row_to_ticket(r) for r in rows]
 
 
@@ -543,14 +543,14 @@ def _decide(ticket_id: int, condition: str, build_fields: Callable[[dict], dict]
     ``condition`` (SQL fixe, jamais issu de l'utilisateur) garantit qu'une décision ne s'applique qu'une fois :
     si un autre superviseur est passé avant, la ligne n'est plus sélectionnée et on retourne None.
     """
-    with local_tx() as c:
-        row = fetch_one(c, f"SELECT * FROM tickets_tb WHERE id = :id AND {condition} FOR UPDATE", id=ticket_id)
+    with local_tx() as conn:
+        row = fetch_one(conn, f"SELECT * FROM tickets_tb WHERE id = :id AND {condition} FOR UPDATE", id=ticket_id)
         if row is None:
             return None
         fields = {k: v for k, v in _prepare(build_fields(row)).items() if k in _UPDATABLE}
         sets = ", ".join(f"`{k}` = :{k}" for k in fields)
-        c.execute(text(f"UPDATE tickets_tb SET {sets}, version = version + 1 WHERE id = :_id"), {**fields, "_id": ticket_id})
-        ticket_log.insert_events(c, [ticket_log.make_event(ticket_id, kind, message, actor)])
+        conn.execute(text(f"UPDATE tickets_tb SET {sets}, version = version + 1 WHERE id = :_id"), {**fields, "_id": ticket_id})
+        ticket_log.insert_events(conn, [ticket_log.make_event(ticket_id, kind, message, actor)])
     invalidate_alert_cache()
     return _row_to_ticket(row)
 
@@ -596,10 +596,10 @@ def set_feedback(ticket_id: int, label: str, actor: str) -> bool:
     """Retour d'expérience « real » / « false » (alimente l'apprentissage de la qualité d'alerte)."""
     if label not in ("real", "false") or get_ticket(ticket_id) is None:
         return False
-    with local_tx() as c:
-        c.execute(text("REPLACE INTO ticket_feedback (ticket_id, label, given_by, given_at) VALUES (:t, :l, :a, :d)"),
+    with local_tx() as conn:
+        conn.execute(text("REPLACE INTO ticket_feedback (ticket_id, label, given_by, given_at) VALUES (:t, :l, :a, :d)"),
                   {"t": ticket_id, "l": label, "a": actor[:64], "d": fmt(now_local().replace(tzinfo=None))})
-        ticket_log.insert_events(c, [ticket_log.make_event(
+        ticket_log.insert_events(conn, [ticket_log.make_event(
             ticket_id, "feedback", "Alerte jugée " + ("réelle" if label == "real" else "fausse (faux positif)") + f" par {actor}", actor)])
     return True
 
@@ -612,12 +612,12 @@ def ack_alerts(ticket_ids: list[int], actor: str) -> int:
     now = fmt(now_local().replace(tzinfo=None))
     new = 0
     verb = "INSERT OR IGNORE" if settings.db_backend == "sqlite" else "INSERT IGNORE"
-    with local_tx() as c:
+    with local_tx() as conn:
         for tid in ticket_ids[:200]:
-            res = c.execute(text(f"{verb} INTO alert_acks (ticket_id, acked_at, acked_by) "
+            res = conn.execute(text(f"{verb} INTO alert_acks (ticket_id, acked_at, acked_by) "
                                  "SELECT id, :n, :a FROM tickets_tb WHERE id = :id"), {"n": now, "a": actor[:64], "id": int(tid)})
             if res.rowcount:
                 new += 1
-                ticket_log.insert_events(c, [ticket_log.make_event(int(tid), "acked", f"Alerte acquittée par {actor}", actor)])
+                ticket_log.insert_events(conn, [ticket_log.make_event(int(tid), "acked", f"Alerte acquittée par {actor}", actor)])
     invalidate_alert_cache()
     return new

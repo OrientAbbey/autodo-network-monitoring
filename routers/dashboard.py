@@ -209,5 +209,5 @@ def health_check():
 
 
 @dashboard_router.get("/api/status")
-def api_status(_s=auth.require_role("supervision")):
+def api_status(_requires_supervision=auth.require_role("supervision")):
     return _json({**monitoring.status(), "tickets": tickets.counts()})

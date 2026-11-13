@@ -133,7 +133,7 @@ async def feedback_ticket(ticket_id: int, body: FeedbackBody, request: Request, 
 
 # ---------------------------------------------------------------- exploitation
 @tickets_router.get("/status")
-def get_system_status(_s=supervision):
+def get_system_status(_requires_supervision=supervision):
     sched = constants.scheduler
     jobs = [{"id": j.id, "next_run": j.next_run_time.strftime("%Y-%m-%d %H:%M:%S") if j.next_run_time else None}
             for j in (sched.get_jobs() if sched else [])]
@@ -142,7 +142,7 @@ def get_system_status(_s=supervision):
 
 
 @tickets_router.get("/test/orange-api")
-def test_orange_api(_s=auth.require_role("admin")):
+def test_orange_api(_requires_login=auth.require_role("admin")):
     """Diagnostic (admin) : n'expose ni identifiants ni URL complètes."""
     try:
         return _json(monitoring.get_orange().test_connection())

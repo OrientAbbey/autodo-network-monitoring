@@ -150,8 +150,8 @@ def fetch_one(conn: Connection, sql: str, **params) -> dict | None:
 
 def ping_local() -> bool:
     try:
-        with local_conn() as c:
-            c.execute(text("SELECT 1"))
+        with local_conn() as conn:
+            conn.execute(text("SELECT 1"))
         return True
     except Exception:
         return False
@@ -160,33 +160,33 @@ def ping_local() -> bool:
 # ----------------------------------------------------------------------------
 # Migrations (sans Alembic) — chaque étape est idempotente
 # ----------------------------------------------------------------------------
-def _col_exists(c: Connection, table: str, col: str) -> bool:
-    return bool(c.execute(text(
+def _col_exists(conn: Connection, table: str, col: str) -> bool:
+    return bool(conn.execute(text(
         "SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = :t AND column_name = :c"),
         {"t": table, "c": col}).first())
 
 
-def _idx_exists(c: Connection, table: str, idx: str) -> bool:
-    return bool(c.execute(text(
+def _idx_exists(conn: Connection, table: str, idx: str) -> bool:
+    return bool(conn.execute(text(
         "SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = :t AND index_name = :i"),
         {"t": table, "i": idx}).first())
 
 
-def _add_col(c: Connection, table: str, col: str, ddl: str) -> None:
-    if not _col_exists(c, table, col):
-        c.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}"))
+def _add_col(conn: Connection, table: str, col: str, ddl: str) -> None:
+    if not _col_exists(conn, table, col):
+        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}"))
 
 
-def _add_idx(c: Connection, table: str, idx: str, ddl: str, unique: bool = False) -> None:
-    if not _idx_exists(c, table, idx):
+def _add_idx(conn: Connection, table: str, idx: str, ddl: str, unique: bool = False) -> None:
+    if not _idx_exists(conn, table, idx):
         try:
-            c.execute(text(f"CREATE {'UNIQUE ' if unique else ''}INDEX {idx} ON {table} {ddl}"))
+            conn.execute(text(f"CREATE {'UNIQUE ' if unique else ''}INDEX {idx} ON {table} {ddl}"))
         except Exception as e:   # ex. doublons historiques : on n'échoue pas au démarrage
             logger.warning("Index %s non créé (%s)", idx, str(e)[:120])
 
 
-def _m1_baseline(c: Connection) -> None:
-    c.execute(text("""CREATE TABLE IF NOT EXISTS tickets_tb (
+def _m1_baseline(conn: Connection) -> None:
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS tickets_tb (
         id BIGINT NOT NULL PRIMARY KEY, type VARCHAR(20) NOT NULL, site VARCHAR(50) NOT NULL,
         database_name VARCHAR(50) NOT NULL, timestamp DATETIME NOT NULL, value DECIMAL(10,3) NOT NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'open', agent VARCHAR(50) NOT NULL DEFAULT 'DIAGNET',
@@ -198,109 +198,109 @@ def _m1_baseline(c: Connection) -> None:
         pertes_warnings JSON DEFAULT NULL,
         INDEX idx_ticket_filter (database_name, type, status, category), INDEX idx_timestamp (timestamp)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
-    c.execute(text("""CREATE TABLE IF NOT EXISTS daily_users (
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS daily_users (
         `date` VARCHAR(10) NOT NULL, client_id VARCHAR(255) NOT NULL, last_seen DATETIME NOT NULL,
         visits_count INT NOT NULL DEFAULT 0, last_ip VARCHAR(45), user_agent TEXT,
         PRIMARY KEY (`date`, client_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
-    c.execute(text("""CREATE TABLE IF NOT EXISTS logs (
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS logs (
         id INT AUTO_INCREMENT PRIMARY KEY, ip_address VARCHAR(45) NOT NULL,
         access_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, action VARCHAR(100) NOT NULL DEFAULT 'criteria_access',
         INDEX idx_ip_time (ip_address, access_time), INDEX idx_access_time (access_time), INDEX idx_action (action)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
-    c.execute(text("CREATE TABLE IF NOT EXISTS ticket_counters (day DATE PRIMARY KEY, n INT NOT NULL) ENGINE=InnoDB"))
-    c.execute(text("""CREATE TABLE IF NOT EXISTS notification_state (
+    conn.execute(text("CREATE TABLE IF NOT EXISTS ticket_counters (day DATE PRIMARY KEY, n INT NOT NULL) ENGINE=InnoDB"))
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS notification_state (
         recipient VARCHAR(255) NOT NULL PRIMARY KEY, ticket_ids TEXT, sent_at DATETIME NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
 
 
-def _m2_tickets_outbox(c: Connection) -> None:
+def _m2_tickets_outbox(conn: Connection) -> None:
     """Version (verrouillage optimiste) + « outbox » Orange (état, tentatives, prochaine échéance)."""
-    _add_col(c, "tickets_tb", "version", "INT NOT NULL DEFAULT 0")
-    _add_col(c, "tickets_tb", "orange_sync_state", "VARCHAR(16) NOT NULL DEFAULT 'pending'")
-    _add_col(c, "tickets_tb", "orange_attempts", "INT NOT NULL DEFAULT 0")
-    _add_col(c, "tickets_tb", "orange_next_retry_at", "DATETIME NULL")
-    _add_col(c, "tickets_tb", "orange_last_error", "VARCHAR(255) NULL")
+    _add_col(conn, "tickets_tb", "version", "INT NOT NULL DEFAULT 0")
+    _add_col(conn, "tickets_tb", "orange_sync_state", "VARCHAR(16) NOT NULL DEFAULT 'pending'")
+    _add_col(conn, "tickets_tb", "orange_attempts", "INT NOT NULL DEFAULT 0")
+    _add_col(conn, "tickets_tb", "orange_next_retry_at", "DATETIME NULL")
+    _add_col(conn, "tickets_tb", "orange_last_error", "VARCHAR(255) NULL")
     # reprise de l'existant
-    c.execute(text("UPDATE tickets_tb SET orange_sync_state = 'synced' WHERE orange_sync_state = 'pending' "
+    conn.execute(text("UPDATE tickets_tb SET orange_sync_state = 'synced' WHERE orange_sync_state = 'pending' "
                    "AND external_api_ticket_id IS NOT NULL AND external_api_ticket_id <> '' AND status = 'open'"))
-    c.execute(text("UPDATE tickets_tb SET orange_sync_state = 'closed' WHERE status = 'closed' "
+    conn.execute(text("UPDATE tickets_tb SET orange_sync_state = 'closed' WHERE status = 'closed' "
                    "AND orange_sync_state IN ('pending','synced')"))
-    _add_idx(c, "tickets_tb", "idx_status_ts", "(status, timestamp)")
-    _add_idx(c, "tickets_tb", "idx_orange_sync", "(orange_sync_state, orange_next_retry_at)")
-    _add_idx(c, "tickets_tb", "uq_external_ticket", "(external_api_ticket_id)", unique=True)
+    _add_idx(conn, "tickets_tb", "idx_status_ts", "(status, timestamp)")
+    _add_idx(conn, "tickets_tb", "idx_orange_sync", "(orange_sync_state, orange_next_retry_at)")
+    _add_idx(conn, "tickets_tb", "uq_external_ticket", "(external_api_ticket_id)", unique=True)
 
 
-def _m3_logs_datetime(c: Connection) -> None:
+def _m3_logs_datetime(conn: Connection) -> None:
     """logs.access_time : TIMESTAMP (converti selon le fuseau de session) → DATETIME locale, comme le reste du schéma."""
-    row = c.execute(text("SELECT data_type FROM information_schema.columns WHERE table_schema = DATABASE() "
+    row = conn.execute(text("SELECT data_type FROM information_schema.columns WHERE table_schema = DATABASE() "
                          "AND table_name = 'logs' AND column_name = 'access_time'")).first()
     if row and str(row[0]).lower() == "timestamp":
-        c.execute(text("ALTER TABLE logs MODIFY access_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"))
+        conn.execute(text("ALTER TABLE logs MODIFY access_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"))
 
 
-def _m4_comptes_gouvernance(c: Connection) -> None:
+def _m4_comptes_gouvernance(conn: Connection) -> None:
     """Comptes nominatifs, audit, versions de configuration, maintenance, accusés, journal de ticket, pics d'usage."""
-    c.execute(text("""CREATE TABLE IF NOT EXISTS users (
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(64) NOT NULL, display_name VARCHAR(100) NOT NULL,
         role VARCHAR(16) NOT NULL, password_hash VARCHAR(255) NOT NULL, active TINYINT(1) NOT NULL DEFAULT 1,
         must_change_password TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL, last_login_at DATETIME NULL,
         failed_logins INT NOT NULL DEFAULT 0, locked_until DATETIME NULL,
         UNIQUE KEY uq_users_username (username)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"""))
-    c.execute(text("""CREATE TABLE IF NOT EXISTS audit_log (
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS audit_log (
         id BIGINT AUTO_INCREMENT PRIMARY KEY, at DATETIME NOT NULL, actor VARCHAR(64) NOT NULL, ip VARCHAR(45) NOT NULL,
         action VARCHAR(64) NOT NULL, target VARCHAR(128) NOT NULL DEFAULT '', details JSON NULL,
         INDEX idx_audit_at (at), INDEX idx_audit_action (action)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
-    c.execute(text("""CREATE TABLE IF NOT EXISTS config_versions (
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS config_versions (
         id INT AUTO_INCREMENT PRIMARY KEY, at DATETIME NOT NULL, actor VARCHAR(64) NOT NULL, comment VARCHAR(200) NOT NULL DEFAULT '',
         config_json LONGTEXT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
-    c.execute(text("""CREATE TABLE IF NOT EXISTS maintenance_windows (
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS maintenance_windows (
         id INT AUTO_INCREMENT PRIMARY KEY, db_key VARCHAR(50) NOT NULL, starts_at DATETIME NOT NULL, ends_at DATETIME NOT NULL,
         reason VARCHAR(200) NOT NULL DEFAULT '', created_by VARCHAR(64) NOT NULL, auto_silence TINYINT(1) NOT NULL DEFAULT 0,
         INDEX idx_maintenance_db (db_key, ends_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
-    c.execute(text("""CREATE TABLE IF NOT EXISTS alert_acks (
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS alert_acks (
         ticket_id BIGINT NOT NULL PRIMARY KEY, acked_at DATETIME NOT NULL, acked_by VARCHAR(64) NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
-    c.execute(text("""CREATE TABLE IF NOT EXISTS ticket_events (
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS ticket_events (
         id BIGINT AUTO_INCREMENT PRIMARY KEY, ticket_id BIGINT NOT NULL, at DATETIME NOT NULL, kind VARCHAR(32) NOT NULL,
         message TEXT NOT NULL, actor VARCHAR(64) NOT NULL DEFAULT 'système', to_orange TINYINT(1) NOT NULL DEFAULT 0,
         orange_sent TINYINT(1) NOT NULL DEFAULT 0, INDEX idx_events_ticket (ticket_id, at),
         INDEX idx_events_orange (to_orange, orange_sent)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
-    c.execute(text("""CREATE TABLE IF NOT EXISTS usage_peaks (
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS usage_peaks (
         `day` DATE NOT NULL PRIMARY KEY, peak_viewers INT NOT NULL, peak_at DATETIME NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
-    c.execute(text("""CREATE TABLE IF NOT EXISTS ticket_feedback (
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS ticket_feedback (
         ticket_id BIGINT NOT NULL PRIMARY KEY, label VARCHAR(8) NOT NULL, given_by VARCHAR(64) NOT NULL, given_at DATETIME NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
-    _add_col(c, "tickets_tb", "validation_state", "VARCHAR(16) NOT NULL DEFAULT 'auto'")
-    _add_col(c, "tickets_tb", "last_note_value", "DECIMAL(10,3) NULL")
-    _add_col(c, "tickets_tb", "last_note_at", "DATETIME NULL")
-    _add_idx(c, "tickets_tb", "idx_validation", "(validation_state, status)")
+    _add_col(conn, "tickets_tb", "validation_state", "VARCHAR(16) NOT NULL DEFAULT 'auto'")
+    _add_col(conn, "tickets_tb", "last_note_value", "DECIMAL(10,3) NULL")
+    _add_col(conn, "tickets_tb", "last_note_at", "DATETIME NULL")
+    _add_idx(conn, "tickets_tb", "idx_validation", "(validation_state, status)")
 
 
-def _m5_historique_detecteurs(c: Connection) -> None:
+def _m5_historique_detecteurs(conn: Connection) -> None:
     """Historique local des métriques (D2), état des détecteurs « futurs » et leurs verdicts en mode ombre."""
-    c.execute(text("""CREATE TABLE IF NOT EXISTS metrics_5min (
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS metrics_5min (
         db_key VARCHAR(50) NOT NULL, ts DATETIME NOT NULL, traffic_gbps DOUBLE NULL, loss_pct DOUBLE NULL,
         latency_ms DOUBLE NULL, tcp_no_response_pct DOUBLE NULL, tcp_block_wp_up_pct DOUBLE NULL, dns_malformed_pct DOUBLE NULL,
         PRIMARY KEY (db_key, ts), INDEX idx_metrics_ts (ts)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
-    c.execute(text("""CREATE TABLE IF NOT EXISTS detector_settings (
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS detector_settings (
         detector VARCHAR(32) NOT NULL PRIMARY KEY, enabled TINYINT(1) NOT NULL DEFAULT 1, trained_at DATETIME NULL,
         metrics_json TEXT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
-    c.execute(text("""CREATE TABLE IF NOT EXISTS detector_verdicts (
+    conn.execute(text("""CREATE TABLE IF NOT EXISTS detector_verdicts (
         id BIGINT AUTO_INCREMENT PRIMARY KEY, detector VARCHAR(32) NOT NULL, db_key VARCHAR(50) NOT NULL, ts DATETIME NOT NULL,
         score DOUBLE NULL, explanation TEXT NOT NULL, created_at DATETIME NOT NULL,
         UNIQUE KEY uq_verdict (detector, db_key, ts), INDEX idx_verdict_ts (ts)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""))
 
 
-def _m6_archive_logs(c: Connection) -> None:
+def _m6_archive_logs(conn: Connection) -> None:
     """L'ancienne table ``logs`` (actions de configuration par IP) est remplacée par ``audit_log`` (qui, quoi, depuis où, avec le détail).
 
     On la RENOMME en ``logs_archived`` au lieu de la supprimer : aucune donnée n'est détruite par une migration automatique.
     Un administrateur peut la supprimer à la main (``DROP TABLE logs_archived``) après vérification.
     """
-    names = {r[0] for r in c.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()"))}
+    names = {r[0] for r in conn.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()"))}
     if "logs" in names and "logs_archived" not in names:
-        c.execute(text("RENAME TABLE logs TO logs_archived"))
+        conn.execute(text("RENAME TABLE logs TO logs_archived"))
 
 
 MIGRATIONS = [
@@ -412,16 +412,16 @@ def ensure_schema() -> bool:
     if is_sqlite():
         return _ensure_schema_sqlite()
     try:
-        with local_tx() as c:
-            c.execute(text("CREATE TABLE IF NOT EXISTS schema_version (version INT PRIMARY KEY, "
+        with local_tx() as conn:
+            conn.execute(text("CREATE TABLE IF NOT EXISTS schema_version (version INT PRIMARY KEY, "
                            "name VARCHAR(100) NOT NULL, applied_at DATETIME NOT NULL) ENGINE=InnoDB"))
-            applied = {r[0] for r in c.execute(text("SELECT version FROM schema_version"))}
+            applied = {r[0] for r in conn.execute(text("SELECT version FROM schema_version"))}
         for version, name, fn in MIGRATIONS:
             if version in applied:
                 continue
-            with local_tx() as c:
-                fn(c)
-                c.execute(text("INSERT INTO schema_version (version, name, applied_at) VALUES (:v, :n, :t)"),
+            with local_tx() as conn:
+                fn(conn)
+                conn.execute(text("INSERT INTO schema_version (version, name, applied_at) VALUES (:v, :n, :t)"),
                           {"v": version, "n": name, "t": fmt(now_local().replace(tzinfo=None))})
             logger.info("Migration %s appliquée : %s", version, name)
         return True
