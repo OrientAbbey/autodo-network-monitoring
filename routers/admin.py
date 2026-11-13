@@ -334,6 +334,7 @@ class TrainBody(BaseModel):
 
 
 def _train(key: str, body: TrainBody) -> dict:
+    """Entraîne le détecteur `key` (« quality » : un modèle global ; sinon une forêt d'isolation par base), enregistre l'entraînement en mode ombre et retourne le résumé. Lève NotEnoughData si l'historique est insuffisant."""
     anomaly_ml.require_ml()                       # « bibliothèque absente » (501) prime sur « pas assez de données » (422)
     if key == "quality":
         metrics = anomaly_ml.train_quality()

@@ -90,6 +90,7 @@ def _rows(conn, stmt, ts: list, **extra) -> dict:
 
 
 def _collect_one(db_key: str, timestamps: list, latest_alert_ts: datetime, want_monitoring: bool) -> DbSnapshot:
+    """Lit les relevés d'UNE base DIAGNET (instantané + mode 7 jours) ; en cas d'échec, retourne un instantané `ok=False` avec l'erreur au lieu de lever."""
     snap = DbSnapshot(db_key)
     if settings.diagnet_source == "fake":                       # démo : aucune base DIAGNET interrogée
         try:

@@ -124,6 +124,7 @@ def format_sse(event: dict) -> str:
 
 @dashboard_router.get("/events")
 async def sse_events(request: Request):
+    """Flux temps réel (Server-Sent Events) : signale aux navigateurs qu'un nouveau cycle est disponible ; limité à `max_sse_subscribers` connexions."""
     app = request.app
     if len(app.state.sse_subscribers) >= settings.max_sse_subscribers:
         raise HTTPException(503, "Trop de connexions temps réel")

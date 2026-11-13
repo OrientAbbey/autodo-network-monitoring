@@ -260,6 +260,7 @@ def _bucket_means(rows: list[tuple]) -> dict[int, float]:
 
 
 def _build_sparklines(now: datetime) -> dict:
+    """Mini-courbes : trafic moyen par tranche pour chaque base, et valeur « attendue » = médiane du même créneau sur les jours précédents (au moins 3 jours d'historique, sur 8 jours lus)."""
     since = now - timedelta(days=8)
     with local_conn() as conn:
         rows = conn.execute(text("SELECT db_key, ts, traffic_gbps FROM metrics_5min WHERE ts >= :s AND traffic_gbps IS NOT NULL "

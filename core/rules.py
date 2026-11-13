@@ -36,7 +36,7 @@ def detect_traffic(recent: list, cfg: dict) -> Verdict:
     """``recent`` : valeurs du plus ancien au plus récent (la valeur « J-1 » en est exclue)."""
     n_drops = cfg["traffic_consecutive_drops_count"]
     min_zero = cfg.get("zero_traffic_min_samples", 1)
-    if any(v is None for v in recent[-(n_drops + 1):]):
+    if any(value is None for value in recent[-(n_drops + 1):]):
         return Verdict(False, "Données manquantes - évaluation impossible")
     values = list(recent)
     if not values:
@@ -45,8 +45,8 @@ def detect_traffic(recent: list, cfg: dict) -> Verdict:
     # 1) trafic nul
     if values[-1] == 0:
         zeros = 0
-        for v in reversed(values):
-            if v != 0:
+        for value in reversed(values):
+            if value != 0:
                 break
             zeros += 1
         if zeros >= min_zero:
@@ -74,7 +74,7 @@ def detect_traffic(recent: list, cfg: dict) -> Verdict:
             if first >= min_pct:
                 return Verdict(True, f"{n_drops} diminutions consécutives détectées "
                                      f"(première baisse: {first:.1f}% ≥ {min_pct:.1f}%) "
-                                     f"({' → '.join(f'{v:.1f}' for v in w)} Gb/s) - "
+                                     f"({' → '.join(f'{value:.1f}' for value in w)} Gb/s) - "
                                      f"Détail: [{', '.join(f'{abs(d):.1f}%' for d in var)}]", first, 3)
     return Verdict(False, "Traffic conditions normal")
 
@@ -83,7 +83,7 @@ def detect_pertes(recent: list, cfg: dict) -> Verdict:
     count = cfg.get("pertes_consecutive_count", 1)
     thr = cfg["alert_pertes_threshold"]
     tail = list(recent)[-count:]
-    if not tail or any(v is None for v in tail):
+    if not tail or any(value is None for value in tail):
         return Verdict(False)
     if len(tail) >= min(count, len(recent)) and all(p >= thr for p in tail):
         return Verdict(True, f"Pertes critiques détectées: {max(tail):.2f}% ≥ seuil {thr}%", max(tail), 1)
@@ -109,20 +109,21 @@ def original_value(ticket_type: str, last_values: list, category: int | None, cf
     pick = lambda i: last_values[max(-n, min(i, n - 1))]       # noqa: E731
     if ticket_type == "traffic":
         if category in (1, 2):
-            v = pick(-2)
+            reference_sample = pick(-2)
         elif category == 3:
-            v = pick(1)
+            reference_sample = pick(1)
         else:
-            v = pick(-1)
+            reference_sample = pick(-1)
     elif ticket_type == "pertes":
-        v = pick(-cfg.get("pertes_consecutive_count", 1))
+        reference_sample = pick(-cfg.get("pertes_consecutive_count", 1))
     else:
-        v = pick(-1)
-    return float(v["value"]), v["timestamp"]
+        reference_sample = pick(-1)
+    return float(reference_sample["value"]), reference_sample["timestamp"]
 
 
 def closure_criterion_met(ticket_type: str, current: float | None, original: float, category: int,
                           mode7d: float | None, cfg: dict) -> bool:
+    """Vrai si la valeur courante satisfait le critère de rétablissement du type de ticket (pertes sous le seuil, trafic revenu près de son niveau d'origine ou du mode 7 jours, base de nouveau fraîche)."""
     if current is None:
         return False
     if ticket_type == "pertes":
@@ -268,6 +269,7 @@ def plan_actions(traffic_alert: bool, pertes_alert: bool, has_traffic_ticket: bo
 # ============================================================================
 def build_description(ticket_type: str, site: str, reason: str, value: float, ts: str,
                       connection_failed: bool = False, failure_reason: str = "") -> str:
+    """Texte du ticket envoyé à Orange : alerte de trafic/pertes, ou défaut de connexion à la base (`connection_failed`)."""
     if connection_failed:
         head = f"[DATABASE CONNECTION FAILURE - {ticket_type.upper()}] Perte de connexion à la base de données {site}. Raison: {failure_reason}. "
         if ticket_type == "traffic":

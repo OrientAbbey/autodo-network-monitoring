@@ -167,29 +167,30 @@ def run_cycle() -> dict:
     return stats
 
 
-def _process_monitoring(snaps: dict, alert_ts: list, now_str: str, cfg: dict, overrides: dict | None = None) -> dict:
+def _process_monitoring(snapshots_by_base: dict, alert_ts: list, now_str: str, cfg: dict, overrides: dict | None = None) -> dict:
+    """Évalue chaque base d'un cycle : détecte, crée/met à jour/ferme les tickets (une seule transaction), notifie, puis alimente l'historique et les détecteurs en mode ombre. Retourne les compteurs du cycle."""
     overrides = overrides or {}
     # maintenance + silences après rejet : lus UNE fois, à l'heure RÉELLE (le checkpoint est arrondi jusqu'à 5 min en arrière :
     # une fenêtre ouverte « maintenant » ne s'appliquerait pas)
     silenced = governance.silenced_databases()
     open_list = tickets.load_open()                              # UNE lecture par cycle
-    index = {(t["database_name"], t["type"]): t for t in open_list}
-    cs = tickets.ChangeSet()
-    orange_on = get_orange().configured
+    open_ticket_by_base_and_type = {(t["database_name"], t["type"]): t for t in open_list}
+    changes = tickets.ChangeSet()
+    orange_enabled = get_orange().configured
     id_factory = tickets.next_id
     checkpoint = parse(now_str)
-    n_db = 0
-    n_silenced = 0
-    for db_key, snap in snaps.items():
+    evaluated_bases = 0
+    silenced_bases = 0
+    for db_key, snap in snapshots_by_base.items():
         try:
             # M-05 : un incident de SUPERVISION (base injoignable) n'est pas un incident RÉSEAU → pas de ticket Orange
             if not snap.ok:
-                n = state.source_failures.get(db_key, 0) + 1
-                state.source_failures[db_key] = n
-                if n >= cfg["source_unreachable_cycles"] and db_key not in state.unreachable_notified:
+                consecutive_failures = state.source_failures.get(db_key, 0) + 1
+                state.source_failures[db_key] = consecutive_failures
+                if consecutive_failures >= cfg["source_unreachable_cycles"] and db_key not in state.unreachable_notified:
                     state.unreachable_notified.add(db_key)
                     notify.notify_internal(f"Source DIAGNET injoignable : {db_key}",
-                                           f"La base {db_key} est injoignable depuis {n} cycles.\nDernière erreur : {snap.error}")
+                                           f"La base {db_key} est injoignable depuis {consecutive_failures} cycles.\nDernière erreur : {snap.error}")
                 continue
             if state.source_failures.pop(db_key, 0) and db_key in state.unreachable_notified:
                 state.unreachable_notified.discard(db_key)
@@ -197,45 +198,45 @@ def _process_monitoring(snaps: dict, alert_ts: list, now_str: str, cfg: dict, ov
             if not alerts_enabled(db_key, cfg):
                 continue
             if governance.is_silenced(db_key, silenced):
-                n_silenced += 1                      # aucune création ni mise à jour de ticket pendant la maintenance
+                silenced_bases += 1                      # aucune création ni mise à jour de ticket pendant la maintenance
                 continue
             db_cfg = config_for(db_key, cfg, overrides)      # seuils globaux + surcharges de CETTE base
-            n_db += 1
+            evaluated_bases += 1
             stamps, traffic, loss = build_series(snap, alert_ts)
-            tv = [{"timestamp": s, "value": v} for s, v in zip(stamps, traffic, strict=True)]
-            lv = [{"timestamp": s, "value": v} for s, v in zip(stamps, loss, strict=True)]
+            traffic_samples = [{"timestamp": s, "value": v} for s, v in zip(stamps, traffic, strict=True)]
+            loss_samples = [{"timestamp": s, "value": v} for s, v in zip(stamps, loss, strict=True)]
             # (J-1 en tête de série ; la détection n'examine que les valeurs récentes)
-            ctx = tickets.DbContext(
-                db_key=db_key, now=now_str, traffic_values=tv, loss_values=lv,
+            db_context = tickets.DbContext(
+                db_key=db_key, now=now_str, traffic_values=traffic_samples, loss_values=loss_samples,
                 traffic=rules.detect_traffic(traffic[1:], db_cfg), pertes=rules.detect_pertes(loss[1:], db_cfg),
-                mode7d=snap.mode7d, cfg=db_cfg, orange_enabled=orange_on)
-            tt, pt = index.get((db_key, "traffic")), index.get((db_key, "pertes"))
-            actions = rules.plan_actions(ctx.traffic.alert, ctx.pertes.alert, tt is not None, pt is not None)
-            tickets.apply_actions(ctx, actions, {"traffic": tt, "pertes": pt}, cs, id_factory)
+                mode7d=snap.mode7d, cfg=db_cfg, orange_enabled=orange_enabled)
+            open_traffic_ticket, open_loss_ticket = open_ticket_by_base_and_type.get((db_key, "traffic")), open_ticket_by_base_and_type.get((db_key, "pertes"))
+            actions = rules.plan_actions(db_context.traffic.alert, db_context.pertes.alert, open_traffic_ticket is not None, open_loss_ticket is not None)
+            tickets.apply_actions(db_context, actions, {"traffic": open_traffic_ticket, "pertes": open_loss_ticket}, changes, id_factory)
 
             last_local = utc_naive_to_local_naive(snap.last_update) if snap.last_update else None
             fresh, minutes = rules.db_freshness(last_local, checkpoint, db_cfg)
             if fresh == "unknown":
                 logger.warning("[%s] Aucune donnée dans la base — fraîcheur inconnue (pas de ticket)", db_key)
             tickets.apply_db_down(db_key, fresh, minutes, fmt(last_local) if last_local else None, now_str, db_cfg,
-                                  index.get((db_key, "db_down")), cs, orange_on, id_factory)
+                                  open_ticket_by_base_and_type.get((db_key, "db_down")), changes, orange_enabled, id_factory)
         except Exception:
             logger.exception("Échec du traitement de %s (cycle poursuivi pour les autres bases)", db_key)
 
-    conflicts = tickets.persist(cs)
-    created = list(cs.inserts)
+    conflicts = tickets.persist(changes)
+    created = list(changes.inserts)
     announced = tickets.visible_to_recipients(created)           # une création en attente de validation n'est PAS annoncée par e-mail
     if announced:                                                # (l'e-mail part à l'approbation : voir routers/tickets.py)
-        closed_ids = {tid for tid, f in cs.updates.items() if f.get("status") == "closed"}
+        closed_ids = {tid for tid, f in changes.updates.items() if f.get("status") == "closed"}
         still_open = tickets.visible_to_recipients([t for t in open_list if t["id"] not in closed_ids] + created)
         notify.notify_new_tickets(announced, still_open)
     # Historique local puis détecteurs « futurs » en mode ombre : aucun des deux ne peut faire échouer le cycle ni toucher un ticket
-    rows_recorded = history.record_snapshots(snaps)
-    shadow_verdicts = sum(shadow.run_shadow(snaps, created).values())
+    rows_recorded = history.record_snapshots(snapshots_by_base)
+    shadow_verdicts = sum(shadow.run_shadow(snapshots_by_base, created).values())
     kinds: dict[str, int] = {}
-    for kind, *_ in cs.events:
+    for kind, *_ in changes.events:
         kinds[kind] = kinds.get(kind, 0) + 1
-    return {"bases_evaluees": n_db, "bases_en_silence": n_silenced, "tickets_crees": len(created), "tickets_maj": len(cs.updates), "conflits": len(conflicts), "historique": rows_recorded, "ombre": shadow_verdicts, **kinds}
+    return {"bases_evaluees": evaluated_bases, "bases_en_silence": silenced_bases, "tickets_crees": len(created), "tickets_maj": len(changes.updates), "conflits": len(conflicts), "historique": rows_recorded, "ombre": shadow_verdicts, **kinds}
 
 
 # ============================================================================
@@ -274,6 +275,7 @@ def job_watchdog() -> None:
 
 
 def register_jobs(scheduler) -> None:
+    """Enregistre les tâches périodiques : cycle de supervision (toutes les 5 min), synchronisation et réconciliation Orange, vidage des visites, pic de spectateurs, chien de garde, purges nocturnes."""
     from apscheduler.triggers.cron import CronTrigger
     from apscheduler.triggers.interval import IntervalTrigger
     tz = constants.CAMEROON_TZ

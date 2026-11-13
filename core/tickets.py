@@ -315,6 +315,7 @@ class DbContext:
 def _new_ticket(ctx: DbContext, ttype: str, values: list, reason: str, category: int,
                 id_factory: Callable[[], int], *, description: str | None = None,
                 timestamp: str | None = None) -> dict:
+    """Construit le dictionnaire d'un nouveau ticket à partir du contexte de la base et de la valeur d'origine retenue par les règles."""
     value, ts = rules.original_value(ttype, values, category, ctx.cfg)
     ts = timestamp or ts or ctx.now
     desc = description or rules.build_description(ttype, ctx.site, reason, value, ts, ctx.connection_failed, ctx.failure_reason)

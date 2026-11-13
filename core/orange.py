@@ -80,6 +80,7 @@ class OrangeClient:
 
     # ------------------------------------------------------------------ jeton
     def _get_token(self, force: bool = False) -> str | None:
+        """Retourne le jeton OAuth (renouvelé s'il expire dans moins de 60 s ou si `force`), ou None si l'authentification échoue."""
         with self._token_lock:                       # un seul thread renouvelle, les autres réutilisent
             if not force and self._token and time.monotonic() < self._token_exp - 60:
                 return self._token
@@ -103,6 +104,7 @@ class OrangeClient:
     # ------------------------------------------------------------------ requête protégée
     def _call(self, method: str, url: str, *, json: dict | None = None, headers: dict | None = None,
               params: dict | None = None, _retry_auth: bool = True) -> Result:
+        """Appel HTTP unique vers l'API Orange : disjoncteur, jeton OAuth, limiteur de débit ; traduit chaque issue en `Result` (réessayable ou non, ambiguë si une requête POST a pu partir)."""
         if not self.breaker.allow():
             return Result(False, retryable=True, error="circuit ouvert (API Orange indisponible)")
         token = self._get_token()
@@ -214,6 +216,7 @@ def _retry_after(r: requests.Response) -> float | None:
 # SYNCHRONISATION (jobs périodiques)
 # ============================================================================
 def _schedule_retry(t: dict, res: Result, now: str, new_state: str, on_failed: Callable | None = None) -> None:
+    """Programme le prochain essai de synchronisation d'un ticket, ou le marque « failed » si l'erreur n'est pas réessayable ou si le nombre maximal de tentatives est atteint."""
     attempts = int(t.get("orange_attempts") or 0) + 1
     if not res.retryable or attempts >= settings.orange_max_attempts:
         tickets.update_fields(t["id"], {"orange_sync_state": "failed", "orange_attempts": attempts,
