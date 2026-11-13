@@ -24,9 +24,7 @@ a.btn-primary:hover, a.btn-secondary:hover { text-decoration: none; }
 /* ---------- pastilles d'état : toujours icône + texte, jamais la couleur seule ---------- */
 .chip { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 2px var(--sp-2); border-radius: 999px; border: 1px solid currentColor;
   font-size: var(--fs-xs); font-weight: var(--fw-bold); line-height: 1.4; white-space: nowrap; }
-.chip-ok { color: var(--ok); }
 .chip-bad { color: var(--bad); }
-.chip-warn { color: var(--warn); }
 .chip-muted { color: var(--text-muted); }
 
 /* ---------- barre d'application (les 4 pages) : titre · état · actions (≤ 6) ---------- */
@@ -73,7 +71,6 @@ a.btn-primary:hover, a.btn-secondary:hover { text-decoration: none; }
 .menu-item:hover, .menu-item:focus-visible { background: var(--surface-2); }
 .menu-item .menu-icon { width: 1.4em; text-align: center; }
 .menu-separator { height: 1px; margin: var(--sp-1) 0; background: var(--border); }
-.menu-group-label { padding: var(--sp-2) var(--sp-3) var(--sp-1); font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* écrans étroits (< 1100 px) : barre ≤ 64 px (titre + état + bouton menu) ; les actions s'ouvrent dessous */
 @media (max-width: 1100px) {

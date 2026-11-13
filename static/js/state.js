@@ -19,8 +19,6 @@ const STATE = {
 
 // ====== ACCÈS DOM ======
 const DOM = {
-    get alertesBadge() { return document.getElementById('alertes-badge'); },
-    get alertesBadgeOpen() { return document.getElementById('alertes-badge-open'); },
     get alertPopup() { return document.getElementById('alert-popup'); },
     get alertPopupMessage() { return document.getElementById('alert-popup-message'); },
     get refreshBtn() { return document.getElementById('refreshBtn'); },
@@ -33,14 +31,6 @@ const DOM = {
     get tableWrapperGi() { return document.getElementById('table-wrapper-gi'); },
     get tableWrapperInternationalGi() { return document.getElementById('table-wrapper-international_gi'); },
     get tableWrapperTdd() { return document.getElementById('table-wrapper-tdd'); },
-    get helpDialog() { return document.getElementById('help-dialog'); },
-    get helpIcon() { return document.getElementById('helpIcon'); },
     get sectionsGrid() { return document.getElementById('sections-grid'); },
-    getTableWrapperRoaming: (interval) => document.getElementById(`table-wrapper-roaming-${interval}`),
-    createCloseBtn() {
-        const btn = document.createElement('button');
-        btn.innerHTML = '✕';
-        btn.className = 'alertes-badge-close';
-        return btn;
-    }
+    getTableWrapperRoaming: (interval) => document.getElementById(`table-wrapper-roaming-${interval}`)
 };

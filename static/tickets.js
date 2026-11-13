@@ -203,9 +203,7 @@
                     active.push(`Time: <b>${labels[filters.time]}</b>`);
                 }
                 document.getElementById('activeFilters').innerHTML = active.length > 0 ? `Active Filters: ${active.join(' | ')}` : '';
-            },
-
-            openSummaryTable: () => window.location.href = '/'
+            }
         };
 
         // Load criteria on page load for filtering purposes only
@@ -264,7 +262,7 @@ document.addEventListener('click', (e) => {
     if (!el) return;
     const actions = {
         toggleFilters: () => UI.toggleFilters(), applyFilters: () => Filters.apply(), clearFilters: () => Filters.clear(),
-        goDashboard: () => { window.location.href = '/'; }, refresh: () => Data.fetch(),
+        refresh: () => Data.fetch(),
     };
     (actions[el.dataset.action] || (() => {}))();
 });

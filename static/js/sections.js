@@ -110,54 +110,9 @@ const SectionManager = {
     }
 };
 
-// ====== VISIBILITÉ DES SECTIONS ======
-const SectionVisibility = {
-    // Applique la visibilité selon l'objet de config reçu du backend
-    applyFromConfig(cfg) {
-        const map = {
-            international: cfg.alerts_enable_international ?? true,
-            gi: cfg.alerts_enable_gi ?? true,
-            international_gi: cfg.alerts_enable_international_gi ?? false,
-            roaming: cfg.alerts_enable_roaming ?? false,
-            tdd: cfg.alerts_enable_tdd ?? false
-        };
-        this.apply(map);
-    },
-
-    // Lit l'état des cases à cocher du panneau et applique
-    applyFromCheckboxes() {
-        const map = {
-            international: !!document.getElementById('alerts_enable_international')?.checked,
-            gi: !!document.getElementById('alerts_enable_gi')?.checked,
-            international_gi: !!document.getElementById('alerts_enable_international_gi')?.checked,
-            roaming: !!document.getElementById('alerts_enable_roaming')?.checked,
-            tdd: !!document.getElementById('alerts_enable_tdd')?.checked
-        };
-        this.apply(map);
-    },
-
-    // Applique une map {sectionId: visibleBool}
-    apply(visibilityMap) {
-        STATE.sections.forEach(sectionId => {
-            const visible = visibilityMap[sectionId] !== false; // défaut à true
-            const sectionEl = document.getElementById(`section-${sectionId}`);
-            if (!sectionEl) return;
-            sectionEl.style.display = visible ? '' : 'none';
-
-            // Gérer aussi la sous-section des alertes liée
-            const alertSection = document.getElementById(`section-alertes-${sectionId}`);
-            if (alertSection) {
-                alertSection.style.display = visible ? '' : 'none';
-            }
-        });
-    }
-};
-
-
-// ====== GRILLE ET GLISSER-DÉPOSER DES SECTIONS ======
+// ====== ORDRE DES SECTIONS DE LA GRILLE ======
 const GridManager = {
-    dragSrcEl: null,
-    orderKey: 'sections_order_v1',
+    legacyOrderStorageKey: 'sections_order_v1',      // ancien ordre persisté (glisser-déposer retiré) : purgé au démarrage
 
     init() {
         const grid = DOM.sectionsGrid;
@@ -166,38 +121,7 @@ const GridManager = {
         // Appliquer l'ordre canonique demandé: international, gi, international_gi, roaming, tdd
         this.applyOrder(grid, STATE.sections);
 
-        // Supprimer tout ordre précédent persisté pour éviter la réapplication
-        try { localStorage.removeItem(this.orderKey); } catch (e) { /* ignore */ }
-
-        // Drag-and-drop désactivé
-    },
-
-    getDragAfterElement(container, y, x) {
-        const draggableElements = [...container.querySelectorAll('section.data-section:not(.dragging)')];
-        // Trouver l'élément après lequel insérer en se basant sur Y (et X pour grille)
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - (box.top + box.height / 2);
-            if (offset < 0 && offset > closest.offset) {
-                return { offset, element: child };
-            } else {
-                return closest;
-            }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
-    },
-
-    saveCurrentOrder(grid) {
-        const order = [...grid.querySelectorAll('section.data-section')].map(s => s.dataset.sectionId);
-        try { localStorage.setItem(this.orderKey, JSON.stringify(order)); } catch (e) { /* ignore */ }
-    },
-
-    restoreOrder(grid) {
-        let order = null;
-        try { order = JSON.parse(localStorage.getItem(this.orderKey) || 'null'); } catch (e) { order = null; }
-        if (!order || !Array.isArray(order) || order.length === 0) return;
-
-        const map = Object.fromEntries([...grid.children].map(c => [c.dataset.sectionId, c]));
-        order.forEach(id => { if (map[id]) grid.appendChild(map[id]); });
+        try { localStorage.removeItem(this.legacyOrderStorageKey); } catch (e) { /* stockage indisponible : sans conséquence */ }
     },
 
     applyOrder(grid, orderArray) {
