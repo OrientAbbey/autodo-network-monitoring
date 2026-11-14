@@ -11,11 +11,11 @@ const AlertManager = {
     /** Résumé affiché : celui du SERVEUR (indépendant des filtres d'affichage) ; à défaut, calculé depuis les alertes reçues. */
     summary(allAlertes) {
         if (STATE.alertSummary) return STATE.alertSummary;
-        const open = (allAlertes || []).filter(a => this.isActionable(a));
+        const open = (allAlertes || []).filter(alerte => this.isActionable(alerte));
         const byDb = {};
-        open.forEach(a => { if (a.db) (byDb[a.db] = byDb[a.db] || new Set()).add(a.type.toLowerCase()); });
+        open.forEach(alerte => { if (alerte.db) (byDb[alerte.db] = byDb[alerte.db] || new Set()).add(alerte.type.toLowerCase()); });
         return { open: open.length, bases: Object.keys(byDb), by_db: Object.fromEntries(Object.entries(byDb).map(([k, v]) => [k, [...v].sort()])),
-            by_type: { traffic: open.filter(a => a.type === 'TRAFFIC').length, pertes: open.filter(a => a.type === 'PERTES').length, db_down: 0 } };
+            by_type: { traffic: open.filter(alerte => alerte.type === 'TRAFFIC').length, pertes: open.filter(alerte => alerte.type === 'PERTES').length, db_down: 0 } };
     },
 
     typeLabel(type) {
@@ -68,17 +68,17 @@ const AlertManager = {
      * Quand quelqu'un clique « Ok », l'accusé est enregistré côté serveur : la pop-up se ferme chez tous les spectateurs.
      */
     checkNewAlertes(allAlertes) {
-        const actionable = allAlertes.filter(a => this.isActionable(a));
+        const actionable = allAlertes.filter(alerte => this.isActionable(alerte));
         STATE.currentAlertes = actionable;
-        const unacked = actionable.filter(a => !a.acked);
+        const unacked = actionable.filter(alerte => !alerte.acked);
         const popupVisible = DOM.alertPopup && getComputedStyle(DOM.alertPopup).display !== 'none';
 
-        if (popupVisible && !(STATE.popupIds || []).some(id => unacked.some(a => a.id === id))) {
+        if (popupVisible && !(STATE.popupIds || []).some(id => unacked.some(alerte => alerte.id === id))) {
             this.closeAlertPopup();                         // acquittée ailleurs (ou fermée) : plus rien à signaler
         }
-        const fresh = unacked.filter(a => !STATE.shownIds.has(a.id));
+        const fresh = unacked.filter(alerte => !STATE.shownIds.has(alerte.id));
         if (fresh.length > 0) {
-            unacked.forEach(a => STATE.shownIds.add(a.id));
+            unacked.forEach(alerte => STATE.shownIds.add(alerte.id));
             this.showAlertPopup(unacked);
         }
         STATE.isFirstLoad = false;
@@ -90,10 +90,10 @@ const AlertManager = {
         const popup = DOM.alertPopup;
         const message = DOM.alertPopupMessage;
         if (!popup || !message || alertes.length === 0) return;
-        STATE.popupIds = alertes.map(a => a.id);
-        const label = a => a.title || a.message || '';
+        STATE.popupIds = alertes.map(alerte => alerte.id);
+        const label = alerte => alerte.title || alerte.message || '';
         clear(message);
-        message.appendChild(el('ul', { class: 'popup-alerts' }, alertes.slice(0, 5).map(a => el('li', { text: label(a) }))));
+        message.appendChild(el('ul', { class: 'popup-alerts' }, alertes.slice(0, 5).map(alerte => el('li', { text: label(alerte) }))));
         if (alertes.length > 5) message.appendChild(el('p', { class: 'hint', text: t('alert.and_more', { count: alertes.length - 5 }) }));
         popup.style.display = 'flex';
         this._lastFocus = document.activeElement;
@@ -164,8 +164,8 @@ const AlertManager = {
             const panel = document.getElementById(`section-alertes-${section}`);
             if (panel) panel.hidden = sectionAlertes.length === 0;      // rien à montrer : le panneau ne prend aucune place
 
-            const openAlertes = sectionAlertes.filter(a => a.status === 'open');
-            const closedAlertes = sectionAlertes.filter(a => a.status === 'closed');
+            const openAlertes = sectionAlertes.filter(alerte => alerte.status === 'open');
+            const closedAlertes = sectionAlertes.filter(alerte => alerte.status === 'closed');
 
             // Check current filter settings from sidebar
             const statusFilter = document.querySelector('input[name="statusFilter"]:checked')?.value || 'all';
@@ -221,8 +221,8 @@ const AlertManager = {
             }
 
             // Separate filtered alerts by status
-            const filteredOpenAlertes = timeFilteredAlertes.filter(a => a.status === 'open');
-            const filteredClosedAlertes = timeFilteredAlertes.filter(a => a.status === 'closed');
+            const filteredOpenAlertes = timeFilteredAlertes.filter(alerte => alerte.status === 'open');
+            const filteredClosedAlertes = timeFilteredAlertes.filter(alerte => alerte.status === 'closed');
 
             // Update counter - show counts based on filters
             const alertesCount = document.getElementById(`alertes-count-${section}`);
@@ -256,18 +256,18 @@ const AlertManager = {
             let html = '';
 
             if (alertesToShow.length > 0) {
-                html = alertesToShow.map(a => {
-                    const isOpen = a.status === 'open';
-                    const titreMessage = (a.title ? `<b>${esc(a.title)}</b>` : esc(a.message || ''));
-                    return `<div class="alert" data-alerte-id="${esc(a.id)}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;${!isOpen ? 'opacity:0.7;' : ''}">
+                html = alertesToShow.map(alerte => {
+                    const isOpen = alerte.status === 'open';
+                    const titreMessage = (alerte.title ? `<b>${esc(alerte.title)}</b>` : esc(alerte.message || ''));
+                    return `<div class="alert" data-alerte-id="${esc(alerte.id)}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;${!isOpen ? 'opacity:0.7;' : ''}">
                         <span>
                             ${titreMessage}
                             <span style="margin-left:8px;padding:2px 8px;border-radius:8px;font-size:0.95em;font-weight:bold;vertical-align:middle;background:${isOpen ? 'var(--bad)' : 'var(--ok)'};color:white;">
                                 ${isOpen ? 'OPEN' : 'CLOSED'}
-                            </span>${a.validation_state === 'pending' ? `<span class="badge-pending">${esc(t('alert.pending'))}</span>` : ''}${a.acked ? `<span class="badge-acked" title="${esc(a.acked_by || '')}">✓ ${esc(t('alert.acked'))}</span>` : ''}<br>
-                            ${esc(t('alert.values'))}: ${(a.valeurs || []).map(v => (v == null ? '—' : Number(v).toFixed(3))).join(' → ')}<br>${esc(t('alert.date'))}: ${esc(a.creation_time || a.date || 'N/A')}
+                            </span>${alerte.validation_state === 'pending' ? `<span class="badge-pending">${esc(t('alert.pending'))}</span>` : ''}${alerte.acked ? `<span class="badge-acked" title="${esc(alerte.acked_by || '')}">✓ ${esc(t('alert.acked'))}</span>` : ''}<br>
+                            ${esc(t('alert.values'))}: ${(alerte.valeurs || []).map(v => (v == null ? '—' : Number(v).toFixed(3))).join(' → ')}<br>${esc(t('alert.date'))}: ${esc(alerte.creation_time || alerte.date || 'N/A')}
                         </span>
-                        ${isOpen ? `<button class="btn-secondary" style="font-size:0.8em;padding:2px 8px;" data-action="dismissAlerte" data-id="${esc(a.id)}" aria-label="${esc(t('alert.hide'))}">✕</button>` : ''}
+                        ${isOpen ? `<button class="btn-secondary" style="font-size:0.8em;padding:2px 8px;" data-action="dismissAlerte" data-id="${esc(alerte.id)}" aria-label="${esc(t('alert.hide'))}">✕</button>` : ''}
                     </div>`;
                 }).join('');
             }
@@ -303,8 +303,8 @@ const AlertManager = {
             // Retirer immédiatement l'alerte fermée du DOM
             document.querySelectorAll(`[data-alerte-id='${alerteId}']`).forEach(el => el.remove());
             // Mettre à jour l'état local
-            STATE.previousAlertes = STATE.previousAlertes.filter(a => a.id !== alerteId);
-            STATE.currentAlertes = STATE.currentAlertes.filter(a => a.id !== alerteId);
+            STATE.previousAlertes = STATE.previousAlertes.filter(alerte => alerte.id !== alerteId);
+            STATE.currentAlertes = STATE.currentAlertes.filter(alerte => alerte.id !== alerteId);
             // Recalcul minimal: si une liste devient vide, afficher le placeholder
             STATE.sections.forEach(section => {
                 const container = document.getElementById(`alertes-list-${section}`);

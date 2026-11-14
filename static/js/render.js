@@ -428,7 +428,7 @@ function updateDashboardDOM(data) {
     const dismissedAlertes = AlertManager.getDismissedAlertes();
 
     // Filtrer les alertes à afficher pour exclure celles qui sont ignorées
-    const finalAlertesToShow = allAlertes.filter(a => !dismissedAlertes.includes(a.id));
+    const finalAlertesToShow = allAlertes.filter(alerte => !dismissedAlertes.includes(alerte.id));
 
     AlertManager.updateBadge(finalAlertesToShow);
     AlertManager.checkNewAlertes(finalAlertesToShow);

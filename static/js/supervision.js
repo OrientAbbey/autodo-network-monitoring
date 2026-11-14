@@ -169,14 +169,14 @@ const Supervision = {
         const { tickets } = await api('/api/supervision/tickets-to-validate');
         clear(panel);
         panel.append(el('p', { class: 'hint', text: t('validation.hint') }), PageKit.table([
-            { label: 'ID', render: tk => `#${tk.id}` }, { label: t('tickets.type'), render: tk => tk.type }, { label: t('tickets.base'), render: tk => tk.database_name },
-            { label: t('common.date'), render: tk => tk.timestamp }, { label: t('tickets.reason'), render: tk => tk.reason || '' },
-            { label: '', render: tk => el('div', { class: 'row-actions' },
-                PageKit.button(t('validation.approve'), async () => { if (await PageKit.guard(() => api(`/tickets/api/${tk.id}/approve`, { method: 'POST' }))) this.loadValidation(panel); }, { primary: true }),
+            { label: 'ID', render: ticket => `#${ticket.id}` }, { label: t('tickets.type'), render: ticket => ticket.type }, { label: t('tickets.base'), render: ticket => ticket.database_name },
+            { label: t('common.date'), render: ticket => ticket.timestamp }, { label: t('tickets.reason'), render: ticket => ticket.reason || '' },
+            { label: '', render: ticket => el('div', { class: 'row-actions' },
+                PageKit.button(t('validation.approve'), async () => { if (await PageKit.guard(() => api(`/tickets/api/${ticket.id}/approve`, { method: 'POST' }))) this.loadValidation(panel); }, { primary: true }),
                 PageKit.button(t('validation.reject'), async () => {
-                    const reasonText = await PageKit.confirm(t('validation.reject_prompt', { id: tk.id }), { danger: true, okText: t('validation.reject'), withText: t('validation.reason') });
+                    const reasonText = await PageKit.confirm(t('validation.reject_prompt', { id: ticket.id }), { danger: true, okText: t('validation.reject'), withText: t('validation.reason') });
                     if (!reasonText) return;
-                    const out = await PageKit.guard(() => api(`/tickets/api/${tk.id}/reject`, { method: 'POST', body: { reason: reasonText === true ? '' : reasonText } }));
+                    const out = await PageKit.guard(() => api(`/tickets/api/${ticket.id}/reject`, { method: 'POST', body: { reason: reasonText === true ? '' : reasonText } }));
                     if (out) { if (out.silence_minutes) Toasts.show(t('validation.silenced', { minutes: out.silence_minutes }), { type: 'info', durationMs: 4000 }); this.loadValidation(panel); }
                 }, { danger: true })) }], tickets, { empty: t('validation.none') }));
     },
