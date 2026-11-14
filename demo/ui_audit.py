@@ -191,6 +191,9 @@ def main():
             visit("tickets_1440_light", "/tickets/", 1440, 900, ".ticket-card", theme="light", login=True)
             visit("supervision_1440_dark", "/supervision", 1440, 900, "#tab-params", login=True)
             visit("admin_1440_dark", "/admin", 1440, 900, "#tab-usage", login=True)
+            visit("tickets_390_dark", "/tickets/", 390, 844, ".ticket-card", login=True, mobile=True)
+            visit("supervision_390_dark", "/supervision", 390, 844, "#tab-params", login=True, mobile=True)
+            visit("admin_390_dark", "/admin", 390, 844, "#tab-usage", login=True, mobile=True)
             browser.close()
     finally:
         app.terminate()
