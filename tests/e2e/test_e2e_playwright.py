@@ -91,9 +91,13 @@ def test_notification_email_sent(stack):
     assert glob.glob("/tmp/autodo_demo_mail/*.eml"), "aucun e-mail reçu par le puits SMTP"
 
 
+# Le planificateur lance un cycle toutes les 5 minutes (cron :01, :06, :11…) : le suivant arrive donc au plus 300 s après le premier.
+# L'attente couvre ce pire cas (+ marge) pour ne pas dépendre de l'horloge au démarrage ; avec E2E_ALIGN=1 il arrive en ~2,5 min.
+MAX_WAIT_FOR_NEXT_CYCLE_SECONDS = CYCLE_PERIOD_S + 120
+
+
 def test_second_cycle_is_stable_no_duplicates(stack):
-    # le cycle est planifié toutes les 5 min : attendre au moins un cycle complet, quel que soit le moment du 1er
-    assert wait_cycles(stack["c0"] + 1, timeout=CYCLE_PERIOD_S + 120), "2e cycle de monitoring non observé"
+    assert wait_cycles(stack["c0"] + 1, timeout=MAX_WAIT_FOR_NEXT_CYCLE_SECONDS), "2e cycle de monitoring non observé"
     time.sleep(3)
     errs = [ln for ln in log_text().splitlines() if "Cycle de supervision en échec" in ln or "Traceback" in ln]
     assert not errs, errs[:3]
