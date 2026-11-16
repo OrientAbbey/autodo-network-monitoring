@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import text
 
+from . import db
 from .config import fmt, now_local, settings
 from .db import fetch_all, fetch_one, local_conn, local_tx
 from .logger import get_logger
@@ -157,7 +158,10 @@ def update_user(user_id: int, *, role: str | None = None, active: bool | None = 
     if role is not None and role not in ROLES:
         raise AccountError("Rôle inconnu.")
     with local_tx() as conn:
-        current = fetch_one(conn, "SELECT * FROM users WHERE id = :id FOR UPDATE", id=user_id)
+        if db.is_sqlite():
+            current = fetch_one(conn, "SELECT * FROM users WHERE id = :id", id=user_id)
+        else:
+            current = fetch_one(conn, "SELECT * FROM users WHERE id = :id FOR UPDATE", id=user_id)
         if not current:
             raise AccountError("Compte introuvable.")
         new_role = role if role is not None else current["role"]

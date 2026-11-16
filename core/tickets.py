@@ -20,7 +20,7 @@ from collections.abc import Callable
 
 from sqlalchemy import bindparam, text
 
-from . import constants, rules, ticket_log
+from . import constants, db, rules, ticket_log
 from .config import fmt, local_to_utc_naive, now_local, parse, period_to_cutoff, settings
 from .db import fetch_all, fetch_one, local_conn, local_tx
 from .logger import get_logger
@@ -546,7 +546,10 @@ def _decide(ticket_id: int, condition: str, build_fields: Callable[[dict], dict]
     si un autre superviseur est passé avant, la ligne n'est plus sélectionnée et on retourne None.
     """
     with local_tx() as conn:
-        row = fetch_one(conn, f"SELECT * FROM tickets_tb WHERE id = :id AND {condition} FOR UPDATE", id=ticket_id)
+        sql = f"SELECT * FROM tickets_tb WHERE id = :id AND {condition}"
+        if not db.is_sqlite():
+            sql += " FOR UPDATE"
+        row = fetch_one(conn, sql, id=ticket_id)
         if row is None:
             return None
         fields = {k: v for k, v in _prepare(build_fields(row)).items() if k in _UPDATABLE}

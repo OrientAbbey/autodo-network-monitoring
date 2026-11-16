@@ -27,6 +27,8 @@ logger = get_logger(__name__)
 _local_engine: Engine | None = None
 _diag_engines: dict[tuple, Engine] = {}
 _lock = threading.Lock()
+# SQLite has no row-level locks, so serialize local write transactions in this single-worker app.
+_sqlite_write_lock = threading.RLock()
 
 
 def is_sqlite() -> bool:
@@ -129,6 +131,12 @@ def dispose_all() -> None:
 @contextmanager
 def local_tx() -> Iterator[Connection]:
     """Transaction d'écriture : COMMIT à la sortie normale, ROLLBACK sur exception."""
+    if is_sqlite():
+        # SQLite n'a ni SELECT ... FOR UPDATE ni verrous de ligne. Sérialiser les
+        # transactions locales pour garder les décisions multi-étapes atomiques.
+        with _sqlite_write_lock, local_engine().begin() as conn:
+            yield conn
+        return
     with local_engine().begin() as conn:
         yield conn
 
