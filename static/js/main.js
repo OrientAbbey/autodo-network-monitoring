@@ -1,0 +1,109 @@
+// AUTODO — Initialisation, exposition globale, actions (CSP)
+// Script classique (partage la portée globale avec les autres fichiers de static/js/, chargés dans l'ordre de dashboard.html).
+
+// ====== INITIALISATION ======
+document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
+    document.querySelectorAll('.notice[data-notice-key]').forEach(n => { try { if (localStorage.getItem(n.dataset.noticeKey)) n.remove(); } catch (e) { /* ignoré */ } });
+
+    requestAnimationFrame(() => {
+        TabManager.initializeTabs();
+        AutoUpdateManager.initializeAutoUpdate();
+        GridManager.init();
+
+        // Initialize filter sidebar event listeners
+        const filterBtn = document.getElementById('filterBtn');
+        const closeSidebarBtn = document.querySelector('.close-sidebar-btn');
+        const filterOverlay = document.querySelector('.filter-sidebar-overlay');
+        const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+        const resetFiltersBtn = document.getElementById('resetFiltersBtn');
+
+        if (filterBtn) {
+            filterBtn.addEventListener('click', function () {
+                toggleFilterSidebar();
+            });
+        }
+
+        if (closeSidebarBtn) {
+            closeSidebarBtn.addEventListener('click', function () {
+                toggleFilterSidebar();
+            });
+        }
+
+        if (filterOverlay) {
+            filterOverlay.addEventListener('click', function () {
+                toggleFilterSidebar();
+            });
+        }
+
+        if (applyFiltersBtn) {
+            applyFiltersBtn.addEventListener('click', function () {
+                applyFilters();
+            });
+        }
+
+        if (resetFiltersBtn) {
+            resetFiltersBtn.addEventListener('click', function () {
+                resetFilters();
+            });
+        }
+
+        const filterInputs = document.querySelectorAll('#filterSidebar input[type="radio"], #filterSidebar input[type="checkbox"]');
+        filterInputs.forEach(input => {
+            input.addEventListener('change', (e) => {
+                try {
+                    // Handle type filter logic
+                    if (input.name === 'typeFilter') {
+                        handleTypeFilterChange(input);
+                    }
+
+                    // Show indicator that filters have been changed
+                    showFilterStatus();
+                } catch (error) {
+                    console.error('Error in filter change handler:', error);
+                }
+            });
+        });
+
+        refreshDashboardData();
+    });
+
+    window.addEventListener('error', (event) => {
+        console.error('[Global] Erreur:', event.error);
+        Toasts.show(t('live.js_error', { error: event.error?.message || '?' }), { type: 'error' });
+    }, { passive: true });
+});
+
+// ====== ACTIONS (remplacent les attributs onclick= inline, incompatibles avec la CSP) ======
+const ACTIONS = {
+    acknowledgeAlert: () => AlertManager.acknowledge(),
+    toggleAutoUpdate: () => AutoUpdateManager.toggleAutoUpdate(),
+    toggleTheme: () => toggleTheme(),
+    clearDismissedAlerts: () => AlertManager.clearDismissedAlerts(),
+    toggleSection: (titleElement) => SectionManager.toggleSection(titleElement),
+    showTab: (tabButton, event) => TabManager.showTab(tabButton.dataset.tab, tabButton.dataset.interval, event),
+    dismissAlerte: (el) => AlertManager.dismissAlerte(el.dataset.id),
+    jumpToAlert: () => AlertManager.jumpToFirst(),
+    dismissNotice: (button) => {
+        const notice = button.closest('.notice');
+        try { localStorage.setItem(notice.dataset.noticeKey, '1'); } catch (e) { /* stockage indisponible : fermé pour cette page */ }
+        notice.remove();
+    },
+    openHelp: () => UIUtils.openHelp(),
+    toggleAppBar: (button) => {
+        const bar = document.getElementById('appBar');
+        const open = bar.classList.toggle('is-open');
+        button.setAttribute('aria-expanded', String(open));
+    },
+};
+document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-action]');
+    const fn = el && ACTIONS[el.dataset.action];
+    if (fn) fn(el, e);
+});
+document.addEventListener('submit', (e) => { if (e.target.hasAttribute('data-no-submit')) e.preventDefault(); });
+// Échap acquitte la pop-up d'alerte (accessibilité clavier)
+document.addEventListener('keydown', (e) => {
+    const pop = document.getElementById('alert-popup');
+    if (e.key === 'Escape' && pop && getComputedStyle(pop).display !== 'none') AlertManager.acknowledge();
+});

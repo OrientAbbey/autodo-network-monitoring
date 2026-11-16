@@ -1,5 +1,0 @@
-# Liste des destinataires pour les notifications de tickets
-# Format: nom,email
-# Lignes commençant par # sont ignorées
-
-Orient Abbey,orient.abbey@orange.com

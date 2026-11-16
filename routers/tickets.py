@@ -1,202 +1,152 @@
-"""
-TICKETS ROUTER - Handles all ticket monitoring, creation, and management
-Integrated Orange API integration for external ticketing
-"""
+"""ROUTES TICKETS — page, API paginée, chronologie, décisions de supervision (valider, rejeter, supprimer, commenter)."""
+import asyncio
 
-import os
+import orjson
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
 
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse
-
-import core.constants as constants
-from core.database_manager import get_local_db_connection
+from core import auth, constants, db, governance, monitoring, notify, ticket_log, tickets
+from core.auth import get_real_ip
+from core.config import load_config, now_local
 from core.logger import get_logger
-from core.ticket_manager import load_tickets
-from core.utils import ttr_to_human_readable
 
 logger = get_logger(__name__)
-
-# ============================================================================
-# ROUTER
-# ============================================================================
 tickets_router = APIRouter()
+PAGE_LIMIT = 1000        # tickets envoyés à la page (les ouverts d'abord) ; le reste via /tickets/api?offset=
+supervision = auth.require_role("supervision")
 
 
-@tickets_router.get('/')
+def _json(data, status_code: int = 200) -> Response:
+    return Response(orjson.dumps(data, default=str), status_code=status_code, media_type="application/json")
+
+
+@tickets_router.get("/")
 def tickets_view(request: Request):
-    """Serve the tickets HTML view with ticket data"""
-    from main import templates
+    """Page /tickets : première page de tickets et options des filtres (types, sites, bases, statuts, périodes)."""
+    rows, total = tickets.load_page(limit=PAGE_LIMIT)
+    sites = sorted({t["site"] for t in rows if t.get("site")})
+    dbs = sorted({t["database_name"] for t in rows if t.get("database_name")})
+    filter_options = {
+        "types": [{"value": "traffic", "label": "Traffic"}, {"value": "pertes", "label": "Pertes"},
+                  {"value": "db_down", "label": "DB_DOWN"}],
+        "sites": [{"value": s, "label": s} for s in sites], "databases": [{"value": d, "label": d} for d in dbs],
+        "statuses": [{"value": "open", "label": "Open"}, {"value": "closed", "label": "Closed"}],
+        "time_periods": [{"value": "all", "label": "All Time"}, {"value": "today", "label": "Today"},
+                         {"value": "yesterday", "label": "Yesterday"}, {"value": "week", "label": "Last 7 Days"},
+                         {"value": "month", "label": "Last 30 Days"}, {"value": "current_month", "label": "Current Month"}]}
+    return request.app.state.templates.TemplateResponse(
+        request, "tickets.html", {"tickets": rows, "total": total, "filter_options": filter_options})
+
+
+@tickets_router.get("/api")
+def get_tickets(limit: int = Query(PAGE_LIMIT, ge=1, le=5000), offset: int = Query(0, ge=0),
+                status: str | None = Query(None, pattern="^(open|closed|deleted)$"),
+                type: str | None = Query(None, pattern="^(traffic|pertes|db_down)$"),
+                database: str | None = Query(None, max_length=50)):
+    rows, total = tickets.load_page(limit, offset, status, type, database)
+    return _json({"tickets": rows, "total": total, "limit": limit, "offset": offset})
+
+
+@tickets_router.get("/api/{ticket_id}/timeline")
+def ticket_timeline(ticket_id: int):
+    """Chronologie d'un ticket : ouverte à tous (même le visiteur peut comprendre l'historique d'une alerte)."""
+    if tickets.get_ticket(ticket_id) is None:
+        raise HTTPException(404, "Ticket introuvable")
+    return _json({"ticket_id": ticket_id, "events": ticket_log.timeline(ticket_id)})
+
+
+# ---------------------------------------------------------------- décisions de supervision
+class ReasonBody(BaseModel):
+    reason: str = Field("", max_length=500)
+
+
+class CommentBody(BaseModel):
+    message: str = Field(min_length=1, max_length=1500)
+    send_to_orange: bool = False
+
+
+class FeedbackBody(BaseModel):
+    label: str = Field(pattern="^(real|false)$")
+
+
+async def _announce(request: Request) -> None:
+    await monitoring.sse_publish({"type": "tickets_changed", "at": now_local().isoformat(timespec="seconds")}, request.app)
+
+
+def _email_after_approval(ticket_id: int) -> None:
+    """L'e-mail de création, retenu jusqu'ici, part maintenant (les autres tickets encore en attente n'y figurent pas)."""
+    approved = tickets.get_ticket(ticket_id)
+    if approved and approved["status"] == "open":
+        notify.notify_new_tickets([approved], tickets.visible_to_recipients(tickets.load_open()))
+
+
+@tickets_router.post("/api/{ticket_id}/approve")
+async def approve_ticket(ticket_id: int, request: Request, session=supervision):
+    ticket = await asyncio.to_thread(tickets.approve, ticket_id, session.username, monitoring.get_orange().configured)
+    if ticket is None:
+        raise HTTPException(409, "Ce ticket n'est pas (ou plus) en attente de validation")
+    governance.audit(session.username, get_real_ip(request), "ticket_approve", str(ticket_id), {"base": ticket["database_name"]})
+    await asyncio.to_thread(_email_after_approval, ticket_id)
+    await _announce(request)
+    return _json({"ok": True})
+
+
+async def _remove_ticket(action: str, ticket_id: int, body: ReasonBody, request: Request, session) -> Response:
+    """Rejet ou suppression : même effet de bord — la base concernée est mise en silence (évite que l'alerte revienne aussitôt)."""
+    function = tickets.reject if action == "reject" else tickets.delete
+    ticket = await asyncio.to_thread(function, ticket_id, session.username, body.reason.strip() or "sans motif")
+    if ticket is None:
+        raise HTTPException(409, "Action impossible sur ce ticket (déjà traité ou inexistant)")
+    minutes = int(load_config().get("rejection_silence_minutes", 0))
+    window = await asyncio.to_thread(governance.silence_after_rejection, ticket["database_name"], session.username, minutes)
+    governance.audit(session.username, get_real_ip(request), f"ticket_{action}", str(ticket_id),
+                     {"base": ticket["database_name"], "reason": body.reason, "silence_minutes": minutes if window else 0})
+    await _announce(request)
+    return _json({"ok": True, "silence_minutes": minutes if window else 0})
+
+
+@tickets_router.post("/api/{ticket_id}/reject")
+async def reject_ticket(ticket_id: int, request: Request, body: ReasonBody = ReasonBody(), session=supervision):
+    return await _remove_ticket("reject", ticket_id, body, request, session)
+
+
+@tickets_router.post("/api/{ticket_id}/delete")
+async def delete_ticket(ticket_id: int, request: Request, body: ReasonBody = ReasonBody(), session=supervision):
+    return await _remove_ticket("delete", ticket_id, body, request, session)
+
+
+@tickets_router.post("/api/{ticket_id}/comment")
+async def comment_ticket(ticket_id: int, body: CommentBody, request: Request, session=supervision):
+    if not await asyncio.to_thread(tickets.add_comment, ticket_id, session.username, body.message.strip(), body.send_to_orange):
+        raise HTTPException(404, "Ticket introuvable")
+    governance.audit(session.username, get_real_ip(request), "ticket_comment", str(ticket_id), {"send_to_orange": body.send_to_orange})
+    return _json({"ok": True})
+
+
+@tickets_router.post("/api/{ticket_id}/feedback")
+async def feedback_ticket(ticket_id: int, body: FeedbackBody, request: Request, session=supervision):
+    if not await asyncio.to_thread(tickets.set_feedback, ticket_id, body.label, session.username):
+        raise HTTPException(404, "Ticket introuvable")
+    governance.audit(session.username, get_real_ip(request), "ticket_feedback", str(ticket_id), {"label": body.label})
+    return _json({"ok": True})
+
+
+# ---------------------------------------------------------------- exploitation
+@tickets_router.get("/status")
+def get_system_status(_requires_supervision=supervision):
+    sched = constants.scheduler
+    jobs = [{"id": j.id, "next_run": j.next_run_time.strftime("%Y-%m-%d %H:%M:%S") if j.next_run_time else None}
+            for j in (sched.get_jobs() if sched else [])]
+    return _json({"status": "ok", "timestamp": now_local().isoformat(), "database": db.ping_local(),
+                  "tickets": tickets.counts(), "jobs": jobs, "monitoring": monitoring.status()})
+
+
+@tickets_router.get("/test/orange-api")
+def test_orange_api(_requires_login=auth.require_role("admin")):
+    """Diagnostic (admin) : n'expose ni identifiants ni URL complètes."""
     try:
-        tickets = load_tickets(open_only=False)
-        for i, ticket in enumerate(tickets):
-            tickets[i]["human_readable"] = ttr_to_human_readable(ticket.get("ttr_seconds"))
-
-        # Extract unique values for filters
-        sites = list(set(ticket.get('site', '') for ticket in tickets if ticket.get('site')))
-        sites = [s for s in sites if s]
-        sites.sort()
-
-        databases = list(set(ticket.get('database_name', '') for ticket in tickets if ticket.get('database_name')))
-        databases = [d for d in databases if d]
-        databases.sort()
-
-        filter_options = {
-            'types': [
-                {'value': 'traffic', 'label': 'Traffic'},
-                {'value': 'pertes', 'label': 'Pertes'},
-                {'value': 'db_down', 'label': 'DB_DOWN'}
-            ],
-            'sites': [{'value': site, 'label': site} for site in sites],
-            'databases': [{'value': db, 'label': db} for db in databases],
-            'statuses': [
-                {'value': 'open', 'label': 'Open'},
-                {'value': 'closed', 'label': 'Closed'}
-            ],
-            'time_periods': [
-                {'value': 'all', 'label': 'All Time'},
-                {'value': 'today', 'label': 'Today'},
-                {'value': 'yesterday', 'label': 'Yesterday'},
-                {'value': 'week', 'label': 'Last 7 Days'},
-                {'value': 'month', 'label': 'Last 30 Days'},
-                {'value': 'current_month', 'label': 'Current Month'}
-            ]
-        }
-
-        return templates.TemplateResponse('tickets.html', {
-            'request': request,
-            'tickets': tickets,
-            'filter_options': filter_options
-        })
-    except Exception as e:
-        logger.error(f"Error in tickets_view: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@tickets_router.get('/status')
-def get_system_status():
-    """Get comprehensive system status"""
-    try:
-        # Check database connection
-        db_connected = False
-        db_error = None
-        try:
-            with get_local_db_connection() as connection:
-                db_connected = True
-        except Exception as e:
-            db_error = str(e)
-        
-        # Get ticket counts
-        json_tickets = load_tickets(open_only=False)
-        open_tickets = [t for t in json_tickets if t['status'] == 'open']
-        closed_tickets = [t for t in json_tickets if t['status'] == 'closed']
-        
-        # Get database ticket count
-        db_ticket_count = 0
-        try:
-            with get_local_db_connection() as connection:
-                with connection.cursor(dictionary=True) as cursor:
-                    cursor.execute("SELECT COUNT(*) as count FROM tickets_tb")
-                    result = cursor.fetchone()
-            db_ticket_count = result['count'] if result else 0
-        except:
-            pass
-        
-        # Get scheduler info
-        scheduler_info = {}
-        if constants.scheduler:
-            scheduler_info = {
-                "running": constants.scheduler.running,
-                "next_run": constants.scheduler.get_jobs()[0].next_run_time.strftime('%Y-%m-%d %H:%M:%S') if constants.scheduler.get_jobs() else None
-            }
-        
-        status = {
-            "system": {
-                "status": "running",
-                "last_monitoring_update": constants.monitoring_data.get('last_update'),
-                "timezone": str(constants.CAMEROON_TZ)
-            },
-            "database": {
-                "connected": db_connected,
-                "error": db_error,
-                "host": f"{os.getenv('LOCAL_DB_HOST')}:{os.getenv('LOCAL_DB_PORT')}",
-                "database": os.getenv('LOCAL_DB_NAME')
-            },
-            "tickets": {
-                "json_total": len(json_tickets),
-                "database_total": db_ticket_count,
-                "open_tickets": len(open_tickets),
-                "closed_tickets": len(closed_tickets),
-                "sync_status": "synced" if len(json_tickets) == db_ticket_count else "out_of_sync"
-            },
-            "monitoring": {
-                "databases_monitored": len(constants.DB_CONFIGS),
-                "scheduler_running": constants.scheduler.running if constants.scheduler else False,
-                **scheduler_info
-            }
-        }
-        
-        return JSONResponse(status)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@tickets_router.get('/api')
-def get_tickets():
-    """Get all tickets as JSON"""
-    tickets = load_tickets(open_only=False)
-    for i, ticket in enumerate(tickets):
-        tickets[i]["human_readable"] = ttr_to_human_readable(ticket.get("ttr_seconds"))
-    return JSONResponse(tickets)
-
-
-@tickets_router.get('/test/orange-api')
-def test_orange_api():
-    """Endpoint to test Orange API connection and authentication"""
-    try:
-        if not constants.orange_api_client:
-            raise HTTPException(status_code=500, detail="Orange API client not initialized")
-
-        logger.debug(f"""
-        === Testing Orange API Connection ===
-        Base URL: {constants.orange_api_client.server}
-        Token Endpoint: {constants.orange_api_client.token_endpoint}
-        Trouble Ticket Endpoint: {constants.orange_api_client.trouble_ticket_endpoint}
-        ====================================
-        """)
-
-        # Test connection and token acquisition
-        success = constants.orange_api_client.test_connection()
-
-        if success:
-            message = "Orange API connection test successful!"
-            status = "success"
-
-            # Get token info if available
-            token_info = {
-                "token_obtained": bool(constants.orange_api_client.access_token),
-                "token_type": constants.orange_api_client.token_type,
-                "expires_at": constants.orange_api_client.token_expires_at.isoformat() if constants.orange_api_client.token_expires_at else None
-            }
-        else:
-            message = "Orange API connection test failed. Check network connectivity and credentials."
-            status = "failed"
-            token_info = {
-                "token_obtained": False,
-                "token_type": None,
-                "expires_at": None
-            }
-
-        return JSONResponse({
-            "status": status,
-            "message": message,
-            "orange_api": {
-                "base_url": constants.orange_api_client.server,
-                "client_id": constants.orange_api_client.client_id,
-                "token_endpoint": constants.orange_api_client.token_endpoint,
-                "trouble_ticket_endpoint": constants.orange_api_client.trouble_ticket_endpoint,
-                **token_info
-            }
-        })
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Orange API test error: {str(e)}")
-
+        return _json(monitoring.get_orange().test_connection())
+    except Exception:
+        logger.exception("Test API Orange")
+        raise HTTPException(500, "Test API Orange en échec") from None
