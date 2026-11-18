@@ -42,12 +42,12 @@ REVUE_CODE_AUTODO.md    revue de code et journal des correctifs
 ## Installation
 
 ```bash
-python3.12 -m venv .venv && . .venv/bin/activate
+python3.12 -m venv .venv && . .venv/bin/activate   # Python 3.12 requis
 pip install -r requirements.lock.txt           # versions exactes validées ; requirements.txt = bornes (<=)
 cp .env.example .env && $EDITOR .env           # ADMIN_USERNAME / ADMIN_PASSWORD : admin INITIAL (changement forcé à la 1re connexion)
 cp db_config.example.json db_config.json       # sources DIAGNET (hôte, base, site…)
 cp email_recipients.example.txt email_recipients.txt   # ou EMAIL_RECIPIENTS dans .env
-pip install -r requirements-ml.txt             # OPTIONNEL : détecteurs D4 (Isolation Forest) et D7 (qualité d'alerte)
+pip install -r requirements-ml.lock.txt        # OPTIONNEL : remplace le verrou ci-dessus, ajoute D4/D7 (Isolation Forest)
 python main.py                                 # crée/migre le schéma, crée l'admin initial, puis http://127.0.0.1:8501
 ```
 
@@ -176,7 +176,7 @@ Le cycle (thread du planificateur) publie `data_version` dans la boucle asyncio 
 (lecture seule). **D1** référence saisonnière (médiane/MAD du même créneau sur 7 jours, ≥ 3 jours requis), **D3** prévision Holt-Winters
 24 h + jours avant saturation d'un lien, **D5** ruptures de niveau (CUSUM), **D4** Isolation Forest par base et **D7** qualité d'alerte
 (validation temporelle 80/20, jamais le TTR comme variable, ≥ `MIN_LABELED_TICKETS` retours des deux classes) — D4/D7 exigent
-`requirements-ml.txt`, sinon l'API répond 501. En **mode ombre** ils tournent à chaque cycle ; `shadow_report` compare leurs épisodes aux vrais
+`requirements-ml.lock.txt`, sinon l'API répond 501. En **mode ombre** ils tournent à chaque cycle ; `shadow_report` compare leurs épisodes aux vrais
 tickets (fenêtre −30 / +60 min) : épisodes confirmés, sans ticket, tickets couverts, avance médiane. **Ces chiffres sont à lire sur vos
 données réelles avant toute décision** : les résultats du prototype (`ROADMAP.md` §3.1) viennent de séries simulées.
 
@@ -208,7 +208,7 @@ par le serveur (motifs d'alerte, audit).
 ## Tests
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -r requirements-dev.lock.txt
 pytest                                  # unitaires, sécurité, intégration, front statique (MariaDB requise ; sinon ignorés)
 ruff check . && bandit -q -r core routers main.py -ll      # seuls les B608 documentés (SQL à colonnes fixes) sont attendus
 playwright install chromium
