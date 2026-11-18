@@ -70,7 +70,7 @@ Réglages : `DB_BACKEND=sqlite` (base locale dans `DATA_DIR/<LOCAL_DB_NAME>.sqli
 ## Tests Playwright
 
 ```bash
-pip install -r requirements-dev.txt && playwright install chromium
+pip install -r requirements-dev.lock.txt && playwright install chromium
 # pile déjà démarrée (MySQL + faux Orange :9001 + puits SMTP :1025) :
 pytest tests/e2e -v            # depuis la racine du dépôt
 ```

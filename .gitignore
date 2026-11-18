@@ -54,5 +54,3 @@ email_recipients.txt
 core/email_notifications.json
 demo/scenario.json
 demo/db_config.json
-.pytest_cache/
-__pycache__/
